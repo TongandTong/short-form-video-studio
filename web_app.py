@@ -16,6 +16,14 @@ import time
 from PIL import Image
 import streamlit as st
 
+# Page Configuration - MUST be first Streamlit command
+st.set_page_config(
+    page_title="Shorts Studio - 9:16 Comparison Video Generator",
+    page_icon="🎬",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
 from config import (
     ASSETS_DIR,
     IMAGES_DIR,
@@ -29,14 +37,6 @@ from ai_script_generator import AIScriptGenerator
 from tts_engine import TTSEngine
 from video_builder import VideoBuilder
 from pipeline import hex_to_rgb
-
-# Page Configuration
-st.set_page_config(
-    page_title="Shorts Studio - 9:16 Comparison Video Generator",
-    page_icon="🎬",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
 
 # Header
 st.markdown(
@@ -53,27 +53,31 @@ st.markdown(
 
 # Sidebar: Network & Sharing Info
 with st.sidebar:
-    st.header("🌐 การแชร์ให้ผู้อื่นใช้งาน")
-    try:
-        host_name = socket.gethostname()
-        local_ip = socket.gethostbyname(host_name)
-    except Exception:
-        local_ip = "127.0.0.1"
+    st.header("🌐 การเชื่อมต่อ & การใช้งาน")
+    is_cloud = os.getenv("STREAMLIT_SHARING_HOST") is not None or "HOSTNAME" in os.environ and "streamlit" in os.environ.get("HOSTNAME", "").lower()
+    
+    if is_cloud:
+        st.success("☁️ กำลังทำงานบน Streamlit Cloud 24 ชม.")
+        st.caption("เปิดใช้งานได้จากมือถือและทุกอุปกรณ์โดยไม่ต้องเปิดคอม")
+    else:
+        try:
+            host_name = socket.gethostname()
+            local_ip = socket.gethostbyname(host_name)
+        except Exception:
+            local_ip = "127.0.0.1"
 
-    st.markdown(
-        f"""
-        **สำหรับเครื่องนี้:**  
-        `http://localhost:8501`  
+        st.markdown(
+            f"""
+            **สำหรับเครื่องนี้:**  
+            `http://localhost:8501`  
 
-        **สำหรับคนอื่นในวง Wi-Fi เดียวกัน:**  
-        `http://{local_ip}:8501`
-        """
-    )
-    st.info(
-        "💡 **ถ้าต้องการให้คนที่อยู่นอกบ้านใช้งาน:**\n"
-        "ใช้ฟรี Cloudflare Tunnel หรือ Localtunnel ได้ทันที:\n"
-        "พิมพ์ใน Terminal: `npx localtunnel --port 8501`"
-    )
+            **สำหรับคนอื่นในวง Wi-Fi เดียวกัน:**  
+            `http://{local_ip}:8501`
+            """
+        )
+        st.info(
+            "💡 **แชร์ข้ามเน็ตฟรี:** `npx localtunnel --port 8501`"
+        )
     st.divider()
     st.markdown("### 🛠️ เครื่องมือในระบบ")
     st.caption("• AI Model: Google Gemini (Deep Research)\n• Voice: Microsoft Edge Neural Thai / Google Cloud\n• Audio: Mixed with Lo-Fi BGM & Pop SFX\n• Video: 1080x1920 30FPS H.264")
