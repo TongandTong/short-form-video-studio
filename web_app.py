@@ -83,18 +83,38 @@ with st.sidebar:
     st.caption("• AI Model: Google Gemini (Deep Research)\n• Voice: Microsoft Edge Neural Thai / Google Cloud\n• Audio: Mixed with Lo-Fi BGM & Pop SFX\n• Video: 1080x1920 30FPS H.264")
 
 # Initialize Session State
+# Initialize Session State
 if "script_data" not in st.session_state:
     st.session_state.script_data = {
         "topic": "กาแฟดริป VS กาแฟแคปซูล",
         "name_a": "กาแฟดริป",
         "name_b": "กาแฟแคปซูล",
-        "research_summary": "เปรียบเทียบกาแฟดริปที่เน้นความสุนทรีย์ กลิ่นหอมอโรม่าชัดเจน กับกาแฟแคปซูลที่เน้นความสะดวกรวดเร็ว รสชาติมาตรฐานทุกแก้วใน 1 นาที",
-        "hook": "สายกาแฟห้ามพลาด! ดริปเองกับแคปซูล แบบไหนตอบโจทย์ชีวิตคุณมากกว่ากัน?",
-        "item_a": "กาแฟดริป ได้กลิ่นหอมกรุ่นแบบสโลว์ไลฟ์ ดึงรสชาติเมล็ดกาแฟแท้ๆ ออกมาได้ชัดเจน เหมาะกับสายสุนทรีย์มีเวลาละเมียดละไม",
-        "item_b": "กาแฟแคปซูล ตอบโจทย์ความเร็วในชั่วโมงเร่งด่วน แค่กดปุ่มเดียวก็ได้รสชาติเข้มข้นคงที่ ได้มาตรฐานร้านหรูในสิบวินาที",
-        "conclusion": "ชอบความหอมคลาสสิกเลือกดริป ชอบความง่ายทันใจเลือกแคปซูล คอมเมนต์บอกกันหน่อยนะ ส่วนพิกัดของแท้ราคาโปร แปะไว้ในคอมเมนต์แรกแล้วครับ",
-        "affiliate_comment": "📍 พิกัดของแท้ราคาโปรโมชั่นพิเศษ:\n👉 กาแฟดริป: https://shopee.co.th/sample_drip\n👉 กาแฟแคปซูล: https://shopee.co.th/sample_capsule\n(ใครสนใจตัวไหน จิ้มดูพิกัดในลิงก์ได้เลยครับ)",
+        "mode": "multi_round",
+        "research_summary": "เปรียบเทียบเจาะลึก 3 ยก: ยก 1 รสชาติและกลิ่นอโรม่า, ยก 2 ความสะดวกรวดเร็วในการชง, ยก 3 ความคุ้มค่าและราคาต่อแก้วระยะยาว",
+        "hook": "สายกาแฟห้ามพลาด! ดริปเองกับแคปซูล เทียบกันหมัดต่อหมัดแบบไหนตอบโจทย์ชีวิตคุณมากกว่ากัน?",
+        "round_1_title": "คุณภาพ & กลิ่นรส",
+        "round_1_a": "ยกแรกเรื่องรสชาติ กาแฟดริปชนะเรื่องความสุนทรีย์ กลิ่นหอมกรุ่นอโรม่า ดึงเอกลักษณ์เมล็ดแท้ได้ละเมียดละไม",
+        "round_1_b": "แต่กาแฟแคปซูล สวนกลับด้วยความเข้มข้นมาตรฐาน แรงดันสม่ำเสมอ ได้รสชาติเหมือนบาริสต้าชงให้ทุกแก้ว",
+        "round_2_title": "ความสะดวก & เวลา",
+        "round_2_a": "ยกที่สองเรื่องเวลา กาแฟดริปต้องใช้เวลาบด ต้มน้ำ ดริป และล้างอุปกรณ์ เหมาะกับวันสบายๆ มีเวลาสโลว์ไลฟ์",
+        "round_2_b": "ในขณะที่แคปซูล ตอบโจทย์ชั่วโมงเร่งด่วน แค่หยอดแคปซูลแล้วกดปุ่ม สิบวินาทีก็ได้ดื่ม ไม่เลอะเทอะ",
+        "round_3_title": "ความคุ้มค่า & ราคา",
+        "round_3_a": "ยกสุดท้ายเรื่องความคุ้ม กาแฟดริปต้นทุนต่อแก้วประหยัดกว่ามาก ซื้อเมล็ดถุงเดียวชงได้หลายสิบแก้ว",
+        "round_3_b": "ส่วนแคปซูล ตัวเครื่องราคาจับต้องได้ง่าย แต่ราคาแคปซูลต่อแก้วจะสูงกว่า แลกกับความสะดวกสบาย",
+        "conclusion": "สรุปฟันธง: ชอบความหอมละเมียดเลือกดริป ชอบความง่ายทันใจเลือกแคปซูล คอมเมนต์บอกกันหน่อยนะ พิกัดของแท้อยู่ในคอมเมนต์แรกแล้วครับ",
+        "affiliate_comment": "📍 พิกัดของแท้ราคาโปรโมชั่นพิเศษ:\n👉 กาแฟดริป: https://shopee.co.th/sample_drip\n👉 กาแฟแคปซูล: https://shopee.co.th/sample_capsule\n(ใครชอบตัวไหน โหวตกันในคอมเมนต์ได้เลยครับ)",
     }
+    # Initialize initial segments list
+    st.session_state.script_data["segments"] = [
+        {"id": "hook", "text": st.session_state.script_data["hook"], "highlight": "none", "round_label": "🔥 เปิดประเด็น"},
+        {"id": "round_1_a", "text": st.session_state.script_data["round_1_a"], "highlight": "A", "round_label": "🥊 ยกที่ 1: คุณภาพ & กลิ่นรส"},
+        {"id": "round_1_b", "text": st.session_state.script_data["round_1_b"], "highlight": "B", "round_label": "🥊 ยกที่ 1: คุณภาพ & กลิ่นรส"},
+        {"id": "round_2_a", "text": st.session_state.script_data["round_2_a"], "highlight": "A", "round_label": "🥊 ยกที่ 2: ความสะดวก & เวลา"},
+        {"id": "round_2_b", "text": st.session_state.script_data["round_2_b"], "highlight": "B", "round_label": "🥊 ยกที่ 2: ความสะดวก & เวลา"},
+        {"id": "round_3_a", "text": st.session_state.script_data["round_3_a"], "highlight": "A", "round_label": "🥊 ยกที่ 3: ความคุ้มค่า & ราคา"},
+        {"id": "round_3_b", "text": st.session_state.script_data["round_3_b"], "highlight": "B", "round_label": "🥊 ยกที่ 3: ความคุ้มค่า & ราคา"},
+        {"id": "conclusion", "text": st.session_state.script_data["conclusion"], "highlight": "none", "round_label": "🏁 สรุปฟันธง"},
+    ]
 
 if "rendered_video_path" not in st.session_state:
     st.session_state.rendered_video_path = None
@@ -195,8 +215,18 @@ with tab1:
 
     in_angles = st.text_input("💡 มุมมองที่ต้องการเน้นเปรียบเทียบเป็นพิเศษ", key="input_angles", placeholder="เช่น ความคุ้มค่าในระยะยาว, ความยากง่ายในการใช้งาน, ความทนทาน...")
 
+    # Video Mode Selection
+    selected_mode = st.radio(
+        "⏱️ รูปแบบและความยาววิดีโอ (Video Comparison Mode):",
+        options=["multi_round", "classic"],
+        format_func=lambda x: "🔥 โหมดเจาะลึก 3 ยก (60-90 วินาที - เปรียบเทียบสลับไปมา 3 ด้าน A vs B)" if x == "multi_round" else "⚡ โหมดกระชับรวดเร็ว (30 วินาที - สรุปสั้นไว)",
+        index=0,
+        horizontal=True,
+        help="โหมด 3 ยก จะเปรียบเทียบสลับไปมา A ➜ B ➜ A ➜ B ➜ A ➜ B ครบทั้งด้านคุณภาพ ความสะดวก และราคาต่อแก้ว",
+    )
+
     if st.button("🚀 สั่งให้ Gemini ทำ Deep Research & ร่างบทใหม่ทันที", type="primary", use_container_width=True):
-        with st.spinner("🤖 Gemini กำลังทำ Deep Research วิเคราะห์สเปก จุดแข็ง จุดด้อย และร่างบท 4 ท่อน..."):
+        with st.spinner("🤖 Gemini กำลังทำ Deep Research วิเคราะห์สเปก จุดแข็ง จุดด้อย และร่างบท..."):
             try:
                 gen = AIScriptGenerator()
                 new_data = gen.generate_script(
@@ -209,6 +239,7 @@ with tab1:
                     key_angles=in_angles,
                     affiliate_link_a=aff_a,
                     affiliate_link_b=aff_b,
+                    script_mode=selected_mode,
                 )
                 st.session_state.script_data = new_data
                 st.success("✅ ทำการวิเคราะห์และสร้างบทเรียบร้อยแล้ว! คลิกไปที่แท็บ '2. ตรวจบท & สั่งรีไรท์' ได้เลยครับ")
@@ -225,45 +256,88 @@ with tab2:
     # Research Factsheet
     summary_text = st.session_state.script_data.get("research_summary", "")
     if summary_text:
-        with st.expander("📊 สรุปข้อมูลเจาะลึก 4 มิติจาก AI (Research Fact Sheet)", expanded=True):
+        with st.expander("📊 สรุปข้อมูลเจาะลึกจาก AI (Research Fact Sheet)", expanded=True):
             st.info(summary_text)
 
     col_script, col_rewrite = st.columns([3, 2], gap="large")
 
-    with col_script:
-        st.markdown("#### ✍️ บทพากย์ 4 ท่อน (แก้ไขได้โดยตรง)")
-        s_hook = st.text_area(
-            "🎯 ท่อนที่ 1: Hook (เปิดประเด็นชวนสงสัย)",
-            value=st.session_state.script_data.get("hook", ""),
-            height=70,
-        )
-        s_item_a = st.text_area(
-            f"🟢 ท่อนที่ 2: จุดเด่น {st.session_state.script_data.get('name_a', 'Item A')} (กรอบและตัวชี้ไปที่ A)",
-            value=st.session_state.script_data.get("item_a", ""),
-            height=90,
-        )
-        s_item_b = st.text_area(
-            f"🟢 ท่อนที่ 3: จุดเด่น {st.session_state.script_data.get('name_b', 'Item B')} (กรอบและตัวชี้ไปที่ B)",
-            value=st.session_state.script_data.get("item_b", ""),
-            height=90,
-        )
-        s_conclusion = st.text_area(
-            "🏁 ท่อนที่ 4: สรุปฟันธง + Affiliate CTA ชวนโหวตและดูคอมเมนต์",
-            value=st.session_state.script_data.get("conclusion", ""),
-            height=90,
-        )
-        s_comment = st.text_area(
-            "📌 ข้อความสำหรับปักหมุดคอมเมนต์แรก (Affiliate Pinned Comment)",
-            value=st.session_state.script_data.get("affiliate_comment", ""),
-            height=120,
-        )
+    is_multi = st.session_state.script_data.get("mode") == "multi_round" or "round_1_a" in st.session_state.script_data
 
-        # Sync changes to session_state
-        st.session_state.script_data["hook"] = s_hook
-        st.session_state.script_data["item_a"] = s_item_a
-        st.session_state.script_data["item_b"] = s_item_b
-        st.session_state.script_data["conclusion"] = s_conclusion
-        st.session_state.script_data["affiliate_comment"] = s_comment
+    with col_script:
+        if is_multi:
+            st.markdown("#### 🥊 บทพากย์ 3 ยก สลับชี้ A vs B (60-90s)")
+            s_hook = st.text_area("🎯 Hook (เปิดประเด็นชวนสงสัย)", value=st.session_state.script_data.get("hook", ""), height=65)
+
+            r1_name = st.session_state.script_data.get('round_1_title', 'คุณภาพ & กลิ่นรส')
+            st.markdown(f"##### 🥊 ยกที่ 1: {r1_name}")
+            col_r1_a, col_r1_b = st.columns(2)
+            with col_r1_a:
+                s_r1_a = st.text_area(f"🟢 A: {st.session_state.script_data.get('name_a', 'A')}", value=st.session_state.script_data.get("round_1_a", ""), height=75)
+            with col_r1_b:
+                s_r1_b = st.text_area(f"🔵 B: {st.session_state.script_data.get('name_b', 'B')}", value=st.session_state.script_data.get("round_1_b", ""), height=75)
+
+            r2_name = st.session_state.script_data.get('round_2_title', 'ความสะดวก & เวลา')
+            st.markdown(f"##### 🥊 ยกที่ 2: {r2_name}")
+            col_r2_a, col_r2_b = st.columns(2)
+            with col_r2_a:
+                s_r2_a = st.text_area(f"🟢 A: {st.session_state.script_data.get('name_a', 'A')}", value=st.session_state.script_data.get("round_2_a", ""), height=75)
+            with col_r2_b:
+                s_r2_b = st.text_area(f"🔵 B: {st.session_state.script_data.get('name_b', 'B')}", value=st.session_state.script_data.get("round_2_b", ""), height=75)
+
+            r3_name = st.session_state.script_data.get('round_3_title', 'ความคุ้มค่า & ราคา')
+            st.markdown(f"##### 🥊 ยกที่ 3: {r3_name}")
+            col_r3_a, col_r3_b = st.columns(2)
+            with col_r3_a:
+                s_r3_a = st.text_area(f"🟢 A: {st.session_state.script_data.get('name_a', 'A')}", value=st.session_state.script_data.get("round_3_a", ""), height=75)
+            with col_r3_b:
+                s_r3_b = st.text_area(f"🔵 B: {st.session_state.script_data.get('name_b', 'B')}", value=st.session_state.script_data.get("round_3_b", ""), height=75)
+
+            s_conclusion = st.text_area("🏁 สรุปฟันธง + Affiliate CTA ปักหมุด", value=st.session_state.script_data.get("conclusion", ""), height=75)
+            s_comment = st.text_area("📌 พิกัด Affiliate ปักหมุดคอมเมนต์แรก", value=st.session_state.script_data.get("affiliate_comment", ""), height=100)
+
+            # Sync and package
+            st.session_state.script_data["hook"] = s_hook
+            st.session_state.script_data["round_1_a"] = s_r1_a
+            st.session_state.script_data["round_1_b"] = s_r1_b
+            st.session_state.script_data["round_2_a"] = s_r2_a
+            st.session_state.script_data["round_2_b"] = s_r2_b
+            st.session_state.script_data["round_3_a"] = s_r3_a
+            st.session_state.script_data["round_3_b"] = s_r3_b
+            st.session_state.script_data["conclusion"] = s_conclusion
+            st.session_state.script_data["affiliate_comment"] = s_comment
+
+            st.session_state.script_data["segments"] = [
+                {"id": "hook", "text": s_hook, "highlight": "none", "round_label": "🔥 เปิดประเด็น"},
+                {"id": "round_1_a", "text": s_r1_a, "highlight": "A", "round_label": f"🥊 {r1_name}"},
+                {"id": "round_1_b", "text": s_r1_b, "highlight": "B", "round_label": f"🥊 {r1_name}"},
+                {"id": "round_2_a", "text": s_r2_a, "highlight": "A", "round_label": f"🥊 {r2_name}"},
+                {"id": "round_2_b", "text": s_r2_b, "highlight": "B", "round_label": f"🥊 {r2_name}"},
+                {"id": "round_3_a", "text": s_r3_a, "highlight": "A", "round_label": f"🥊 {r3_name}"},
+                {"id": "round_3_b", "text": s_r3_b, "highlight": "B", "round_label": f"🥊 {r3_name}"},
+                {"id": "conclusion", "text": s_conclusion, "highlight": "none", "round_label": "🏁 สรุปฟันธง"},
+            ]
+        else:
+            st.markdown("#### ✍️ บทพากย์ 4 ท่อน (แก้ไขได้โดยตรง)")
+            s_hook = st.text_area("🎯 ท่อนที่ 1: Hook (เปิดประเด็นชวนสงสัย)", value=st.session_state.script_data.get("hook", ""), height=70)
+            s_item_a = st.text_area(f"🟢 ท่อนที่ 2: จุดเด่น {st.session_state.script_data.get('name_a', 'Item A')}", value=st.session_state.script_data.get("item_a", ""), height=90)
+            s_item_b = st.text_area(f"🔵 ท่อนที่ 3: จุดเด่น {st.session_state.script_data.get('name_b', 'Item B')}", value=st.session_state.script_data.get("item_b", ""), height=90)
+            s_conclusion = st.text_area("🏁 ท่อนที่ 4: สรุปฟันธง + Affiliate CTA", value=st.session_state.script_data.get("conclusion", ""), height=90)
+            s_comment = st.text_area("📌 ข้อความสำหรับปักหมุดคอมเมนต์แรก", value=st.session_state.script_data.get("affiliate_comment", ""), height=120)
+
+            st.session_state.script_data["hook"] = s_hook
+            st.session_state.script_data["item_a"] = s_item_a
+            st.session_state.script_data["item_b"] = s_item_b
+            st.session_state.script_data["conclusion"] = s_conclusion
+            st.session_state.script_data["affiliate_comment"] = s_comment
+
+            name_a_val = st.session_state.script_data.get('name_a', 'A')
+            name_b_val = st.session_state.script_data.get('name_b', 'B')
+            st.session_state.script_data["segments"] = [
+                {"id": "hook", "text": s_hook, "highlight": "none", "round_label": "🔥 เปิดประเด็น"},
+                {"id": "item_a", "text": s_item_a, "highlight": "A", "round_label": f"📦 {name_a_val}"},
+                {"id": "item_b", "text": s_item_b, "highlight": "B", "round_label": f"📦 {name_b_val}"},
+                {"id": "conclusion", "text": s_conclusion, "highlight": "none", "round_label": "🏁 สรุปฟันธง"},
+            ]
 
     with col_rewrite:
         st.markdown("#### 🔄 สั่ง AI ปรับแก้ / รีไรท์ใหม่")
@@ -278,7 +352,7 @@ with tab2:
             ],
         )
         rewrite_instruction = st.text_area(
-            "คำสั่งปรับแก้เพิ่มเติม (เช่น 'ขอท่อนฮุคให้กระแทกใจกว่านี้', 'ย่อให้สั้นลง'):",
+            "คำสั่งปรับแก้เพิ่มเติม (เช่น 'ขอยก 2 ให้เห็นความเร็วชัดขึ้น', 'ย่อให้กระชับขึ้น'):",
             placeholder="เช่น ขอให้เน้นประเด็นเรื่องราคาให้ชัดเจนขึ้น และใช้คำสแลงวัยรุ่น...",
             height=110,
         )

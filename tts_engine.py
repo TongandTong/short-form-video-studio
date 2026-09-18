@@ -34,6 +34,7 @@ class SegmentTimeline:
     duration: float
     highlight_target: str  # "none", "A", or "B"
     audio_path: str
+    round_label: str = ""
 
 
 def preprocess_thai_pacing(text: str) -> str:
@@ -170,12 +171,16 @@ class TTSEngine:
         Takes script data, generates audio per segment with edge-tts neural voice,
         computes exact timeline, injects transition SFX, mixes BGM, and outputs master audio.
         """
-        segments_meta = [
-            {"id": "hook", "text": script_data.get("hook", ""), "highlight": "none"},
-            {"id": "item_a", "text": script_data.get("item_a", ""), "highlight": "A"},
-            {"id": "item_b", "text": script_data.get("item_b", ""), "highlight": "B"},
-            {"id": "conclusion", "text": script_data.get("conclusion", ""), "highlight": "none"},
-        ]
+        # Dynamic segments support (Multi-Round 60-90s or Classic 30s)
+        if "segments" in script_data and isinstance(script_data["segments"], list) and len(script_data["segments"]) > 0:
+            segments_meta = script_data["segments"]
+        else:
+            segments_meta = [
+                {"id": "hook", "text": script_data.get("hook", ""), "highlight": "none", "round_label": "🔥 เปิดประเด็น"},
+                {"id": "item_a", "text": script_data.get("item_a", ""), "highlight": "A", "round_label": f"📦 {script_data.get('name_a', 'ไอเทม A')}"},
+                {"id": "item_b", "text": script_data.get("item_b", ""), "highlight": "B", "round_label": f"📦 {script_data.get('name_b', 'ไอเทม B')}"},
+                {"id": "conclusion", "text": script_data.get("conclusion", ""), "highlight": "none", "round_label": "🏁 สรุปฟันธง"},
+            ]
 
         if output_master_audio is None:
             output_master_audio = AUDIO_DIR / "master_audio.mp3"
@@ -185,10 +190,10 @@ class TTSEngine:
         audio_clips = []
         speech_timed_clips = []
 
-        print(f"[TTS] Synthesizing speech with voice: {self.voice_key}...")
-        for seg in segments_meta:
-            seg_id = seg["id"]
-            text = seg["text"].strip()
+        print(f"[TTS] Synthesizing speech with voice: {self.voice_key} ({len(segments_meta)} segments)...")
+        for idx, seg in enumerate(segments_meta):
+            seg_id = seg.get("id", f"seg_{idx}")
+            text = seg.get("text", "").strip()
             if not text:
                 continue
 
@@ -210,8 +215,9 @@ class TTSEngine:
                     start_time=start_t,
                     end_time=end_t,
                     duration=duration,
-                    highlight_target=seg["highlight"],
+                    highlight_target=seg.get("highlight", "none"),
                     audio_path=str(seg_path),
+                    round_label=seg.get("round_label", ""),
                 )
             )
 
@@ -224,19 +230,21 @@ class TTSEngine:
         # Master layer list for CompositeAudioClip
         all_layers = list(speech_timed_clips)
 
-        # Transition SFX at keyframe moments
+        # Transition SFX on every round switch
         sfx_clips = []
         if include_sfx:
             pop_sfx_path = AUDIO_DIR / "sfx_pop.wav"
             whoosh_sfx_path = AUDIO_DIR / "sfx_whoosh.wav"
 
-            if pop_sfx_path.exists() and whoosh_sfx_path.exists():
+            if pop_sfx_path.exists():
+                last_target = "none"
                 for seg in timeline:
-                    if seg.highlight_target in ["A", "B"]:
-                        # Trigger SFX right at the start of Item A or Item B
+                    if seg.highlight_target in ["A", "B"] and seg.highlight_target != last_target:
+                        # Trigger pop SFX at the exact timestamp of switching to A or B
                         sfx_c = AudioFileClip(str(pop_sfx_path)).with_start(seg.start_time)
                         sfx_clips.append(sfx_c)
                         all_layers.append(sfx_c)
+                    last_target = seg.highlight_target
 
         # Background Music (BGM) loop with subtle ducking and smooth fade in/out
         bgm_clip = None

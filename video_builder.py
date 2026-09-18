@@ -202,8 +202,8 @@ class VideoBuilder:
             lines.append(current_line)
         return lines if lines else [text]
 
-    def _render_subtitle_card(self, text: str) -> Image.Image:
-        """Renders subtitle card with high-contrast text and semi-transparent backdrop."""
+    def _render_subtitle_card(self, text: str, round_label: str = "") -> Image.Image:
+        """Renders subtitle card with high-contrast text, round badge, and semi-transparent backdrop."""
         w, h = SUBTITLE_BOX["w"], SUBTITLE_BOX["h"]
         card = Image.new("RGBA", (w, h), (0, 0, 0, 0))
         draw = ImageDraw.Draw(card)
@@ -216,12 +216,31 @@ class VideoBuilder:
             width=2,
         )
 
-        font = self._load_font(40, bold=True)
+        # Optional Round / Dimension Badge at the top
+        text_offset_y = 15
+        if round_label:
+            badge_font = self._load_font(22, bold=True)
+            bbox = badge_font.getbbox(round_label)
+            bw = (bbox[2] - bbox[0]) + 32
+            bh = 36
+            bx = (w - bw) // 2
+            by = 12
+            draw.rounded_rectangle(
+                [bx, by, bx + bw, by + bh],
+                radius=18,
+                fill=(40, 40, 40, 245),
+                outline=self.highlight_color + (220,),
+                width=2,
+            )
+            draw.text((w // 2, by + bh // 2), round_label, font=badge_font, fill=(255, 255, 255, 255), anchor="mm")
+            text_offset_y = 28
+
+        font = self._load_font(38, bold=True)
         lines = self._wrap_text(text, font, max_width=w - 80)
 
-        line_height = 55
+        line_height = 52
         total_text_h = len(lines) * line_height
-        start_y = (h - total_text_h) // 2 + 25
+        start_y = (h - total_text_h) // 2 + text_offset_y
 
         for i, line in enumerate(lines):
             y = start_y + (i * line_height)
@@ -309,7 +328,7 @@ class VideoBuilder:
         # 6. Pre-render Subtitle Cards
         subtitle_cards: Dict[str, Image.Image] = {}
         for seg in timeline:
-            subtitle_cards[seg.segment_id] = self._render_subtitle_card(seg.text)
+            subtitle_cards[seg.segment_id] = self._render_subtitle_card(seg.text, getattr(seg, "round_label", ""))
         default_sub_card = self._render_subtitle_card(f"กำลังเปรียบเทียบ: {name_a} vs {name_b}")
 
         # 7. Animated Pointing Indicator
