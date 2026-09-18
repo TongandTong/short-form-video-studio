@@ -7,3 +7,6 @@ backgroundColor = "#F5F2EB"
 secondaryBackgroundColor = "#FFFFFF"
 textColor = "#1F1F1F"
 font = "sans serif"
+
+[client]
+showErrorDetails = "full"

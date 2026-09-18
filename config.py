@@ -7,12 +7,16 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 import os
+import sys
 from dotenv import load_dotenv
 
 load_dotenv()
 
 # Base Directories
 BASE_DIR = Path(__file__).resolve().parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+
 ASSETS_DIR = BASE_DIR / "assets"
 IMAGES_DIR = ASSETS_DIR / "images"
 FONTS_DIR = ASSETS_DIR / "fonts"
@@ -133,9 +137,8 @@ def get_regular_font_path() -> str:
 
 # Auto-delegation if Streamlit Cloud or user executes config.py as main entrypoint
 if __name__ == "__main__":
+    import runpy
     _web_app_file = BASE_DIR / "web_app.py"
     if _web_app_file.exists():
-        with open(_web_app_file, "r", encoding="utf-8") as _f:
-            _code = _f.read()
-        exec(_code, globals())
+        runpy.run_path(str(_web_app_file), run_name="__main__")
 
