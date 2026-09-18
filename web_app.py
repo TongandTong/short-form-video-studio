@@ -33,7 +33,7 @@ from config import (
     COLOR_BG_CREAM,
     COLOR_HIGHLIGHT_LIME,
 )
-from ai_script_generator import AIScriptGenerator
+from ai_script_generator import AIScriptGenerator, get_random_idea
 from tts_engine import TTSEngine
 from video_builder import VideoBuilder
 from pipeline import hex_to_rgb
@@ -99,6 +99,26 @@ if "script_data" not in st.session_state:
 if "rendered_video_path" not in st.session_state:
     st.session_state.rendered_video_path = None
 
+# Initialize Form Keys if not present
+if "input_topic" not in st.session_state:
+    st.session_state.input_topic = st.session_state.script_data.get("topic", "กาแฟดริป VS กาแฟแคปซูล")
+if "input_name_a" not in st.session_state:
+    st.session_state.input_name_a = st.session_state.script_data.get("name_a", "กาแฟดริป")
+if "input_name_b" not in st.session_state:
+    st.session_state.input_name_b = st.session_state.script_data.get("name_b", "กาแฟแคปซูล")
+if "input_details_a" not in st.session_state:
+    st.session_state.input_details_a = ""
+if "input_details_b" not in st.session_state:
+    st.session_state.input_details_b = ""
+if "input_target" not in st.session_state:
+    st.session_state.input_target = ""
+if "input_angles" not in st.session_state:
+    st.session_state.input_angles = ""
+if "input_aff_a" not in st.session_state:
+    st.session_state.input_aff_a = ""
+if "input_aff_b" not in st.session_state:
+    st.session_state.input_aff_b = ""
+
 # Tabs Navigation
 tab1, tab2, tab3, tab4 = st.tabs([
     "1. 🔍 ป้อนข้อมูล & ค้นหาเจาะลึก",
@@ -111,27 +131,69 @@ tab1, tab2, tab3, tab4 = st.tabs([
 # TAB 1: INPUT & DEEP RESEARCH
 # -------------------------------------------------------------
 with tab1:
+    # Viral Idea Helper Banner
+    st.markdown(
+        """
+        <div style="background: rgba(50, 205, 50, 0.08); border: 1px solid rgba(50, 205, 50, 0.3); border-radius: 12px; padding: 14px 18px; margin-bottom: 16px;">
+            <div style="font-weight: 700; font-size: 16px; color: #1F1F1F; margin-bottom: 4px;">💡 คิดไม่ออก? สุ่มหัวข้อไวรัลยอดฮิตในคลิกเดียว</div>
+            <div style="font-size: 13px; color: #555;">ดึงหัวข้อคู่เปรียบเทียบที่มีการค้นหาสูง พร้อมสเปกและกลุ่มเป้าหมายมาเติมให้ทันที</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    col_cat, col_rnd = st.columns([3, 2])
+    with col_cat:
+        cat_options = [
+            "ทั้งหมด (สุ่มทุกหมวด)",
+            "📱 ไอที & แกดเจ็ต",
+            "☕ เครื่องดื่ม & อาหาร",
+            "🏠 ของใช้ในบ้าน & ครัว",
+            "💄 สุขภาพ & บิวตี้",
+        ]
+        selected_cat = st.selectbox(
+            "📂 เลือกหมวดหมู่ไอเดีย",
+            cat_options,
+            index=0,
+            label_visibility="collapsed",
+        )
+    with col_rnd:
+        if st.button("🎲 สุ่มหัวข้อไวรัลทันที", use_container_width=True):
+            template = get_random_idea(selected_cat)
+            st.session_state.input_topic = template["topic"]
+            st.session_state.input_name_a = template["name_a"]
+            st.session_state.input_name_b = template["name_b"]
+            st.session_state.input_details_a = template["details_a"]
+            st.session_state.input_details_b = template["details_b"]
+            st.session_state.input_target = template["target_audience"]
+            st.session_state.input_angles = template["key_angles"]
+            st.session_state.input_aff_a = template["affiliate_link_a"]
+            st.session_state.input_aff_b = template["affiliate_link_b"]
+            st.toast(f"สุ่มได้หัวข้อ: {template['topic']} สำเร็จ!")
+            st.rerun()
+
+    st.divider()
     st.subheader("กำหนดหัวข้อและบริบทเพื่อให้ AI วิเคราะห์เจาะลึก")
     st.caption("ยิ่งใส่รายละเอียดเยอะ AI จะยิ่งค้นหาและเปรียบเทียบจุดเด่นจุดด้อยได้ลึกซึ้งและไม่ซ้ำซาก")
 
     col1, col2 = st.columns(2)
     with col1:
-        in_topic = st.text_input("📌 หัวข้อเปรียบเทียบ (Topic)", value=st.session_state.script_data.get("topic", "กาแฟดริป VS กาแฟแคปซูล"))
-        in_name_a = st.text_input("📦 ชื่อสินค้า / สิ่งที่เปรียบเทียบ A", value=st.session_state.script_data.get("name_a", "กาแฟดริป"))
-        in_details_a = st.text_area("📝 ข้อมูล/สเปก/จุดเด่นของ A (มีหรือไม่ก็ได้)", placeholder="เช่น เมล็ดกาแฟคั่วบด สุนทรียภาพ กลิ่นหอม คุมอุณหภูมิเอง...", height=85)
+        in_topic = st.text_input("📌 หัวข้อเปรียบเทียบ (Topic)", key="input_topic")
+        in_name_a = st.text_input("📦 ชื่อสินค้า / สิ่งที่เปรียบเทียบ A", key="input_name_a")
+        in_details_a = st.text_area("📝 ข้อมูล/สเปก/จุดเด่นของ A (มีหรือไม่ก็ได้)", key="input_details_a", placeholder="เช่น เมล็ดกาแฟคั่วบด สุนทรียภาพ กลิ่นหอม คุมอุณหภูมิเอง...", height=85)
     with col2:
-        in_target = st.text_input("🎯 กลุ่มเป้าหมายคนดู", placeholder="เช่น วัยทำงาน, นักเรียนงบน้อย, สายกาแฟจริงจัง, คนรักสุขภาพ...")
-        in_name_b = st.text_input("📦 ชื่อสินค้า / สิ่งที่เปรียบเทียบ B", value=st.session_state.script_data.get("name_b", "กาแฟแคปซูล"))
-        in_details_b = st.text_area("📝 ข้อมูล/สเปก/จุดเด่นของ B (มีหรือไม่ก็ได้)", placeholder="เช่น ชงใน 30 วินาที ได้มาตรฐาน รวดเร็ว ไม่เลอะเทอะ เครื่องกะทัดรัด...", height=85)
+        in_target = st.text_input("🎯 กลุ่มเป้าหมายคนดู", key="input_target", placeholder="เช่น วัยทำงาน, นักเรียนงบน้อย, สายกาแฟจริงจัง, คนรักสุขภาพ...")
+        in_name_b = st.text_input("📦 ชื่อสินค้า / สิ่งที่เปรียบเทียบ B", key="input_name_b")
+        in_details_b = st.text_area("📝 ข้อมูล/สเปก/จุดเด่นของ B (มีหรือไม่ก็ได้)", key="input_details_b", placeholder="เช่น ชงใน 30 วินาที ได้มาตรฐาน รวดเร็ว ไม่เลอะเทอะ เครื่องกะทัดรัด...", height=85)
 
     st.markdown("#### 🔗 ลิงก์ Affiliate สำหรับให้ AI วางในคอมเมนต์ปักหมุด")
     col_aff1, col_aff2 = st.columns(2)
     with col_aff1:
-        aff_a = st.text_input("พิกัด Affiliate สินค้า A", placeholder="https://shopee.co.th/link_a")
+        aff_a = st.text_input("พิกัด Affiliate สินค้า A", key="input_aff_a", placeholder="https://shopee.co.th/link_a")
     with col_aff2:
-        aff_b = st.text_input("พิกัด Affiliate สินค้า B", placeholder="https://shopee.co.th/link_b")
+        aff_b = st.text_input("พิกัด Affiliate สินค้า B", key="input_aff_b", placeholder="https://shopee.co.th/link_b")
 
-    in_angles = st.text_input("💡 มุมมองที่ต้องการเน้นเปรียบเทียบเป็นพิเศษ", placeholder="เช่น ความคุ้มค่าในระยะยาว, ความยากง่ายในการใช้งาน, ความทนทาน...")
+    in_angles = st.text_input("💡 มุมมองที่ต้องการเน้นเปรียบเทียบเป็นพิเศษ", key="input_angles", placeholder="เช่น ความคุ้มค่าในระยะยาว, ความยากง่ายในการใช้งาน, ความทนทาน...")
 
     if st.button("🚀 สั่งให้ Gemini ทำ Deep Research & ร่างบทใหม่ทันที", type="primary", use_container_width=True):
         with st.spinner("🤖 Gemini กำลังทำ Deep Research วิเคราะห์สเปก จุดแข็ง จุดด้อย และร่างบท 4 ท่อน..."):

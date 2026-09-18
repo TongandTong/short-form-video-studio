@@ -12,10 +12,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
 import os
+import re
 import sys
 import edge_tts
 from gtts import gTTS
 from moviepy import AudioFileClip, CompositeAudioClip
+import moviepy.audio.fx as afx
 
 from config import AUDIO_DIR, TEMP_DIR, TTS_SILENCE_GAP
 
@@ -32,6 +34,29 @@ class SegmentTimeline:
     duration: float
     highlight_target: str  # "none", "A", or "B"
     audio_path: str
+
+
+def preprocess_thai_pacing(text: str) -> str:
+    """
+    Intelligently inserts subtle micro-pauses (commas / ellipses) into Thai sentences
+    so Neural TTS engines (Edge-TTS / Azure) breathe and articulate naturally.
+    """
+    if not text:
+        return text
+    t = re.sub(r"\s+", " ", text.strip())
+    # Add breathing pauses after exclamation and question marks
+    t = re.sub(r"([!?])\s*", r"\1 ... ", t)
+    t = re.sub(r"(:)\s*", r"\1, ", t)
+    # Natural breathing pause before contrast conjunctions
+    connectors = [
+        "ในขณะที่", "ขณะเดียวกัน", "ในทางกลับกัน", "ข้อดีก็คือ", "ข้อดีคือ",
+        "ข้อเสียคือ", "จุดเด่นคือ", "ข้อจำกัดคือ", "สำหรับ", "นอกจากนี้",
+        "โดยรวมแล้ว", "สรุปก็คือ", "แต่ว่า", "แต่", "ส่วน"
+    ]
+    for c in connectors:
+        t = re.sub(rf"(?<![,...])\s+({re.escape(c)})", r", \1", t)
+    t = re.sub(r",\s*,", ",", t)
+    return re.sub(r"\s+", " ", t).strip()
 
 
 class TTSEngine:
@@ -167,8 +192,10 @@ class TTSEngine:
             if not text:
                 continue
 
+            # Smart pacing preprocessor for natural breathing pauses in neural TTS
+            paced_text = preprocess_thai_pacing(text)
             seg_path = TEMP_DIR / f"tts_{self.voice_key}_{seg_id}.mp3"
-            self.synthesize_segment(text, seg_path)
+            self.synthesize_segment(paced_text, seg_path)
 
             clip = AudioFileClip(str(seg_path))
             duration = clip.duration
@@ -179,7 +206,7 @@ class TTSEngine:
             timeline.append(
                 SegmentTimeline(
                     segment_id=seg_id,
-                    text=text,
+                    text=text,  # Keep clean text for subtitles
                     start_time=start_t,
                     end_time=end_t,
                     duration=duration,
@@ -211,7 +238,7 @@ class TTSEngine:
                         sfx_clips.append(sfx_c)
                         all_layers.append(sfx_c)
 
-        # Background Music (BGM) loop at gentle volume
+        # Background Music (BGM) loop with subtle ducking and smooth fade in/out
         bgm_clip = None
         if include_bgm:
             bgm_path = AUDIO_DIR / "bgm_lofi.wav"
@@ -220,13 +247,22 @@ class TTSEngine:
                 # Loop or trim to total_speech_duration
                 if raw_bgm.duration < total_speech_duration:
                     loops = int(total_speech_duration / raw_bgm.duration) + 1
-                    # Repeat bgm
                     repeated = [raw_bgm.with_start(i * raw_bgm.duration) for i in range(loops)]
                     bgm_composite = CompositeAudioClip(repeated).subclipped(0, total_speech_duration)
                 else:
                     bgm_composite = raw_bgm.subclipped(0, total_speech_duration)
 
-                # Set subtle background volume
+                # Apply ducking volume and smooth fade in/out
+                try:
+                    fade_in_d = min(0.6, total_speech_duration / 4)
+                    fade_out_d = min(1.0, total_speech_duration / 4)
+                    bgm_composite = bgm_composite.with_effects([
+                        afx.AudioFadeIn(fade_in_d),
+                        afx.AudioFadeOut(fade_out_d)
+                    ])
+                except Exception:
+                    pass
+
                 bgm_clip = bgm_composite.with_volume_scaled(bgm_volume)
                 all_layers.insert(0, bgm_clip)
 
