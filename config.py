@@ -130,3 +130,12 @@ def get_regular_font_path() -> str:
         if font_path.exists():
             return str(font_path)
     return get_font_path("bold")
+
+# Auto-delegation if Streamlit Cloud or user executes config.py as main entrypoint
+if __name__ == "__main__":
+    _web_app_file = BASE_DIR / "web_app.py"
+    if _web_app_file.exists():
+        with open(_web_app_file, "r", encoding="utf-8") as _f:
+            _code = _f.read()
+        exec(_code, globals())
+
