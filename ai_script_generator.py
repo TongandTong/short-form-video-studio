@@ -23,6 +23,110 @@ if sys.stdout and hasattr(sys.stdout, "reconfigure"):
 load_dotenv()
 
 
+FRAMEWORK_PRESETS: Dict[str, Dict[str, str]] = {
+    "persona": {
+        "id": "persona",
+        "name": "👤 Persona-based (ใครเหมาะกับอะไร)",
+        "desc": "จัดกลุ่มตามผู้ใช้ เช่น มือใหม่ vs มือโปร หรือ คนตื่นสาย vs สายชิล",
+        "hook_guide": "กระตุกเตือนว่า 'อย่าเพิ่งซื้อถ้ายังไม่รู้ว่าคุณเป็นคนประเภทไหน!'",
+        "r1_focus": "สไตล์การใช้งาน & ไลฟ์สไตล์ผู้ใช้",
+        "r2_focus": "ทักษะ ความเร่งรีบ & การปรับแต่ง",
+        "r3_focus": "ความคุ้มค่าตามระดับการใช้งานจริง",
+        "conclusion_guide": "ฟันธงชัดเจนว่าคนแบบไหนเหมาะกับ A และคนแบบไหนเหมาะกับ B",
+    },
+    "crossover": {
+        "id": "crossover",
+        "name": "🔀 Cross-over (จับคู่ข้ามหมวด)",
+        "desc": "เทียบสิ่งที่ไม่น่าเข้ากันแต่คนสงสัย เช่น กาแฟสด vs ชามัทฉะ (การตื่นตัว & โฟกัส)",
+        "hook_guide": "เปิดด้วยประเด็นน่าสงสัยว่า 2 สิ่งนี้ดูคนละเรื่อง แต่ถ้าต้องการผลลัพธ์นี้ ตัวไหนชนะขาด?",
+        "r1_focus": "กลไกการทำงาน & ผลลัพธ์ที่ได้ทันที",
+        "r2_focus": "ผลข้างเคียง & ความนิ่งต่อเนื่องตลอดวัน",
+        "r3_focus": "ความสะดวกและความง่ายในชีวิตประจำวัน",
+        "conclusion_guide": "ชี้ชัดว่าสำหรับเป้าหมายนี้ ตัวไหนตอบโจทย์ตรงจุดกว่ากัน",
+    },
+    "cost_value": {
+        "id": "cost_value",
+        "name": "💰 Cost vs Value (คำนวณต้นทุนจริง)",
+        "desc": "ซูมเรื่องเงิน เวลา และจุดคุ้มทุน เช่น ชงเอง vs ซื้อร้าน สิ้นปีเหลือเงินกี่บาท",
+        "hook_guide": "เปิดด้วยตัวเลขเงินที่ประหยัดได้ต่อปี ชวนสะดุ้งกระตุกต่อมอยากรู้",
+        "r1_focus": "ต้นทุนก้อนแรก & ค่าอุปกรณ์เริ่มต้น",
+        "r2_focus": "ค่าใช้จ่ายรายวัน & เวลาที่ต้องเสียไป",
+        "r3_focus": "จุดคุ้มทุน (Breakeven) & ยอดเงินเก็บใน 1 ปี",
+        "conclusion_guide": "คำนวณจุดคุ้มทุนเป็นตัวเลขชัดเจน และบอกว่าใครจะคุ้มเงินที่สุด",
+    },
+    "blind_test": {
+        "id": "blind_test",
+        "name": "🙈 Blind Test / Experiment (ทดลองจริง)",
+        "desc": "คนทั่วไปแยกออกจริงไหม เช่น ของหลักร้อย vs หลักพัน หรือสูตรทางเลือก vs สูตรแท้",
+        "hook_guide": "ถ้าปิดตาชิม/ลองโดยไม่ดูป้ายราคา คนทั่วไปจะแยกออกจริงไหม ผลลัพธ์น่าตกใจมาก!",
+        "r1_focus": "สัมผัสแรก รสชาติ หรือความรู้สึกภายนอก",
+        "r2_focus": "ประสิทธิภาพการใช้งานจริงแบบไม่มองแบรนด์",
+        "r3_focus": "ความคุ้มค่าเทียบกับราคาที่จ่ายเพิ่ม",
+        "conclusion_guide": "เฉลยผลทดสอบจริงว่าคุ้มที่จะจ่ายแพงกว่าไหม หรือตัวถูกก็เหลือเฟือ",
+    },
+    "scenario_budget": {
+        "id": "scenario_budget",
+        "name": "🎯 Scenario / Budget (จำกัดเงื่อนไข)",
+        "desc": "จำกัดงบหรือพื้นที่ เช่น งบ 1,000 บาท ซื้อแบบไหนจบสุด หรืออยู่คอนโดเลือกตัวไหน",
+        "hook_guide": "เปิดด้วยเพดานงบประมาณหรือเงื่อนไขจำกัด เลือกทางไหนเจ็บตัวน้อยสุดและจบจริง",
+        "r1_focus": "สิ่งที่ได้จริงในงบประมาณจำกัดนี้",
+        "r2_focus": "ข้อจำกัดที่ต้องยอมรับ (Trade-offs)",
+        "r3_focus": "ความทนทานและความคุ้มค่าในระยะยาว",
+        "conclusion_guide": "สรุปทางเลือกที่ดีที่สุดที่จบในงบหรือเงื่อนไขนั้นๆ",
+    },
+    "price_tier": {
+        "id": "price_tier",
+        "name": "🏷️ Price Tier (แพง vs ถูก)",
+        "desc": "ของหลักร้อยที่ฟังก์ชันและสเปกเทียบชั้นหลักหมื่น สู้ไหวจริงไหม",
+        "hook_guide": "ราคาต่างกันหลายเท่าตัว! ของหลักร้อยจะท้าชนของหลักหมื่นได้จริงเหรอ?",
+        "r1_focus": "ฟังก์ชันหลักที่ทำได้เทียบเท่าตัวแพง",
+        "r2_focus": "จุดต่างของวัสดุ ดีเทล และความพรีเมียม",
+        "r3_focus": "ความทนทานและประสบการณ์การใช้งานระยะยาว",
+        "conclusion_guide": "ฟันธงว่าส่วนต่างราคาคุ้มค่าที่จะจ่ายเพิ่มหรือไม่",
+    },
+    "old_vs_modern": {
+        "id": "old_vs_modern",
+        "name": "⏳ Old School vs Modern (เก่า vs ใหม่)",
+        "desc": "เสน่ห์งานคราฟต์คลาสสิกดั้งเดิม vs นวัตกรรมเครื่องอัตโนมัติความเร็วสูง",
+        "hook_guide": "ยุคนี้ยังต้องเหนื่อยทำมืออยู่ไหม หรือเครื่องออโต้จะเข้ามาแทนที่ 100% แล้ว?",
+        "r1_focus": "เสน่ห์ความสุนทรีย์ & การคราฟต์ด้วยตัวเอง",
+        "r2_focus": "ความเร็ว ความง่าย & ความสม่ำเสมอได้มาตรฐาน",
+        "r3_focus": "การดูแลรักษา ล้างทำความสะอาด & ความจุกจิก",
+        "conclusion_guide": "ฟันธงว่าคนดูเหมาะกับสายดื่มด่ำความคลาสสิก หรือสายเน้นชีวิตง่าย",
+    },
+    "myth_vs_reality": {
+        "id": "myth_vs_reality",
+        "name": "💡 Myth vs Reality (ความเชื่อ vs ความจริง)",
+        "desc": "วิทยาศาสตร์หักล้างความเชื่อผิดๆ เช่น คั่วเข้ม vs คั่วอ่อน ใครคาเฟอีนแรงกว่ากัน",
+        "hook_guide": "คุณกำลังเข้าใจผิดอยู่หรือเปล่า? ความจริงระหว่าง 2 สิ่งนี้ที่คน 90% ยังเชื่อผิดๆ!",
+        "r1_focus": "ความเชื่อยอดฮิตที่คนมักเข้าใจผิด",
+        "r2_focus": "ข้อเท็จจริงทางวิทยาศาสตร์ที่พิสูจน์แล้ว",
+        "r3_focus": "ผลลัพธ์จริงและการนำไปใช้งานให้ถูกต้อง",
+        "conclusion_guide": "หักล้างความเชื่อเดิมและฟันธงวิธีเลือกที่ถูกต้องตามหลักการ",
+    },
+    "local_vs_import": {
+        "id": "local_vs_import",
+        "name": "🇹🇭 Local vs Import (ของไทย vs ของนอก)",
+        "desc": "ลบอคติ เมล็ดไทยเกรดประกวด vs เมล็ดนอกยอดฮิต เทียบหมัดต่อหมัด",
+        "hook_guide": "อย่าเพิ่งดูถูกของไทย! ลองเทียบตัวท็อปบ้านเรา กับตัวดังนำเข้า ใครจะอยู่ใครจะไป?",
+        "r1_focus": "คุณภาพวัตถุดิบ & รสสัมผัสเนื้อแท้",
+        "r2_focus": "ความสดใหม่ ความเข้ากันได้กับคนไทย & ภาษีนำเข้า",
+        "r3_focus": "ความคุ้มค่าคุ้มราคาเมื่อเทียบกันตรงๆ",
+        "conclusion_guide": "ชี้ชัดจุดที่ของไทยทำได้เหนือกว่า และจุดเด่นเฉพาะตัวของสินค้านอก",
+    },
+    "hype_vs_standard": {
+        "id": "hype_vs_standard",
+        "name": "🔥 Hype vs Standard (ทริกไวรัล vs สูตรมาตรฐาน)",
+        "desc": "ทริกลัดหรือสูตรแปลกบนโซเชียล เทียบกับวิธีมาตรฐานที่มือโปรใช้จริง",
+        "hook_guide": "ทริกไวรัลในโซเชียลที่คนแห่ทำตาม เวิร์กจริงหรือแค่หลอกตา? มาทดลองเทียบกับวิธีจริง!",
+        "r1_focus": "ความแปลกใหม่ & สิ่งที่ทริกไวรัลเคลมไว้",
+        "r2_focus": "ผลลัพธ์จริงเมื่อทดสอบเทียบกับสูตรมาตรฐาน",
+        "r3_focus": "ความสม่ำเสมอและความคุ้มค่าในการทำซ้ำ",
+        "conclusion_guide": "ฟันธงว่าสูตรไวรัลคุ้มค่าที่จะลองไหม หรือวิธีมาตรฐานคือคำตอบที่ดีที่สุด",
+    },
+}
+
+
 class AIScriptGenerator:
     """Generates deep, fact-based Thai comparison scripts using Gemini."""
 
@@ -61,14 +165,28 @@ class AIScriptGenerator:
         tone: str = "engaging",
         script_mode: str = "multi_round",  # "multi_round" (60-90s) or "classic" (30s)
         channel_outro_cta: str = "",
+        framework: str = "persona",
     ) -> Dict[str, Any]:
         """
         Deep-researches comparison points and writes a short-form script in Thai.
         Supports:
+        - 10 Viral Comparison Frameworks (Persona, Crossover, Cost vs Value, Blind Test, etc.)
         - "multi_round" (60-90s): 3-Round back-and-forth battle comparing multiple dimensions.
         - "classic" (30s): 4-part concise summary.
         """
+        fw = FRAMEWORK_PRESETS.get(framework, FRAMEWORK_PRESETS["persona"])
         outro_prompt_hint = f"\n- ข้อความส่งท้ายประจำเพจที่ต้องสอดแทรกไว้ใน conclusion: '{channel_outro_cta}'" if channel_outro_cta else ""
+
+        framework_directive = f"""
+กรอบการเล่าเรื่องเชิงกลยุทธ์ (Content Framework):
+- หมวดหมู่: {fw['name']}
+- แนวคิดหลัก: {fw['desc']}
+- ทิศทาง Hook: {fw['hook_guide']}
+- โฟกัสยกที่ 1: {fw['r1_focus']}
+- โฟกัสยกที่ 2: {fw['r2_focus']}
+- โฟกัสยกที่ 3: {fw['r3_focus']}
+- ทิศทางสรุปฟันธง: {fw['conclusion_guide']}
+"""
 
         if script_mode == "multi_round":
             prompt = f"""
@@ -81,23 +199,24 @@ class AIScriptGenerator:
 - กลุ่มเป้าหมายคนดู: {target_audience or 'บุคคลทั่วไป / ผู้บริโภคที่กำลังตัดสินใจซื้อ'}
 - จุดเน้นพิเศษ: {key_angles or 'เปรียบเทียบรอบด้านทั้งประสิทธิภาพ ความสะดวก และราคา'}
 - โทนอารมณ์: {tone} (น่าสนใจ มีน้ำหนักคำ ชวนฟัง กระชับ ไม่เวิ่นเว้อ)
+{framework_directive}
 
 ภารกิจของคุณ:
-ร่างบทพากย์วิดีโอเปรียบเทียบสลับไปมา 3 ยก (3 Rounds Battle) สลับชี้ A ➜ B ➜ A ➜ B ➜ A ➜ B:
-1. hook: ประโยคเปิดคลิป 1 ประโยค ยิงคำถามคมๆ กระตุกต่อมอยากรู้ให้อยู่ดูต่อ
-2. ยกที่ 1 (คุณภาพ & ประสิทธิภาพ / ฟิลลิ่ง):
-   - round_1_title: ตั้งชื่อยกที่ 1 สั้นๆ (เช่น "คุณภาพ & รสชาติ" หรือ "ประสิทธิภาพ")
+ร่างบทพากย์วิดีโอเปรียบเทียบสลับไปมา 3 ยก (3 Rounds Battle) สลับชี้ A ➜ B ➜ A ➜ B ➜ A ➜ B ตามกรอบ Framework ข้างต้น:
+1. hook: ประโยคเปิดคลิป 1 ประโยค ยิงคำถามคมๆ หรือประเด็นชวนสะดุ้งตามแนวทาง Framework ให้อยู่ดูต่อ
+2. ยกที่ 1 ({fw['r1_focus']}):
+   - round_1_title: ตั้งชื่อยกที่ 1 สั้นๆ (ให้สอดคล้องกับ {fw['r1_focus']})
    - round_1_a: จุดเด่นด้านนี้ของ {name_a} (1-2 ประโยคกระชับ)
    - round_1_b: สวนกลับด้วยจุดต่างด้านนี้ของ {name_b} (1-2 ประโยคกระชับ)
-3. ยกที่ 2 (ความสะดวก & เวลา / การใช้งานจริง):
-   - round_2_title: ตั้งชื่อยกที่ 2 สั้นๆ (เช่น "ความสะดวก & เวลา")
-   - round_2_a: ขั้นตอน/ข้อจำกัดด้านนี้ของ {name_a} (1-2 ประโยคกระชับ)
-   - round_2_b: สวนกลับด้วยความเร็ว/ความง่ายของ {name_b} (1-2 ประโยคกระชับ)
-4. ยกที่ 3 (ความคุ้มค่า & ต้นทุน / ราคา):
-   - round_3_title: ตั้งชื่อยกที่ 3 สั้นๆ (เช่น "ความคุ้มค่า & ราคา")
-   - round_3_a: ความคุ้มค่า/งบประมาณของ {name_a} (1-2 ประโยคกระชับ)
-   - round_3_b: สวนกลับด้วยความคุ้มค่า/ค่าใช้จ่ายของ {name_b} (1-2 ประโยคกระชับ)
-5. conclusion: สรุปฟันธงชัดเจนว่าใครควรเลือก A และใครควรเลือก B พร้อม CTA สไตล์ Affiliate เนียนๆ ชวนคนดูโหวต และบอกว่าพิกัดของแท้อยู่ในคอมเมนต์แรก{outro_prompt_hint}
+3. ยกที่ 2 ({fw['r2_focus']}):
+   - round_2_title: ตั้งชื่อยกที่ 2 สั้นๆ (ให้สอดคล้องกับ {fw['r2_focus']})
+   - round_2_a: ข้อมูล/การเปรียบเทียบด้านนี้ของ {name_a} (1-2 ประโยคกระชับ)
+   - round_2_b: สวนกลับด้วยจุดต่างด้านนี้ของ {name_b} (1-2 ประโยคกระชับ)
+4. ยกที่ 3 ({fw['r3_focus']}):
+   - round_3_title: ตั้งชื่อยกที่ 3 สั้นๆ (ให้สอดคล้องกับ {fw['r3_focus']})
+   - round_3_a: ข้อมูล/ความคุ้มค่าด้านนี้ของ {name_a} (1-2 ประโยคกระชับ)
+   - round_3_b: สวนกลับด้วยข้อมูล/ความคุ้มค่าของ {name_b} (1-2 ประโยคกระชับ)
+5. conclusion: สรุปฟันธงตามแนวทาง {fw['conclusion_guide']} พร้อม CTA สไตล์ Affiliate เนียนๆ ชวนคนดูโหวต และบอกว่าพิกัดของแท้อยู่ในคอมเมนต์แรก{outro_prompt_hint}
 6. affiliate_comment: ข้อความสำหรับปักหมุดคอมเมนต์แรก รวบรวมพิกัด {name_a} และ {name_b} พร้อมอีโมจิ
 
 สำคัญมาก:
@@ -109,15 +228,15 @@ class AIScriptGenerator:
   "name_a": "{name_a}",
   "name_b": "{name_b}",
   "mode": "multi_round",
-  "research_summary": "สรุปข้อมูลเจาะลึก 3 ยกสั้นๆ...",
-  "hook": "ประโยคเปิดคลิป...",
-  "round_1_title": "คุณภาพ & ฟิลลิ่ง",
+  "research_summary": "สรุปข้อมูลเจาะลึก 3 ยกสั้นๆ ตามกรอบ {fw['name']}...",
+  "hook": "ประโยคเปิดคลิปตามกรอบ...",
+  "round_1_title": "{fw['r1_focus']}",
   "round_1_a": "...",
   "round_1_b": "...",
-  "round_2_title": "ความสะดวก & เวลา",
+  "round_2_title": "{fw['r2_focus']}",
   "round_2_a": "...",
   "round_2_b": "...",
-  "round_3_title": "ความคุ้มค่า & ราคา",
+  "round_3_title": "{fw['r3_focus']}",
   "round_3_a": "...",
   "round_3_b": "...",
   "conclusion": "ประโยคสรุปฟันธงและ CTA...",
@@ -135,14 +254,15 @@ class AIScriptGenerator:
 - กลุ่มเป้าหมายคนดู: {target_audience or 'บุคคลทั่วไป / ผู้บริโภคที่กำลังตัดสินใจซื้อ'}
 - จุดที่อยากเน้นเปรียบเทียบ: {key_angles or 'ความคุ้มค่า สเปกการใช้งานจริง และความสะดวก'}
 - โทนอารมณ์: {tone} (น่าสนใจ มีน้ำหนักคำ ชวนฟัง กระชับ ไม่เวิ่นเว้อ)
+{framework_directive}
 
 ภารกิจของคุณ:
-1. ทำ Deep Comparative Research วิเคราะห์เจาะลึก 4 มิติสำคัญ
+1. ทำ Deep Comparative Research วิเคราะห์เจาะลึกตามกรอบ {fw['name']}
 2. เขียนบทพากย์วิดีโอ 4 ท่อน (สั้น กระชับ สำหรับอ่านพากย์ 20-30 วินาที):
-   - hook: ประโยคเปิดคลิป 1 ประโยค ยิงคำถามหรือประเด็นตรงจุด ชวนสงสัยให้อยู่ดูต่อ
-   - item_a: เจาะจุดเด่นของ {name_a} ให้เห็นภาพชัดเจน ทำไมต้องตัวนี้ (1-2 ประโยคกระชับ)
-   - item_b: เจาะจุดเด่นของ {name_b} ให้เห็นความต่าง ทำไมต้องตัวนี้ (1-2 ประโยคกระชับ)
-   - conclusion: สรุปฟันธง พร้อมประโยค Call-To-Action (CTA) สไตล์ Affiliate แบบเนียนๆ ชวนคนดูโหวต และบอกว่าพิกัดของแท้อยู่ในคอมเมนต์แรกแล้ว{outro_prompt_hint}
+   - hook: ประโยคเปิดคลิป 1 ประโยค ยิงคำถามหรือประเด็นตรงจุดตามกรอบ {fw['name']} ชวนสงสัยให้อยู่ดูต่อ
+   - item_a: เจาะจุดเด่นของ {name_a} ให้เห็นภาพชัดเจนตามกรอบ (1-2 ประโยคกระชับ)
+   - item_b: เจาะจุดเด่นของ {name_b} ให้เห็นความต่างตามกรอบ (1-2 ประโยคกระชับ)
+   - conclusion: สรุปฟันธงตามแนวทาง {fw['conclusion_guide']} พร้อมประโยค Call-To-Action (CTA) สไตล์ Affiliate แบบเนียนๆ ชวนคนดูโหวต และบอกว่าพิกัดของแท้อยู่ในคอมเมนต์แรกแล้ว{outro_prompt_hint}
 3. affiliate_comment: ข้อความสำหรับปักหมุดคอมเมนต์แรกใต้คลิป รวบรวมพิกัด {name_a} และ {name_b} จัดวางสวยงามพร้อมอีโมจิ
 
 สำคัญ: ห้ามใส่ Enter จริงในค่า JSON string เด็ดขาด ให้ใช้ \\n เท่านั้น ตอบเป็น JSON block:
@@ -152,7 +272,7 @@ class AIScriptGenerator:
   "name_a": "{name_a}",
   "name_b": "{name_b}",
   "mode": "classic",
-  "research_summary": "สรุปข้อมูลเจาะลึก 4 มิติสั้นๆ...",
+  "research_summary": "สรุปข้อมูลเจาะลึก 4 มิติสั้นๆ ตามกรอบ {fw['name']}...",
   "hook": "ประโยคเปิดคลิป...",
   "item_a": "ประโยคอธิบายไอเทม A...",
   "item_b": "ประโยคอธิบายไอเทม B...",
@@ -161,14 +281,25 @@ class AIScriptGenerator:
 }}
 """
         raw_res = self._call_gemini(prompt, affiliate_link_a, affiliate_link_b, topic, name_a, name_b)
-        return self._package_script_data(raw_res, script_mode, name_a, name_b)
+        return self._package_script_data(raw_res, script_mode, name_a, name_b, framework)
 
-    def _package_script_data(self, data: Dict[str, Any], mode: str, name_a: str, name_b: str) -> Dict[str, Any]:
+    def _package_script_data(
+        self,
+        data: Dict[str, Any],
+        mode: str,
+        name_a: str,
+        name_b: str,
+        framework: str = "persona",
+    ) -> Dict[str, Any]:
         """Constructs the canonical segments timeline structure for TTS and Video engines."""
+        fw = FRAMEWORK_PRESETS.get(framework, FRAMEWORK_PRESETS["persona"])
+        data["framework"] = framework
+        data["framework_name"] = fw["name"]
+
         if mode == "multi_round" and "round_1_a" in data:
-            r1 = data.get("round_1_title", "ยกที่ 1: คุณภาพ & ฟิลลิ่ง")
-            r2 = data.get("round_2_title", "ยกที่ 2: ความสะดวก & เวลา")
-            r3 = data.get("round_3_title", "ยกที่ 3: ความคุ้มค่า & ราคา")
+            r1 = data.get("round_1_title", fw.get("r1_focus", "คุณภาพ & ฟิลลิ่ง"))
+            r2 = data.get("round_2_title", fw.get("r2_focus", "ความสะดวก & เวลา"))
+            r3 = data.get("round_3_title", fw.get("r3_focus", "ความคุ้มค่า & ราคา"))
             data["mode"] = "multi_round"
             data["segments"] = [
                 {"id": "hook", "text": data.get("hook", ""), "highlight": "none", "round_label": "🔥 เปิดประเด็น"},
@@ -252,7 +383,8 @@ class AIScriptGenerator:
 }}
 """
             raw_res = self._call_gemini(prompt, "", "", topic, name_a, name_b)
-            return self._package_script_data(raw_res, "multi_round", name_a, name_b)
+            fw = current_script.get("framework", "persona")
+            return self._package_script_data(raw_res, "multi_round", name_a, name_b, framework=fw)
         else:
             prompt = f"""
 คุณเป็น Senior Video Script Doctor มีบทเปรียบเทียบเดิมดังนี้:
@@ -271,7 +403,7 @@ class AIScriptGenerator:
 โทนที่ต้องการ: {tone}
 
 โปรดรีไรท์บทใหม่ทั้ง 4 ท่อนให้ตรงตามคำสั่ง ปรับคำให้คมขึ้น น่าฟังขึ้น และจบด้วย CTA เนียนๆ เช่นเดิม
-สำคัญ: ห้ามมี Enter จริงใน JSON string ให้ใช้ \\n เท่านั้น ตอบเฉพาะ JSON:
+สำคัญ: ห้ามมี Enter จริงใน JSON string ให้ใช้ \n เท่านั้น ตอบเฉพาะ JSON:
 
 {{
   "topic": "{topic}",
@@ -287,7 +419,8 @@ class AIScriptGenerator:
 }}
 """
             raw_res = self._call_gemini(prompt, "", "", topic, name_a, name_b)
-            return self._package_script_data(raw_res, "classic", name_a, name_b)
+            fw = current_script.get("framework", "persona")
+            return self._package_script_data(raw_res, "classic", name_a, name_b, framework=fw)
 
     def _call_gemini(
         self,
@@ -374,6 +507,15 @@ class AIScriptGenerator:
             "name_b",
             "research_summary",
             "hook",
+            "round_1_title",
+            "round_1_a",
+            "round_1_b",
+            "round_2_title",
+            "round_2_a",
+            "round_2_b",
+            "round_3_title",
+            "round_3_a",
+            "round_3_b",
             "item_a",
             "item_b",
             "conclusion",
@@ -386,136 +528,219 @@ class AIScriptGenerator:
                 val = m.group(1).replace('\\"', '"').replace("\\n", "\n")
                 data[field] = val
 
-        if "hook" in data and "item_a" in data:
+        if "hook" in data and ("item_a" in data or "round_1_a" in data):
             return data
 
         sanitized = re.sub(r"[\r\n]+", "\\n", clean)
         return json.loads(sanitized)
 
 
-# Curated High-Retention Trending Comparison Library
+# Curated High-Retention Trending Comparison Library across 10 Viral Frameworks
 TRENDING_COMPARISON_TEMPLATES = [
-    # 📱 Gadget & Tech
+    # 👤 Persona-based
     {
+        "framework": "persona",
         "category": "📱 ไอที & แกดเจ็ต",
-        "topic": "iPad Air VS iPad Pro",
+        "topic": "iPad Air VS iPad Pro (ใครเหมาะกับตัวไหน)",
         "name_a": "iPad Air",
         "name_b": "iPad Pro",
-        "details_a": "ชิปแรง ประสิทธิภาพเกินพอ น้ำหนักเบา ราคาคุ้มค่าสำหรับเรียนและทำงานทั่วไป",
-        "details_b": "หน้าจอ Tandem OLED 120Hz ProMotion กล้องดีกว่า ลำโพง 4 ตัว เหมาะกับครีเอเตอร์มืออาชีพ",
+        "details_a": "ชิปแรง น้ำหนักเบา ราคาคุ้มค่า เหมาะสำหรับเรียน จดโน้ต และทำงานทั่วไป",
+        "details_b": "หน้าจอ Tandem OLED 120Hz ProMotion กล้องคู่ ลำโพง 4 ตัว เหมาะกับครีเอเตอร์มืออาชีพ",
         "target_audience": "นักศึกษา คนทำงาน และสายกราฟิกที่กำลังตัดสินใจซื้อไอแพด",
-        "key_angles": "ความคุ้มค่าของสเปกเทียบกับส่วนต่างราคาหลักหมื่น",
+        "key_angles": "ความคุ้มค่าของสเปกเทียบกับพฤติกรรมการใช้งานจริงของแต่ละคน",
         "affiliate_link_a": "https://shopee.co.th/ipad_air_official",
         "affiliate_link_b": "https://shopee.co.th/ipad_pro_official",
     },
     {
+        "framework": "persona",
         "category": "📱 ไอที & แกดเจ็ต",
-        "topic": "หูฟังไร้สาย Earbuds VS หูฟัง In-Ear",
+        "topic": "หูฟังทรง Earbuds VS หูฟัง In-Ear",
         "name_a": "หูฟังทรง Earbuds",
         "name_b": "หูฟังทรง In-Ear",
-        "details_a": "แปะหูใส่สบาย ไม่อุดอู้ ได้ยินเสียงรอบข้าง ปลอดภัยเวลาเดินข้างนอก",
-        "details_b": "จุกยางซีลหู ตัดเสียงรบกวนเงียบสนิท (ANC) เบสแน่นเต็มมิติ ฟังเพลงโฟกัสสุดๆ",
+        "details_a": "แปะหูใส่สบายทั้งวัน ไม่อุดอู้ ได้ยินเสียงรอบข้าง ปลอดภัยเวลาเดินข้างนอก",
+        "details_b": "จุกยางซีลหู ตัดเสียงรบกวนเงียบสนิท (ANC) เบสแน่น เหมาะกับคนชอบโลกส่วนตัว",
         "target_audience": "คนทำงานออฟฟิศ นักเรียน และสายเดินทางที่ใช้หูฟังทุกวัน",
-        "key_angles": "ความสบายในการสวมใส่ทั้งวัน เทียบกับประสิทธิภาพการตัดเสียงรบกวน",
+        "key_angles": "ความสบายไม่อึดอัด เทียบกับสมาธิและการตัดเสียงรบกวนขั้นสุด",
         "affiliate_link_a": "https://shopee.co.th/earbuds_sample",
         "affiliate_link_b": "https://shopee.co.th/inear_sample",
     },
+
+    # 🔀 Cross-over
     {
-        "category": "📱 ไอที & แกดเจ็ต",
-        "topic": "เมาส์เพื่อสุขภาพ (Ergonomic) VS เมาส์ทั่วไป",
-        "name_a": "เมาส์ทรง Ergonomic",
-        "name_b": "เมาส์ธรรมดาทั่วไป",
-        "details_a": "ทรงแนวตั้ง 57 องศา ลดการบิดของกระดูกข้อมือ ป้องกันออฟฟิศซินโดรมระยะยาว",
-        "details_b": "รูปทรงคุ้นมือ น้ำหนักเบา ควบคุมง่าย พกพาสะดวก ราคาเข้าถึงง่าย",
-        "target_audience": "พนักงานออฟฟิศ โปรแกรมเมอร์ และคนที่ใช้คอมพิวเตอร์เกินวันละ 6 ชั่วโมง",
-        "key_angles": "การแก้ปัญหาปวดข้อมือเรื้อรัง เทียบกับความเคยชินและความคล่องตัว",
-        "affiliate_link_a": "https://shopee.co.th/ergo_mouse_promo",
-        "affiliate_link_b": "https://shopee.co.th/normal_mouse_promo",
-    },
-    # ☕ Food & Drinks
-    {
-        "category": "☕ เครื่องดื่ม & อาหาร",
-        "topic": "กาแฟดริป VS กาแฟแคปซูล",
-        "name_a": "กาแฟดริป",
-        "name_b": "กาแฟแคปซูล",
-        "details_a": "กลิ่นอโรม่าหอมกรุ่น สุนทรียภาพ ได้รสสัมผัสเมล็ดแท้ ละเมียดละไม",
-        "details_b": "สะดวกเร็วใน 1 นาที รสชาติคงที่มาตรฐานทุกแก้ว ล้างทำความสะอาดง่าย",
-        "target_audience": "คนรักกาแฟ คนทำงานเช้าที่ต้องการคาเฟอีนคุณภาพ",
-        "key_angles": "ความสุนทรีย์ในการชง เทียบกับความสะดวกรวดเร็วในชั่วโมงเร่งด่วน",
-        "affiliate_link_a": "https://shopee.co.th/sample_drip",
-        "affiliate_link_b": "https://shopee.co.th/sample_capsule",
-    },
-    {
+        "framework": "crossover",
         "category": "☕ เครื่องดื่ม & อาหาร",
         "topic": "ชาเขียวมัทฉะแท้ VS กาแฟดำอเมริกาโน่",
         "name_a": "มัทฉะแท้เกรดพิธีการ",
         "name_b": "กาแฟดำอเมริกาโน่",
         "details_a": "มี L-Theanine ให้สมาธิต่อเนื่อง ไม่ใจสั่น คุมหิว สารต้านอนุมูลอิสระ EGCG สูง",
-        "details_b": "กระตุ้นความตื่นตัวทันที เพิ่มการเผาผลาญ 0 แคลอรี่ ชงง่ายหาซื้อง่าย",
-        "target_audience": "สายรักสุขภาพ คนคุมน้ำหนัก และวัยทำงานที่อยากโฟกัสงาน",
-        "key_angles": "พลังงานที่นิ่งต่อเนื่องแบบมัทฉะ เทียบกับความตื่นตัวเร็วแบบกาแฟดำ",
+        "details_b": "กระตุ้นความตื่นตัวทันที เพิ่มอัตราการเผาผลาญ 0 แคลอรี่ ชงง่ายหาซื้อง่าย",
+        "target_audience": "สายรักสุขภาพ คนคุมน้ำหนัก และวัยทำงานที่ต้องการโฟกัสทำงานทั้งวัน",
+        "key_angles": "พลังงานที่นิ่งต่อเนื่องยาวนาน เทียบกับความตื่นตัวฉับพลัน",
         "affiliate_link_a": "https://shopee.co.th/ceremonial_matcha",
         "affiliate_link_b": "https://shopee.co.th/specialty_coffee_beans",
     },
-    # 🏠 Home & Living
     {
+        "framework": "crossover",
+        "category": "💄 สุขภาพ & บิวตี้",
+        "topic": "เวย์โปรตีนเชค VS ไข่ต้ม 5 ฟอง",
+        "name_a": "เวย์โปรตีนชงดื่ม",
+        "name_b": "ไข่ต้ม CP / ตลาดสด",
+        "details_a": "ได้โปรตีน 25-30 กรัมใน 1 สกู๊ป ดื่มง่ายใน 30 วินาที ดูดซึมไว เหมาะหลังเล่นเวททันที",
+        "details_b": "อาหารธรรมชาติ 100% มีวิตามิน แร่ธาตุ ไขมันดี อิ่มท้องนาน ต้นทุนประหยัดมาก",
+        "target_audience": "คนเริ่มออกกำลังกาย สร้างกล้ามเนื้อ และคนคุมอาหาร",
+        "key_angles": "ความสะดวกสะดวกรวดเร็ว เทียบกับคุณค่าอาหารธรรมชาติและต้นทุนต่อวัน",
+        "affiliate_link_a": "https://shopee.co.th/whey_protein",
+        "affiliate_link_b": "https://shopee.co.th/boiled_eggs",
+    },
+
+    # 💰 Cost vs Value
+    {
+        "framework": "cost_value",
+        "category": "☕ เครื่องดื่ม & อาหาร",
+        "topic": "ชงกาแฟกินเองที่บ้าน VS ซื้อกาแฟสดร้านดังทุกวัน",
+        "name_a": "ชงดื่มเองที่บ้าน",
+        "name_b": "ซื้อกาแฟสดร้านดัง",
+        "details_a": "ต้นทุนเมล็ดเกรดพรีเมียมแก้วละ 15-25 บาท ค่าอุปกรณ์คืนทุนใน 3 เดือนแรก",
+        "details_b": "แก้วละ 65-150 บาท ปีนึงจ่าย 25,000-50,000 บาท แลกกับไม่ต้องล้าง ไม่ต้องชงเอง",
+        "target_audience": "คนทำงานออฟฟิศที่ติดกาแฟทุกเช้า และอยากวางแผนการเงินเก็บเงินแสน",
+        "key_angles": "คำนวณเงินเหลือเก็บใน 1 ปี และจุดคุ้มทุนค่าอุปกรณ์",
+        "affiliate_link_a": "https://shopee.co.th/home_coffee_maker",
+        "affiliate_link_b": "https://shopee.co.th/coffee_shop_card",
+    },
+    {
+        "framework": "cost_value",
+        "category": "📱 ไอที & แกดเจ็ต",
+        "topic": "รถยนต์ไฟฟ้า (EV) VS รถยนต์น้ำมัน (คำนวณ 5 ปี)",
+        "name_a": "รถยนต์ไฟฟ้า (EV)",
+        "name_b": "รถยนต์น้ำมัน (ICE)",
+        "details_a": "ค่าไฟกิโลเมตรละ 0.6-0.9 บาท เช็กระยะถูก แต่มีค่าเบี้ยประกันและเสื่อมราคาแบตเตอรี่",
+        "details_b": "ค่าน้ำมันกิโลเมตรละ 2.5-3.5 บาท ซ่อมบำรุงมีช่างทั่วไป อะไหล่หาง่าย เติมไวใน 3 นาที",
+        "target_audience": "คนที่กำลังจะออกรถคันใหม่ หรือขับรถวันละเกิน 50 กิโลเมตร",
+        "key_angles": "ส่วนต่างค่าพลังงาน 5 ปีเทียบกับค่าเบี้ยประกันและราคาขายต่อ",
+        "affiliate_link_a": "https://shopee.co.th/ev_charger",
+        "affiliate_link_b": "https://shopee.co.th/car_accessories",
+    },
+
+    # 🙈 Blind Test / Experiment
+    {
+        "framework": "blind_test",
+        "category": "☕ เครื่องดื่ม & อาหาร",
+        "topic": "กาแฟคั่วบด 100 บาท VS เมล็ด Geisha แก้วละ 250 บาท",
+        "name_a": "เมล็ดคั่วบดหลักร้อย",
+        "name_b": "เมล็ดประกวด Geisha หลักพัน",
+        "details_a": "รสชาติเข้มข้น หอมมาตรฐาน ชงเติมนมหรือดื่มดำก็อร่อย คุ้มค่าเงิน",
+        "details_b": "กลิ่นฟลอรัลดอกไม้สีขาว โทนซิตรัสซับซ้อน ได้คะแนน Cupping 88+ ลื่นคอสุดๆ",
+        "target_audience": "คอกาแฟและคนที่สงสัยว่ากาแฟแพงๆ มีดีจริงหรือแค่อุปทานหมู่",
+        "key_angles": "ถ้าปิดตาชิม คนทั่วไปแยกโน้ตดอกไม้กับกาแฟปกติออกจริงไหม",
+        "affiliate_link_a": "https://shopee.co.th/daily_beans",
+        "affiliate_link_b": "https://shopee.co.th/geisha_specialty",
+    },
+
+    # 🎯 Scenario / Budget
+    {
+        "framework": "scenario_budget",
+        "category": "☕ เครื่องดื่ม & อาหาร",
+        "topic": "งบ 1,000 บาท: หม้อต้ม Moka Pot VS เซ็ตดริปเปอร์พร้อมตาชั่ง",
+        "name_a": "หม้อต้ม Moka Pot สไตล์เข้ม",
+        "name_b": "เซ็ตดริปเปอร์ V60 พร้อมตาชั่ง",
+        "details_a": "สกัดกาแฟได้เข้มข้นคล้ายเอสเพรสโซ่ ชงเมนูนมอร่อย ทนทานใช้งานได้ตลอดชีพ",
+        "details_b": "เรียนรู้ศาสตร์การสกัดได้ลึกซึ้ง ได้กาแฟใสหอมกรุ่น คุมรสชาติได้ละเอียดทุกหยด",
+        "target_audience": "มือใหม่งบจำกัดที่อยากเริ่มทำกาแฟดื่มเองที่บ้านด้วยงบ 1,000 บาท",
+        "key_angles": "ความครอบคลุมเมนู และความคุ้มค่าที่จะจบในงบ 1,000 บาท",
+        "affiliate_link_a": "https://shopee.co.th/mokapot_set",
+        "affiliate_link_b": "https://shopee.co.th/v60_drip_set",
+    },
+
+    # 🏷️ Price Tier
+    {
+        "framework": "price_tier",
+        "category": "📱 ไอที & แกดเจ็ต",
+        "topic": "ไมค์ไวร์เลสหลักร้อย VS ไมค์ไวร์เลสแบรนด์ดังหลักหมื่น",
+        "name_a": "ไมค์ไร้สายหลักร้อย (Budget Wireless)",
+        "name_b": "ไมค์สตูดิโอระดับหมื่น (Pro Wireless)",
+        "details_a": "ใช้งานง่าย เสียบแล้วติดทันที ตัดเสียงรบกวนพอใช้ เหมาะกับมือใหม่เริ่มทำคลิป",
+        "details_b": "มี Safety Track บันทึกเสียงสำรองในตัว ระยะส่ง 250 ม. คลื่น 2.4GHz เสถียรสูง",
+        "target_audience": "ครีเอเตอร์ คนทำคลิป TikTok / Reels ที่กำลังเลือกซื้อไมค์ติดเสื้อ",
+        "key_angles": "คุณภาพเสียงที่คนดูในมือถือฟังออกจริงไหม เทียบกับส่วนต่างราคา 10 เท่า",
+        "affiliate_link_a": "https://shopee.co.th/budget_mic",
+        "affiliate_link_b": "https://shopee.co.th/pro_mic",
+    },
+
+    # ⏳ Old School vs Modern
+    {
+        "framework": "old_vs_modern",
+        "category": "☕ เครื่องดื่ม & อาหาร",
+        "topic": "กาแฟดริปมือสโลว์ไลฟ์ VS กาแฟแคปซูลทันใจ",
+        "name_a": "กาแฟดริปมือ (Manual Drip)",
+        "name_b": "กาแฟแคปซูล (Capsule Machine)",
+        "details_a": "กลิ่นอโรม่าหอมกรุ่น สุนทรียภาพ ได้รสสัมผัสเมล็ดแท้ ละเมียดละไม ได้ควบคุมทุกขั้นตอน",
+        "details_b": "สะดวกเร็วใน 1 นาที รสชาติคงที่มาตรฐานทุกแก้ว ล้างทำความสะอาดง่าย ไม่เลอะเทอะ",
+        "target_audience": "คนรักกาแฟ และคนทำงานเช้าที่ต้องการคาเฟอีนคุณภาพ",
+        "key_angles": "ความสุนทรีย์ในการชง เทียบกับความสะดวกรวดเร็วในชั่วโมงเร่งด่วน",
+        "affiliate_link_a": "https://shopee.co.th/sample_drip",
+        "affiliate_link_b": "https://shopee.co.th/sample_capsule",
+    },
+
+    # 💡 Myth vs Reality
+    {
+        "framework": "myth_vs_reality",
+        "category": "☕ เครื่องดื่ม & อาหาร",
+        "topic": "กาแฟคั่วเข้ม VS กาแฟคั่วอ่อน (ใครคาเฟอีนแรงกว่า?)",
+        "name_a": "กาแฟคั่วเข้ม (Dark Roast)",
+        "name_b": "กาแฟคั่วอ่อน (Light Roast)",
+        "details_a": "รสเข้ม ขม บอดี้หนัก มีกลิ่นสโมคกี้ แต่คาเฟอีนระเหิดไปตามความร้อนบางส่วน",
+        "details_b": "รสเปรี้ยวผลไม้ บอดี้บาง แต่โมเลกุลคาเฟอีนคงอยู่ครบกว่าเมื่อเทียบตามน้ำหนักเมล็ด",
+        "target_audience": "คนชอบดื่มกาแฟ และคนที่เข้าใจผิดว่ากาแฟขมแปลว่าคาเฟอีนเยอะ",
+        "key_angles": "หลักการวิทยาศาสตร์เรื่องคาเฟอีนเทียบกับความรู้สึกขมที่ปลายลิ้น",
+        "affiliate_link_a": "https://shopee.co.th/dark_roast_beans",
+        "affiliate_link_b": "https://shopee.co.th/light_roast_beans",
+    },
+
+    # 🇹🇭 Local vs Import
+    {
+        "framework": "local_vs_import",
+        "category": "☕ เครื่องดื่ม & อาหาร",
+        "topic": "เมล็ดไทยเกรดประกวดแม่จันใต้ VS เมล็ดนอก Ethiopia Yirgacheffe",
+        "name_a": "เมล็ดไทยแม่จันใต้ (Thai Specialty)",
+        "name_b": "เมล็ดเอธิโอเปีย (Ethiopia Yirgacheffe)",
+        "details_a": "รสชาติดอกไม้ป่า หวานฉ่ำปลาย คั่วสดใหม่จากดอยในไทย ไม่ต้องผ่านภาษีนำเข้ามหาโหด",
+        "details_b": "เอกลักษณ์ความหอมเบอร์กาม็อตและชามะลิระดับโลก แหล่งกำเนิดกาแฟที่คอกาแฟต้องลอง",
+        "target_audience": "สายกาแฟ Specialty และคนที่อยากเปิดใจอุดหนุนเกษตรกรไทย",
+        "key_angles": "ความสดใหม่และคุณภาพเทียบกับต้นทุนค่าขนส่งข้ามทวีป",
+        "affiliate_link_a": "https://shopee.co.th/thai_specialty_coffee",
+        "affiliate_link_b": "https://shopee.co.th/ethiopia_coffee_beans",
+    },
+
+    # 🔥 Hype vs Standard
+    {
+        "framework": "hype_vs_standard",
         "category": "🏠 ของใช้ในบ้าน & ครัว",
-        "topic": "หม้อทอดไร้น้ำมัน VS เตาอบลมร้อน",
+        "topic": "หม้อทอดไร้น้ำมัน VS เตาอบลมร้อนมาตรฐาน",
         "name_a": "หม้อทอดไร้น้ำมัน (Air Fryer)",
         "name_b": "เตาอบลมร้อน (Convection Oven)",
-        "details_a": "ร้อนไว อาหารกรอบเร็ว รีดน้ำมันได้ดี เหมาะกับเมนูด่วน 1-2 คน ขนาดกะทัดรัด",
-        "details_b": "ความจุเยอะ ทำอาหารได้พร้อมกันหลายอย่าง ทำเบเกอรี่และย่างไก่ทั้งตัวได้สม่ำเสมอ",
+        "details_a": "ลมร้อนหมุนเวียนเร็ว อาหารกรอบไวใน 10 นาที รีดน้ำมันหยดทิ้ง เหมาะมื้อด่วน 1-2 คน",
+        "details_b": "พื้นที่กว้าง ทำอาหารได้หลายอย่างพร้อมกัน ย่างไก่ทั้งตัว อบเบเกอรี่เนียนสม่ำเสมอ",
         "target_audience": "คนอยู่คอนโด แม่บ้าน และคนที่ชอบทำอาหารคลีนทานเองที่บ้าน",
-        "key_angles": "ความสะดวกรวดเร็วในการทำมื้อด่วน เทียบกับความหลากหลายและความจุ",
+        "key_angles": "กระแสทอดไร้น้ำมันที่คนฮิต เทียบกับความหลากหลายและคุ้มค่าของเตาอบจริง",
         "affiliate_link_a": "https://shopee.co.th/airfryer_deal",
         "affiliate_link_b": "https://shopee.co.th/oven_deal",
     },
-    {
-        "category": "🏠 ของใช้ในบ้าน & ครัว",
-        "topic": "เครื่องดูดฝุ่นไร้สาย VS หุ่นยนต์ดูดฝุ่น",
-        "name_a": "เครื่องดูดฝุ่นไร้สาย",
-        "name_b": "หุ่นยนต์ดูดฝุ่นถูพื้น",
-        "details_a": "แรงดูดทรงพลัง ดูดได้ทุกที่ ทั้งโซฟา ซอกตู้ ผ้าม่าน ในรถ จัดการจุดเลอะได้ทันที",
-        "details_b": "ทำงานอัตโนมัติทุกวันตามเวลาที่ตั้งไว้ ไม่ต้องเปลืองแรง เก็บฝุ่นละเอียดตอนไม่อยู่ห้อง",
-        "target_audience": "คนทำงานไม่มีเวลา คนเลี้ยงสัตว์ และคนรักความสะอาดในบ้าน",
-        "key_angles": "ความคล่องตัวจัดการซอกหลืบ เทียบกับการประหยัดแรงและเวลาแบบอัตโนมัติ",
-        "affiliate_link_a": "https://shopee.co.th/cordless_vacuum",
-        "affiliate_link_b": "https://shopee.co.th/robot_vacuum",
-    },
-    # 💄 Health & Beauty
-    {
-        "category": "💄 สุขภาพ & บิวตี้",
-        "topic": "เวย์โปรตีน Concentrate VS เวย์โปรตีน Isolate",
-        "name_a": "เวย์ Concentrate (WPC)",
-        "name_b": "เวย์ Isolate (WPI)",
-        "details_a": "โปรตีน 70-80% ราคาคุ้มค่า รสชาติอร่อยกลมกล่อม เหมาะกับคนสร้างกล้ามทั่วไป",
-        "details_b": "โปรตีน 90%+ แลคโตสและไขมันเกือบศูนย์ ย่อยง่าย คนแพ้นมทานได้ ลีนไว",
-        "target_audience": "คนออกกำลังกาย เล่นเวท และคนที่อยากเสริมโปรตีนให้ถึงในแต่ละวัน",
-        "key_angles": "ความคุ้มค่าคุ้มราคา เทียบกับความบริสุทธิ์ของโปรตีนและคนที่มีอาการแพ้นม",
-        "affiliate_link_a": "https://shopee.co.th/whey_concentrate",
-        "affiliate_link_b": "https://shopee.co.th/whey_isolate",
-    },
-    {
-        "category": "💄 สุขภาพ & บิวตี้",
-        "topic": "คุชชั่นเกาหลี (Cushion) VS รองพื้นเนื้อแมตต์ (Foundation)",
-        "name_a": "คุชชั่น (Cushion)",
-        "name_b": "รองพื้นเนื้อแมตต์ (Foundation)",
-        "details_a": "ให้งานผิวฉ่ำโกลว์ดูเป็นธรรมชาติ พกพาง่าย ตบเติมระหว่างวันได้สะดวกรวดเร็ว",
-        "details_b": "การปกปิดระดับ Full Coverage คุมมันยาวนานทั้งวัน ไม่เยิ้มแม้เจออากาศร้อนชื้น",
-        "target_audience": "สาวๆ และคนที่แต่งหน้าทำงานหรือไปเรียนในทุกๆ วัน",
-        "key_angles": "งานผิวสบายๆ เป็นธรรมชาติพกพาง่าย เทียบกับความติดทนคุมมันขั้นสุด",
-        "affiliate_link_a": "https://shopee.co.th/cushion_glow",
-        "affiliate_link_b": "https://shopee.co.th/matte_foundation",
-    }
 ]
 
 
-def get_random_idea(category: Optional[str] = None) -> Dict[str, str]:
-    """Returns a random high-retention comparison idea template."""
+def get_random_idea(
+    category: Optional[str] = None,
+    framework: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Returns a random high-retention comparison idea template across 10 frameworks."""
     import random
     pool = TRENDING_COMPARISON_TEMPLATES
     if category and category != "ทั้งหมด (สุ่มทุกหมวด)":
-        filtered = [item for item in pool if item["category"] == category]
+        filtered = [item for item in pool if item.get("category") == category]
+        if filtered:
+            pool = filtered
+    if framework and framework != "all":
+        filtered = [item for item in pool if item.get("framework") == framework]
         if filtered:
             pool = filtered
     return random.choice(pool).copy()
@@ -531,5 +756,6 @@ if __name__ == "__main__":
         details_b="เน้นเสียงคมชัดระดับ Hi-Res ไม่ต้องชาร์จ ไม่ดีเลย์",
         key_angles="คุณภาพเสียงเทียบกับความคล่องตัว",
         target_audience="คนชอบฟังเพลงระหว่างเดินทางและทำงาน",
+        framework="persona",
     )
     print(json.dumps(res, ensure_ascii=False, indent=2))

@@ -36,7 +36,7 @@ from config import (
     save_channel_profile,
     DEFAULT_CHANNEL_PROFILE,
 )
-from ai_script_generator import AIScriptGenerator, get_random_idea
+from ai_script_generator import AIScriptGenerator, get_random_idea, FRAMEWORK_PRESETS
 from tts_engine import TTSEngine
 from video_builder import VideoBuilder
 from pipeline import hex_to_rgb
@@ -167,6 +167,8 @@ if "input_aff_a" not in st.session_state:
     st.session_state.input_aff_a = ""
 if "input_aff_b" not in st.session_state:
     st.session_state.input_aff_b = ""
+if "input_framework" not in st.session_state:
+    st.session_state.input_framework = st.session_state.script_data.get("framework", "persona")
 
 # Tabs Navigation
 tab1, tab2, tab3, tab4 = st.tabs([
@@ -184,14 +186,14 @@ with tab1:
     st.markdown(
         """
         <div style="background: rgba(50, 205, 50, 0.08); border: 1px solid rgba(50, 205, 50, 0.3); border-radius: 12px; padding: 14px 18px; margin-bottom: 16px;">
-            <div style="font-weight: 700; font-size: 16px; color: #1F1F1F; margin-bottom: 4px;">💡 คิดไม่ออก? สุ่มหัวข้อไวรัลยอดฮิตในคลิกเดียว</div>
-            <div style="font-size: 13px; color: #555;">ดึงหัวข้อคู่เปรียบเทียบที่มีการค้นหาสูง พร้อมสเปกและกลุ่มเป้าหมายมาเติมให้ทันที</div>
+            <div style="font-weight: 700; font-size: 16px; color: #1F1F1F; margin-bottom: 4px;">💡 คิดไม่ออก? สุ่มหัวข้อไวรัลยอดฮิตในคลิกเดียว (คัดสรร 10 กรอบเนื้อหา)</div>
+            <div style="font-size: 13px; color: #555;">ดึงหัวข้อคู่เปรียบเทียบที่มีการค้นหาสูง พร้อมสเปก กลุ่มเป้าหมาย และกรอบความคิดไวรัลมาเติมให้ทันที</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    col_cat, col_rnd = st.columns([3, 2])
+    col_cat, col_fw_filter, col_rnd = st.columns([2, 3, 2])
     with col_cat:
         cat_options = [
             "ทั้งหมด (สุ่มทุกหมวด)",
@@ -201,23 +203,36 @@ with tab1:
             "💄 สุขภาพ & บิวตี้",
         ]
         selected_cat = st.selectbox(
-            "📂 เลือกหมวดหมู่ไอเดีย",
+            "📂 หมวดหมู่สินค้า",
             cat_options,
+            index=0,
+            label_visibility="collapsed",
+        )
+    with col_fw_filter:
+        fw_filter_options = [("all", "🎯 สุ่มทุกแนวทาง (10 Frameworks)")] + [
+            (k, FRAMEWORK_PRESETS[k]["name"]) for k in FRAMEWORK_PRESETS
+        ]
+        selected_fw_filter = st.selectbox(
+            "🎯 แนวทางเนื้อหา",
+            options=[x[0] for x in fw_filter_options],
+            format_func=lambda x: dict(fw_filter_options).get(x, x),
             index=0,
             label_visibility="collapsed",
         )
     with col_rnd:
         if st.button("🎲 สุ่มหัวข้อไวรัลทันที", use_container_width=True):
-            template = get_random_idea(selected_cat)
+            template = get_random_idea(category=selected_cat, framework=selected_fw_filter)
             st.session_state.input_topic = template["topic"]
             st.session_state.input_name_a = template["name_a"]
             st.session_state.input_name_b = template["name_b"]
-            st.session_state.input_details_a = template["details_a"]
-            st.session_state.input_details_b = template["details_b"]
-            st.session_state.input_target = template["target_audience"]
-            st.session_state.input_angles = template["key_angles"]
-            st.session_state.input_aff_a = template["affiliate_link_a"]
-            st.session_state.input_aff_b = template["affiliate_link_b"]
+            st.session_state.input_details_a = template.get("details_a", "")
+            st.session_state.input_details_b = template.get("details_b", "")
+            st.session_state.input_target = template.get("target_audience", "")
+            st.session_state.input_angles = template.get("key_angles", "")
+            st.session_state.input_aff_a = template.get("affiliate_link_a", "")
+            st.session_state.input_aff_b = template.get("affiliate_link_b", "")
+            if "framework" in template:
+                st.session_state.input_framework = template["framework"]
             st.toast(f"สุ่มได้หัวข้อ: {template['topic']} สำเร็จ!")
             st.rerun()
 
@@ -244,18 +259,32 @@ with tab1:
 
     in_angles = st.text_input("💡 มุมมองที่ต้องการเน้นเปรียบเทียบเป็นพิเศษ", key="input_angles", placeholder="เช่น ความคุ้มค่าในระยะยาว, ความยากง่ายในการใช้งาน, ความทนทาน...")
 
-    # Video Mode Selection
-    selected_mode = st.radio(
-        "⏱️ รูปแบบและความยาววิดีโอ (Video Comparison Mode):",
-        options=["multi_round", "classic"],
-        format_func=lambda x: "🔥 โหมดเจาะลึก 3 ยก (60-90 วินาที - เปรียบเทียบสลับไปมา 3 ด้าน A vs B)" if x == "multi_round" else "⚡ โหมดกระชับรวดเร็ว (30 วินาที - สรุปสั้นไว)",
-        index=0,
-        horizontal=True,
-        help="โหมด 3 ยก จะเปรียบเทียบสลับไปมา A ➜ B ➜ A ➜ B ➜ A ➜ B ครบทั้งด้านคุณภาพ ความสะดวก และราคาต่อแก้ว",
-    )
+    st.markdown("#### 🎯 รูปแบบวิดีโอ & กรอบมุมมองไวรัล (Framing & Mode)")
+    col_mode, col_fw = st.columns([1, 1], gap="medium")
+    with col_mode:
+        selected_mode = st.radio(
+            "⏱️ รูปแบบและความยาววิดีโอ:",
+            options=["multi_round", "classic"],
+            format_func=lambda x: "🔥 โหมดเจาะลึก 3 ยก (60-90s - สลับชี้ A vs B)" if x == "multi_round" else "⚡ โหมดกระชับรวดเร็ว (30s - สรุปสั้นไว)",
+            index=0,
+            help="โหมด 3 ยก จะเปรียบเทียบสลับไปมา A ➜ B ➜ A ➜ B ➜ A ➜ B ครบทุกมิติ",
+        )
+    with col_fw:
+        fw_keys = list(FRAMEWORK_PRESETS.keys())
+        cur_fw = st.session_state.get("input_framework", "persona")
+        cur_idx = fw_keys.index(cur_fw) if cur_fw in fw_keys else 0
+        selected_fw = st.selectbox(
+            "🎯 กรอบมุมมองการจับคู่ (Viral Framework):",
+            options=fw_keys,
+            index=cur_idx,
+            format_func=lambda k: FRAMEWORK_PRESETS[k]["name"],
+            help="เลือกแนวทางที่จะให้ AI เน้น เพื่อสร้างเนื้อหาให้เข้ากับจิตวิทยาคนดูบน Reels/TikTok/Shorts",
+        )
+        st.session_state.input_framework = selected_fw
+        st.info(f"💡 **แนวทาง:** {FRAMEWORK_PRESETS[selected_fw]['desc']}")
 
     if st.button("🚀 สั่งให้ Gemini ทำ Deep Research & ร่างบทใหม่ทันที", type="primary", use_container_width=True):
-        with st.spinner("🤖 Gemini กำลังทำ Deep Research วิเคราะห์สเปก จุดแข็ง จุดด้อย และร่างบท..."):
+        with st.spinner("🤖 Gemini กำลังทำ Deep Research วิเคราะห์สเปก จุดแข็ง จุดด้อย และร่างบทตาม Framework..."):
             try:
                 gen = AIScriptGenerator()
                 new_data = gen.generate_script(
@@ -270,6 +299,7 @@ with tab1:
                     affiliate_link_b=aff_b,
                     script_mode=selected_mode,
                     channel_outro_cta=st.session_state.channel_profile.get("default_outro_cta", ""),
+                    framework=selected_fw,
                 )
                 st.session_state.script_data = new_data
                 st.success("✅ ทำการวิเคราะห์และสร้างบทเรียบร้อยแล้ว! คลิกไปที่แท็บ '2. ตรวจบท & สั่งรีไรท์' ได้เลยครับ")
@@ -282,6 +312,20 @@ with tab1:
 with tab2:
     st.subheader("📝 Script Review & Rewrite Studio")
     st.caption("อ่านบทที่ AI คิดมา ตรวจสอบความถูกต้อง สั่ง AI รีไรท์เฉพาะจุด หรือแก้คำด้วยตัวเองได้อิสระ")
+
+    # Framework badge
+    active_fw = st.session_state.script_data.get("framework", st.session_state.get("input_framework", "persona"))
+    fw_info = FRAMEWORK_PRESETS.get(active_fw, FRAMEWORK_PRESETS["persona"])
+    st.markdown(
+        f"""
+        <div style="background: rgba(30, 144, 255, 0.08); border: 1px solid rgba(30, 144, 255, 0.3); border-radius: 10px; padding: 10px 16px; margin-bottom: 14px;">
+            <span style="font-weight: 700; color: #0056b3;">🎯 กรอบเนื้อหาปัจจุบัน:</span> 
+            <span style="font-weight: 600; color: #111;">{fw_info['name']}</span> 
+            <span style="color: #666; font-size: 13px;">— {fw_info['desc']}</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     # Research Factsheet
     summary_text = st.session_state.script_data.get("research_summary", "")
