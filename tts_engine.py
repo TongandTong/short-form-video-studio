@@ -216,11 +216,19 @@ class TTSEngine:
         include_bgm: bool = True,
         bgm_volume: float = 0.12,
         include_sfx: bool = True,
+        **kwargs,
     ) -> Tuple[List[SegmentTimeline], Path, float]:
         """
         Takes script data, generates audio per segment with edge-tts neural voice,
         computes exact timeline, injects transition SFX, mixes BGM, and outputs master audio.
+        Supports aliases: output_audio_path, enable_bgm, enable_sfx.
         """
+        if output_master_audio is None and "output_audio_path" in kwargs:
+            output_master_audio = kwargs["output_audio_path"]
+        if "enable_bgm" in kwargs:
+            include_bgm = kwargs["enable_bgm"]
+        if "enable_sfx" in kwargs:
+            include_sfx = kwargs["enable_sfx"]
         # Dynamic segments support (Multi-Round 60-90s or Classic 30s)
         if "segments" in script_data and isinstance(script_data["segments"], list) and len(script_data["segments"]) > 0:
             segments_meta = script_data["segments"]

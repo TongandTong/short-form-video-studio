@@ -556,10 +556,10 @@ with tab_script:
                     master_audio_path = output_mp4.parent / f"{output_mp4.stem}_audio.mp3"
                     timeline, audio_file, total_duration = tts.build_timeline(
                         script_data=st.session_state.script_data,
-                        output_audio_path=master_audio_path,
-                        enable_bgm=bool(prof.get("default_enable_bgm", True)),
+                        output_master_audio=master_audio_path,
+                        include_bgm=bool(prof.get("default_enable_bgm", True)),
                         bgm_volume=float(prof.get("default_bgm_vol", 0.12)),
-                        enable_sfx=bool(prof.get("default_enable_sfx", True)),
+                        include_sfx=bool(prof.get("default_enable_sfx", True)),
                     )
 
                     st.write("🎬 4/4: กำลังตัดต่อวิดีโอ 1080x1920 (9:16) พร้อมอนิเมชั่น...")
@@ -857,10 +857,10 @@ with tab_render:
 
                 timeline, audio_file, total_duration = tts.build_timeline(
                     script_data=st.session_state.script_data,
-                    output_audio_path=master_audio_path,
-                    enable_bgm=ov_bgm,
+                    output_master_audio=master_audio_path,
+                    include_bgm=ov_bgm,
                     bgm_volume=ov_bgm_vol,
-                    enable_sfx=bool(prof.get("default_enable_sfx", True)),
+                    include_sfx=bool(prof.get("default_enable_sfx", True)),
                 )
 
                 st.write("🎞️ 2/3: ตัดต่อคลิป 1080x1920 Dynamic Highlight & Watermark...")
