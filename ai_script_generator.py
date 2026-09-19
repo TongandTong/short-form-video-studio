@@ -706,6 +706,70 @@ class AIScriptGenerator:
         sanitized = re.sub(r"[\r\n]+", "\\n", clean)
         return json.loads(sanitized)
 
+    def generate_fresh_topic_idea(
+        self,
+        category: Optional[str] = None,
+        framework: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Uses Gemini to invent a brand new, trending, highly viral comparison topic on demand."""
+        cat_hint = f"ในหมวดหมู่: {category}" if category and category != "ทั้งหมด (สุ่มทุกหมวด)" else "เลือกหมวดหมู่ที่เป็นกระแสไวรัลในไทย (ของกิน, เครื่องดื่ม, แกดเจ็ต, ของใช้, สุขภาพ, การเงิน)"
+        fw_hint = f"ใช้กรอบจิตวิทยา: {framework}" if framework and framework != "all" else "เลือกกรอบจิตวิทยาที่น่าสนใจ (เช่น persona, budget_vs_luxury, crossover, perfect_pairing, science_myth)"
+
+        prompt = f"""คุณคือ Senior Viral Content Strategist ของช่องวิดีโอสั้น 'แตกต่างกันอย่างไร / Why It Works'
+โปรดคิดหัวข้อเปรียบเทียบ (VS / Pairing) ที่สดใหม่ แปลกใหม่ ชวนสงสัย และมีโอกาสเป็นไวรัลสูงมาก 1 หัวข้อ
+เงื่อนไข:
+- {cat_hint}
+- {fw_hint}
+- ต้องเป็นของ 2 สิ่งที่คนไทยรู้จักดี เคยสงสัย หรือกำลังถกเถียงกันในชีวิตประจำวัน
+- ชื่อไอเทม A และ B ต้องชัดเจน เป็นรูปธรรม จับต้องได้ ไม่ใช่นามธรรม
+
+ตอบกลับเป็น JSON Schema นี้เท่านั้น:
+{{
+  "framework": "{framework if framework and framework != 'all' else 'persona'}",
+  "category": "{category if category and category != 'ทั้งหมด (สุ่มทุกหมวด)' else '☕ เครื่องดื่ม & อาหาร'}",
+  "topic": "ชื่อหัวข้อคลิปที่ดึงดูด น่าคลิกดู (เช่น กาแฟส้ม VS กาแฟมะพร้าว หรือ ทำไมกินสิ่งนี้คู่กันแล้วดี)",
+  "name_a": "ชื่อไอเทม A พร้อมคำขยายสั้นๆ",
+  "name_b": "ชื่อไอเทม B พร้อมคำขยายสั้นๆ",
+  "details_a": "จุดเด่น รสชาติ หรือสเปกของ A (1-2 ประโยค)",
+  "details_b": "จุดเด่น รสชาติ หรือสเปกของ B (1-2 ประโยค)",
+  "target_audience": "กลุ่มคนที่สนใจประเด็นนี้",
+  "key_angles": "มิติเปรียบเทียบหลักที่ทำให้คนดูต้องหยุดดูจนจบ",
+  "affiliate_link_a": "https://shopee.co.th",
+  "affiliate_link_b": "https://shopee.co.th"
+}}"""
+
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "temperature": 0.88,
+                "topP": 0.95,
+                "maxOutputTokens": 800,
+                "responseMimeType": "application/json",
+            },
+        }
+
+        for url in [self.endpoint, self.fallback_endpoint, self.secondary_fallback]:
+            try:
+                response = requests.post(
+                    url,
+                    headers={"Content-Type": "application/json"},
+                    json=payload,
+                    timeout=18,
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+                    raw_text = "".join([p.get("text", "") for p in parts if not p.get("thought")]).strip()
+                    if raw_text:
+                        parsed = self._clean_and_parse_json(raw_text)
+                        if parsed.get("topic") and parsed.get("name_a") and parsed.get("name_b"):
+                            return parsed
+            except Exception as e:
+                print(f"[AI] Fresh topic call error on {url}: {e}")
+
+        # Fallback to random template
+        return get_random_idea(category=category, framework=framework, use_ai=False)
+
 
 # Curated High-Retention Trending Comparison Library across 8 Categories & 10 Frameworks
 TRENDING_COMPARISON_TEMPLATES = [
@@ -1066,6 +1130,149 @@ TRENDING_COMPARISON_TEMPLATES = [
         "affiliate_link_a": "https://shopee.co.th/iphone_official",
         "affiliate_link_b": "https://shopee.co.th/apple_watch_official",
     },
+    {
+        "framework": "perfect_pairing",
+        "category": "☕ เครื่องดื่ม & อาหาร",
+        "topic": "กาแฟช็อตเอสเปรสโซ + น้ำส้มสด (ทำไมเข้ากันอย่างลงตัว)",
+        "name_a": "ช็อตเอสเปรสโซเข้มข้น (Espresso Shot)",
+        "name_b": "น้ำส้มคั้นสดแท้ 100% (Fresh Orange Juice)",
+        "details_a": "รสขมเข้ม บอดี้แน่น มีกลิ่นหอมอโรม่าคั่วบด",
+        "details_b": "ความเปรี้ยวอมหวานจากกรดซิตริกธรรมชาติ ช่วยตัดความขมและชูรสฟรุตตี้ให้เด่นชัด",
+        "target_audience": "คอกาแฟสายสดชื่น และคนที่เพิ่งเริ่มหัดดื่มกาแฟดำ",
+        "key_angles": "Citrus & Coffee Synergy สัดส่วนความสดชื่นที่ไม่ต้องใส่น้ำตาลเพิ่ม",
+        "affiliate_link_a": "https://shopee.co.th/coffee_beans",
+        "affiliate_link_b": "https://shopee.co.th/orange_press",
+    },
+    {
+        "framework": "persona",
+        "category": "☕ เครื่องดื่ม & อาหาร",
+        "topic": "กาแฟ Cold Brew VS กาแฟ Iced Americano",
+        "name_a": "กาแฟสกัดเย็น (Cold Brew)",
+        "name_b": "อเมริกาโน่เย็น (Iced Americano)",
+        "details_a": "แช่น้ำเย็น 12-18 ชม. กรดต่ำ รสนุ่มละมุน ไม่ระคายเคืองกระเพาะ ดื่มง่าย",
+        "details_b": "สกัดด้วยน้ำร้อนแรงดันสูงแล้วเทลงน้ำแข็ง คาแรกเตอร์ชัด ขมเข้ม บอดี้แน่น",
+        "target_audience": "คนทำงาน คอกาแฟ และคนที่มีปัญหากรดไหลย้อนหรือแสบท้อง",
+        "key_angles": "ความเป็นกรดต่ำกับความนุ่มคอ เทียบกับความเข้มตื่นตัวฉับพลัน",
+        "affiliate_link_a": "https://shopee.co.th/cold_brew_pot",
+        "affiliate_link_b": "https://shopee.co.th/espresso_maker",
+    },
+    {
+        "framework": "budget_vs_luxury",
+        "category": "🏠 ของใช้ในบ้าน",
+        "topic": "กระทะเหล็กหล่อ (Cast Iron) VS กระทะเคลือบหินอ่อน (Non-Stick)",
+        "name_a": "กระทะเหล็กหล่อ (Cast Iron)",
+        "name_b": "กระทะเคลือบหินอ่อน (Non-Stick)",
+        "details_a": "กักเก็บความร้อนสูง ย่างสเต๊กเกรียมกรอบหอม ทนทานใช้ได้ชั่วลูกชั่วหลาน ยิ่งใช้ยิ่งลื่น",
+        "details_b": "น้ำหนักเบา ไม่ต้องใช้น้ำมัน ทำความสะอาดง่าย แต่สารเคลือบมีอายุการใช้งาน 1-2 ปี",
+        "target_audience": "สายทำอาหาร พ่อบ้านแม่บ้าน และคนรักสเต๊ก",
+        "key_angles": "ความทนทานและการสะสมความร้อนระดับเชฟ เทียบกับความสะดวกล้างง่ายของมือใหม่",
+        "affiliate_link_a": "https://shopee.co.th/cast_iron_pan",
+        "affiliate_link_b": "https://shopee.co.th/nonstick_pan",
+    },
+    {
+        "framework": "persona",
+        "category": "📱 ไอที & แกดเจ็ต",
+        "topic": "แปรงสีฟันไฟฟ้าโซนิค VS แปรงสีฟันขนนุ่มธรรมดา",
+        "name_a": "แปรงสีฟันไฟฟ้าโซนิค (Sonic Toothbrush)",
+        "name_b": "แปรงสีฟันขนนุ่มธรรมดา (Manual Toothbrush)",
+        "details_a": "สั่น 30,000-40,000 ครั้ง/นาที กำจัดคราบพลัคได้ลึกกว่า 3 เท่า มีระบบจับเวลา 2 นาที",
+        "details_b": "ราคาประหยัด ควบคุมน้ำหนักมือได้ตามใจ พกพาง่าย ไม่ต้องกังวลเรื่องชาร์จแบต",
+        "target_audience": "คนที่รักสุขภาพฟัน คนจัดฟัน และคนอยากแก้ปัญหากลิ่นปากและหินปูน",
+        "key_angles": "ประสิทธิภาพการขจัดคราบหินปูนและความสม่ำเสมอ เทียบกับความประหยัดและความคล่องตัว",
+        "affiliate_link_a": "https://shopee.co.th/electric_toothbrush",
+        "affiliate_link_b": "https://shopee.co.th/soft_toothbrush",
+    },
+    {
+        "framework": "crossover",
+        "category": "☕ เครื่องดื่ม & อาหาร",
+        "topic": "นมโอ๊ตบาริสต้า (Oat Milk) VS นมสดพาสเจอร์ไรส์ 100%",
+        "name_a": "นมโอ๊ตบาริสต้า (Oat Milk Barista)",
+        "name_b": "นมวัวพาสเจอร์ไรส์แท้ 100%",
+        "details_a": "ไม่มีแลคโตส ใยอาหารเบต้ากลูแคนสูง รสมันนัวจากข้าวโอ๊ต เหมาะกับกาแฟคั่วกลาง-อ่อน",
+        "details_b": "โปรตีนและแคลเซียมธรรมชาติสูง รสนมแท้กลมกล่อม ตีฟองครีมได้เนียนนุ่มและอยู่ตัวนาน",
+        "target_audience": "คนแพ้นมวัว สายวีแกน และคนรักกาแฟลาเต้",
+        "key_angles": "ความสบายท้องไร้แลคโตส เทียบกับสารอาหารโปรตีนและความมันนัวดั้งเดิม",
+        "affiliate_link_a": "https://shopee.co.th/oat_milk",
+        "affiliate_link_b": "https://shopee.co.th/fresh_milk",
+    },
+    {
+        "framework": "persona",
+        "category": "🏠 ของใช้ในบ้าน",
+        "topic": "หุ่นยนต์ดูดฝุ่นถูพื้น VS เครื่องดูดฝุ่นไร้สายทรงพลัง",
+        "name_a": "หุ่นยนต์ดูดฝุ่นอัตโนมัติ (Robot Vacuum)",
+        "name_b": "เครื่องดูดฝุ่นไร้สาย (Cordless Vacuum)",
+        "details_a": "ตั้งเวลาทำงานได้ทุกวัน หลบสิ่งกีดขวางด้วย LiDAR ดูดพร้อมถูและกลับแท่นชาร์จเอง",
+        "details_b": "แรงดูดมหาศาล ดูดไรฝุ่นบนที่นอน ซอกโซฟา และผ้าม่านได้ทุกมุมห้อง สะอาดหมดจดทันใจ",
+        "target_audience": "คนทำงานไม่มีเวลา คนเลี้ยงสัตว์ และคนรักความสะอาดแบบไร้ฝุ่น",
+        "key_angles": "การประหยัดเวลาแบบอัตโนมัติ เทียบกับพลังการทำความสะอาดเฉพาะจุดที่ละเอียดกว่า",
+        "affiliate_link_a": "https://shopee.co.th/robot_vacuum",
+        "affiliate_link_b": "https://shopee.co.th/cordless_vacuum",
+    },
+    {
+        "framework": "science_myth",
+        "category": "💄 สุขภาพ & บิวตี้",
+        "topic": "ครีมกันแดด Physical VS ครีมกันแดด Chemical",
+        "name_a": "กันแดด Physical (แร่ธาตุสะท้อนแสง)",
+        "name_b": "กันแดด Chemical (สารเคมีซับรังสี)",
+        "details_a": "ใช้ Zinc Oxide / Titanium Dioxide เคลือบผิวสะท้อนรังสี UV ออก อ่อนโยน ไม่ระคายเคือง",
+        "details_b": "เนื้อบางเบา ซึมไว ไม่วอก ไม่ขาวลอย เหมาะกับการทาก่อนแต่งหน้าและเล่นกีฬากลางแจ้ง",
+        "target_audience": "คนผิวแพ้ง่าย เป็นสิว และคนที่ต้องเผชิญแดดเมืองไทยทุกวัน",
+        "key_angles": "ความอ่อนโยนต่อผิวแพ้ง่าย เทียบกับความสบายผิวไม่เหนอะหนะ",
+        "affiliate_link_a": "https://shopee.co.th/physical_sunscreen",
+        "affiliate_link_b": "https://shopee.co.th/chemical_sunscreen",
+    },
+    {
+        "framework": "budget_vs_luxury",
+        "category": "🏠 ของใช้ในบ้าน",
+        "topic": "หม้อหุงข้าวดิจิทัล (IH Smart Cooker) VS หม้อหุงข้าวไฟฟ้าธรรมดา",
+        "name_a": "หม้อหุงข้าวดิจิทัลระบบแม่เหล็ก IH",
+        "name_b": "หม้อหุงข้าวไฟฟ้าแผ่นความร้อนทั่วไป",
+        "details_a": "ความร้อนกระจาย 360 องศา ข้าวสุกเรียงเม็ดนุ่มฟูสม่ำเสมอ คุมอุณหภูมิแม่นยำ หุงข้าวได้ทุกสายพันธุ์",
+        "details_b": "ราคาหลักร้อย ใช้งานง่ายแค่กดสวิตช์เดียว ร้อนไว ประหยัดไฟ เหมาะกับหอพักและชีวิตง่ายๆ",
+        "target_audience": "คนที่ให้ความสำคัญกับความอร่อยของข้าวสวย และครอบครัวยุคใหม่",
+        "key_angles": "คุณภาพรสสัมผัสความฟูของเมล็ดข้าว เทียบกับความคุ้มค่าและใช้งานง่าย",
+        "affiliate_link_a": "https://shopee.co.th/ih_rice_cooker",
+        "affiliate_link_b": "https://shopee.co.th/basic_rice_cooker",
+    },
+    {
+        "framework": "persona",
+        "category": "💄 สุขภาพ & บิวตี้",
+        "topic": "รองเท้าวิ่ง Max Cushion VS รองเท้าวิ่งทรง Barefoot",
+        "name_a": "รองเท้าวิ่งพื้นหนานุ่ม (Max Cushion)",
+        "name_b": "รองเท้าวิ่งมินิมอล (Barefoot Shoes)",
+        "details_a": "โฟมหนานุ่ม ซับแรงกระแทกเข่าและข้อเท้าดีเยี่ยม วิ่งระยะไกลสบาย เหมาะกับคนน้ำหนักเยอะ",
+        "details_b": "พื้นบางไร้ดรอป กระตุ้นการลงเท้าแบบธรรมชาติ เสริมสร้างกล้ามเนื้อฝ่าเท้าและเอ็นร้อยหวายให้แข็งแรง",
+        "target_audience": "นักวิ่งทุกระดับ คนออกกำลังกาย และคนที่มีปัญหาปวดข้อเข่า",
+        "key_angles": "การปกป้องลดแรงกระแทก เทียบกับการฝึกฝ่าเท้าตามสรีระธรรมชาติ",
+        "affiliate_link_a": "https://shopee.co.th/max_cushion_shoes",
+        "affiliate_link_b": "https://shopee.co.th/barefoot_shoes",
+    },
+    {
+        "framework": "crossover",
+        "category": "☕ เครื่องดื่ม & อาหาร",
+        "topic": "ไข่ไก่สดฟาร์มเบอร์ 0 VS ไข่เป็ดไล่ทุ่ง",
+        "name_a": "ไข่ไก่เบอร์ 0 สดพิเศษ",
+        "name_b": "ไข่เป็ดไล่ทุ่งสด",
+        "details_a": "ไข่ขาวโปรตีนแน่น คอเลสเตอรอลพอเหมาะ กลิ่นคาวน้อย เหมาะกับไข่ต้ม ไข่คน และอาหารทุกเมนู",
+        "details_b": "ไข่แดงฟองโต สีส้มเข้มจัด มีไขมันดีและรสชาติมันนัวเข้มข้น เหมาะทำไข่ดาวกรอบและไข่พะโล้",
+        "target_audience": "คนทำอาหาร สายฟิตเนส และคนรักไข่ดาวกรอบไข่แดงเยิ้ม",
+        "key_angles": "ความเนียนละมุนของไข่ขาว เทียบกับความมันนัวเข้มข้นของไข่แดงเป็ด",
+        "affiliate_link_a": "https://shopee.co.th/fresh_eggs",
+        "affiliate_link_b": "https://shopee.co.th/duck_eggs",
+    },
+    {
+        "framework": "persona",
+        "category": "🏠 ของใช้ในบ้าน",
+        "topic": "ที่นอนยางพาราแท้ 100% VS ที่นอนพ็อกเก็ตสปริง (Pocket Spring)",
+        "name_a": "ที่นอนยางพาราแท้ 100%",
+        "name_b": "ที่นอน Pocket Spring แยกอิสระ",
+        "details_a": "รองรับสรีระกระดูกสันหลังตามน้ำหนัก ไม่สะสมไรฝุ่น ทนทานไม่ยุบตัวนาน 10-15 ปี",
+        "details_b": "สปริงแยกจุด คนข้างๆ ขยับตัวไม่สะเทือน ระบายอากาศดี ไม่ร้อนหลัง นุ่มเด้งกำลังดี",
+        "target_audience": "คนปวดหลัง ออฟฟิศซินโดรม และคนที่มีปัญหาเรื่องการนอนหลับ",
+        "key_angles": "การพยุงแนวกระดูกลดอาการปวดเมื่อย เทียบกับการไม่สะเทือนคนข้างเคียงและการระบายความร้อน",
+        "affiliate_link_a": "https://shopee.co.th/latex_mattress",
+        "affiliate_link_b": "https://shopee.co.th/spring_mattress",
+    },
 ]
 
 CATEGORIES = list(dict.fromkeys(item["category"] for item in TRENDING_COMPARISON_TEMPLATES if "category" in item))
@@ -1074,9 +1281,19 @@ CATEGORIES = list(dict.fromkeys(item["category"] for item in TRENDING_COMPARISON
 def get_random_idea(
     category: Optional[str] = None,
     framework: Optional[str] = None,
+    use_ai: bool = False,
+    seen_topics: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    """Returns a random high-retention comparison idea template across 10 frameworks."""
+    """Returns a fresh high-retention comparison idea template or generates a fresh one via AI."""
     import random
+
+    if use_ai:
+        try:
+            gen = AIScriptGenerator()
+            return gen.generate_fresh_topic_idea(category=category, framework=framework)
+        except Exception:
+            pass
+
     pool = TRENDING_COMPARISON_TEMPLATES
     if category and category != "ทั้งหมด (สุ่มทุกหมวด)":
         filtered = [item for item in pool if item.get("category") == category]
@@ -1086,6 +1303,13 @@ def get_random_idea(
         filtered = [item for item in pool if item.get("framework") == framework]
         if filtered:
             pool = filtered
+
+    # Avoid recently selected topics in this session
+    if seen_topics:
+        unseen = [item for item in pool if item.get("topic") not in seen_topics]
+        if unseen:
+            pool = unseen
+
     return random.choice(pool).copy()
 
 

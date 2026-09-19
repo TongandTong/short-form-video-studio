@@ -80,16 +80,89 @@ def remove_fake_checkerboard_bg(img: Image.Image) -> Image.Image:
     return img
 
 
+def translate_to_english_subject(th_text: str) -> str:
+    """
+    Extracts or accurately translates Thai product/item names to a clean English visual subject
+    so AI image generation (FLUX/Pollinations) and web image search query the exact physical object.
+    """
+    if not th_text:
+        return ""
+    # 1. Check if English is already inside parentheses: e.g. "กาแฟคั่วบด (Ground Coffee)"
+    m = re.search(r"\(([A-Za-z0-9\s\-,]+)\)", th_text)
+    if m:
+        val = m.group(1).strip()
+        if len(val) > 2:
+            return val
+
+    # 2. Clean out parentheses and punctuation
+    clean = re.sub(r"\(.*?\)", "", th_text).strip()
+    clean = re.sub(r"^[0-9\.\-\s]+", "", clean).strip()
+
+    # 3. Quick dictionary for ultra-common Thai comparison items
+    KNOWN_TERMS = {
+        "กาแฟดำ": "black americano coffee in clear glass",
+        "อเมริกาโน่": "iced americano coffee glass",
+        "กาแฟส้ม": "orange juice espresso layered coffee glass",
+        "กาแฟนม": "creamy iced caffe latte glass",
+        "กาแฟดริป": "pour over drip coffee kettle with dripper",
+        "กาแฟแคปซูล": "modern coffee capsule pod",
+        "เมล็ดกาแฟ": "roasted arabica coffee beans",
+        "มัทฉะ": "japanese ceremonial matcha green tea in ceramic bowl",
+        "ชาเขียว": "iced green tea cup",
+        "ชาไทย": "thai orange milk tea with ice in glass",
+        "ชานม": "bubble milk tea cup with boba tapioca pearls",
+        "หม้อทอด": "air fryer modern kitchen appliance",
+        "เตาอบ": "countertop electric oven appliance",
+        "กระทะ": "nonstick cooking frying pan",
+        "หม้อต้ม": "moka pot espresso maker on stove",
+        "หูฟัง": "wireless bluetooth earbuds with charging case",
+        "หูฟังไร้สาย": "true wireless stereo earbuds in open case",
+        "หูฟังมีสาย": "in ear monitor hi-fi wired earphones",
+        "โทรศัพท์": "modern smartphone front mockup",
+        "นาฬิกา": "smartwatch fitness tracker on stand",
+        "ไอแพด": "modern tablet screen with stylus pen",
+        "คีย์บอร์ด": "mechanical gaming keyboard rgb",
+        "เมาส์": "ergonomic wireless mouse",
+        "รองเท้าวิ่ง": "running sport sneakers pair",
+        "เสื้อกันฝน": "raincoat jacket",
+        "น้ำมันพืช": "cooking oil glass bottle",
+        "เนยแท้": "block of golden natural butter on wooden board",
+        "เนยเทียม": "margarine spread tub",
+        "หมูสามชั้น": "crispy grilled pork belly slices on plate",
+        "กิมจิ": "fresh spicy korean cabbage kimchi in ceramic bowl",
+        "ไข่ไก่": "fresh brown chicken eggs in basket",
+        "ไข่เป็ด": "fresh white duck eggs",
+        "ข้าวกล้อง": "organic brown rice grain bowl",
+        "ข้าวขาว": "steamed jasmine white rice in ceramic bowl",
+    }
+    for k, v in KNOWN_TERMS.items():
+        if k in clean:
+            return v
+
+    # 4. Instant translation via Google Translate single API
+    try:
+        q = urllib.parse.quote(clean)
+        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=th&tl=en&dt=t&q={q}"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=4) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            en = data[0][0][0]
+            if en and isinstance(en, str):
+                en = en.strip()
+                en = re.sub(r"^(make your own|compare|versus|why)\s+", "", en, flags=re.IGNORECASE)
+                return en
+    except Exception:
+        pass
+
+    return clean
+
+
 def search_wikimedia_image(query: str) -> Optional[str]:
     """
     Searches Thai and English Wikipedia / Wikimedia Commons for a high-res image.
     Supports bilingual lookup, automatic redirect resolution, and raster thumbnail extraction.
     """
-    eng_term = None
-    m = re.search(r"\(([A-Za-z0-9\s]+)\)", query)
-    if m:
-        eng_term = m.group(1).strip()
-
+    eng_term = translate_to_english_subject(query)
     clean_q = re.sub(r"\(.*?\)", "", query).strip()
     clean_q = re.sub(r"[^\w\s\u0E00-\u0E7F]", "", clean_q).strip()
     if not clean_q and not eng_term:
@@ -140,7 +213,7 @@ def search_wikimedia_image(query: str) -> Optional[str]:
         except Exception:
             pass
 
-    # Step 2: Search English Wikipedia (using English term in parentheses if available, or clean_q)
+    # Step 2: Search English Wikipedia (using translated English term)
     en_queries = [q for q in [eng_term, clean_q] if q]
     for eq in en_queries:
         try:
@@ -166,23 +239,23 @@ def search_wikimedia_image(query: str) -> Optional[str]:
 CARTOON_STYLES = {
     "3d_pixar": {
         "name": "✨ 3D Pixar / Cute 3D (อนิเมชั่น 3 มิติ สตูดิโอคลีน)",
-        "prompt": "3D cute stylized cartoon illustration of {name}, vibrant soft pastel colors, Pixar 3D animation style, clean white studio background, smooth lighting, octane render, 4k",
+        "prompt": "3D cute stylized studio product render of {name}, single centered product item, vibrant glossy pastel colors, Pixar 3D animation style, clean white plain studio background, smooth spotlight, octane render, sharp focus, 4k, no people, no text",
     },
     "2d_flat": {
         "name": "🎨 2D Flat Vector (การ์ตูนเวกเตอร์ มินิมอล สีสดใส)",
-        "prompt": "Modern 2D flat vector cartoon illustration of {name}, cute kawaii icon, minimalist clean line art, bold pastel colors, white isolated background, graphic design sticker style",
+        "prompt": "Modern 2D flat vector cartoon sticker illustration of {name}, single centered item, cute kawaii icon, minimalist clean line art, bold pastel colors, solid white isolated background, graphic design, no people, no text",
     },
     "ghibli": {
         "name": "🍃 Studio Ghibli (ลายเส้นอนิเมะ อบอุ่น นุ่มนวล ละมุนตา)",
-        "prompt": "Studio Ghibli style anime illustration of {name}, Hayao Miyazaki aesthetic, nostalgic soft watercolor lighting, charming detailed hand-drawn anime art, clean light background",
+        "prompt": "Studio Ghibli aesthetic hand-drawn anime illustration of {name}, Hayao Miyazaki style, charming food and object art, soft watercolor lighting, centered single item, clean plain light background, no text",
     },
     "claymation": {
         "name": "🧸 Claymation / Stop-Motion (ดินน้ำมันปั้น 3D น่ารัก)",
-        "prompt": "Cute claymation clay sculpture illustration of {name}, plasticine stop-motion aesthetic, handmade craft texture, soft warm studio lighting, clean background, Aardman style",
+        "prompt": "Cute claymation plasticine clay sculpture miniature of {name}, stop-motion aesthetic, handmade craft texture, centered single product, soft warm studio lighting, plain white background, Aardman style, no text",
     },
     "cyberpunk": {
         "name": "⚡ Cyberpunk / Neon Glow (ไซเบอร์พังก์ นีออน สตรีทล้ำยุค)",
-        "prompt": "Stylized futuristic cyberpunk 3D icon of {name}, glowing neon accents, synthwave aesthetic, sleek high-tech edges, clean dark-studio isolated render",
+        "prompt": "Stylized futuristic cyberpunk 3D icon of {name}, glowing neon accents, synthwave aesthetic, sleek high-tech edges, centered single product, clean dark-studio isolated render, 4k, no text",
     },
 }
 
@@ -196,22 +269,17 @@ def generate_ai_cartoon_image(
     """
     Generates a charming stylized cartoon illustration via free AI engine (Pollinations.ai).
     Supports presets: '3d_pixar', '2d_flat', 'ghibli', 'claymation', 'cyberpunk'.
-    Includes bilingual English extraction, randomized seed, and automatic retry.
+    Translates Thai product names to precise English visual nouns for 100% accurate AI generation.
     """
-    # Extract English term inside parentheses if present (e.g. "Light Roast" in "กาแฟคั่วอ่อน (Light Roast)")
-    eng_match = re.search(r"\(([A-Za-z0-9\s\-]+)\)", item_name)
-    eng_term = eng_match.group(1).strip() if eng_match else ""
-
-    clean_name = re.sub(r"\(.*?\)", "", item_name).strip()
-    if not clean_name:
-        clean_name = item_name.strip()
-    if not clean_name:
+    eng_subject = translate_to_english_subject(item_name)
+    if not eng_subject:
+        clean_name = re.sub(r"\(.*?\)", "", item_name).strip()
+        eng_subject = clean_name or item_name.strip()
+    if not eng_subject:
         return None
 
-    ai_subject = f"{eng_term}, {clean_name}" if eng_term else clean_name
-
     style_cfg = CARTOON_STYLES.get(art_style, CARTOON_STYLES["3d_pixar"])
-    prompt = style_cfg["prompt"].format(name=ai_subject)
+    prompt = style_cfg["prompt"].format(name=eng_subject)
 
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 
@@ -221,10 +289,9 @@ def generate_ai_cartoon_image(
 
     prompts_to_try = [
         prompt,
-        f"cute 3D cartoon illustration of {ai_subject}, clean white studio background, vibrant colors, product spotlight",
+        f"3D commercial product render of {eng_subject}, centered single object, clean solid white background, vibrant colors, spotlight illumination, sharp 4k, no people, no text",
+        f"clean cute 3D miniature of {eng_subject}, white background, isolated, octane render",
     ]
-    if eng_term:
-        prompts_to_try.append(f"3D cute miniature of {eng_term}, clean plain background, high detail render")
 
     for attempt_idx, p_text in enumerate(prompts_to_try):
         try:
@@ -250,15 +317,15 @@ def generate_ai_cartoon_image(
             if attempt_idx < len(prompts_to_try) - 1:
                 time.sleep(0.8)
                 continue
-            print(f"[ImageFetcher] AI cartoon generation failed for ({clean_name}): {e}")
+            print(f"[ImageFetcher] AI cartoon generation failed for ({eng_subject}): {e}")
 
     return None
 
 
 def search_duckduckgo_image(query: str) -> Optional[str]:
-    """Lightweight DuckDuckGo image query without requiring external libraries."""
-    clean_q = re.sub(r"\(.*?\)", "", query).strip()
-    clean_q = clean_q + " isolated product"
+    """Lightweight DuckDuckGo image query using translated English product terms."""
+    eng_subject = translate_to_english_subject(query)
+    clean_q = f"{eng_subject} isolated product photography white background"
     url = f"https://html.duckduckgo.com/html/?q={urllib.parse.quote(clean_q)}"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"

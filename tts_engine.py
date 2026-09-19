@@ -137,10 +137,57 @@ class TTSEngine:
     """Manages multi-segment audio generation, measurement, and master track assembly with BGM/SFX."""
 
     VOICE_PRESETS = {
-        "edge_niwat": {"engine": "edge", "voice": "th-TH-NiwatNeural", "desc": "นิวัฒน์ (ชาย - นุ่มลึก มีน้ำหนัก เว้นจังหวะธรรมชาติ)"},
-        "edge_premwadee": {"engine": "edge", "voice": "th-TH-PremwadeeNeural", "desc": "เปรมวดี (หญิง - สดใส ชัดเจน เป็นธรรมชาติ)"},
-        "gcloud_neural": {"engine": "gcloud", "voice": "th-TH-Neural2-C", "desc": "Google Cloud Neural2-C (สตูดิโอ)"},
-        "gtts_thai": {"engine": "gtts", "voice": "th", "desc": "Google Translate TTS (พื้นฐาน ฟรี)"},
+        "edge_senior_male": {
+            "engine": "edge",
+            "voice": "th-TH-NiwatNeural",
+            "rate": "-5%",
+            "pitch": "-8Hz",
+            "desc": "🧔‍♂️ เสียงชายสุขุม/มีอายุ (ทุ้มลึก นุ่มนวล สไตล์ผู้ใหญ่ น่าเชื่อถือ)",
+        },
+        "edge_elder_doc": {
+            "engine": "edge",
+            "voice": "th-TH-NiwatNeural",
+            "rate": "-8%",
+            "pitch": "-14Hz",
+            "desc": "👴 เสียงอาจารย์/ผู้เชี่ยวชาญอาวุโส (ทุ้มต่ำ ใจเย็น มีน้ำหนักคำ)",
+        },
+        "edge_story_male": {
+            "engine": "edge",
+            "voice": "th-TH-NiwatNeural",
+            "rate": "-2%",
+            "pitch": "-5Hz",
+            "desc": "🎙️ เสียงเล่าเรื่องสารคดี (ทุ้มนุ่ม ลุ่มลึก น่าติดตาม)",
+        },
+        "edge_niwat": {
+            "engine": "edge",
+            "voice": "th-TH-NiwatNeural",
+            "rate": "+0%",
+            "pitch": "+0Hz",
+            "desc": "👦 นิวัฒน์ มาตรฐาน (ชายวัยทำงาน - ธรรมชาติ ฟังสบาย)",
+        },
+        "edge_energetic_male": {
+            "engine": "edge",
+            "voice": "th-TH-NiwatNeural",
+            "rate": "+10%",
+            "pitch": "+2Hz",
+            "desc": "⚡ นิวัฒน์ ไวรัลวัยรุ่น (กระฉับกระเฉง ตื่นเต้น ไวรัล TikTok)",
+        },
+        "edge_mature_female": {
+            "engine": "edge",
+            "voice": "th-TH-PremwadeeNeural",
+            "rate": "-4%",
+            "pitch": "-5Hz",
+            "desc": "👩 เปรมวดี ผู้ใหญ่/ภูมิฐาน (นุ่มนวล มั่นใจ ชัดถ้อยชัดคำ)",
+        },
+        "edge_premwadee": {
+            "engine": "edge",
+            "voice": "th-TH-PremwadeeNeural",
+            "rate": "+0%",
+            "pitch": "+0Hz",
+            "desc": "👧 เปรมวดี มาตรฐาน (หญิงสดใส เป็นมิตร)",
+        },
+        "gcloud_neural": {"engine": "gcloud", "voice": "th-TH-Neural2-C", "desc": "🌟 Google Cloud Neural2-C (สตูดิโอ)"},
+        "gtts_thai": {"engine": "gtts", "voice": "th", "desc": "🤖 Google Translate TTS (ฟรี พื้นฐาน)"},
     }
 
     EMOTION_PRESETS = {
@@ -225,11 +272,14 @@ class TTSEngine:
 
     async def _synthesize_edge_tts(self, text: str, voice: str, output_path: Path):
         """Generate high-fidelity audio using Microsoft Edge Neural TTS."""
+        preset = self.VOICE_PRESETS.get(self.voice_key, {})
+        rate = self.speech_rate if self.speech_rate not in ("+0%", "0%", "") else preset.get("rate", "+0%")
+        pitch = self.speech_pitch if self.speech_pitch not in ("+0Hz", "0Hz", "") else preset.get("pitch", "+0Hz")
         communicate = edge_tts.Communicate(
             text=text,
             voice=voice,
-            rate=self.speech_rate,
-            pitch=self.speech_pitch,
+            rate=rate,
+            pitch=pitch,
         )
         await communicate.save(str(output_path))
 

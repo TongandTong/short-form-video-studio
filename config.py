@@ -181,6 +181,8 @@ DEFAULT_CHANNEL_PROFILE = {
     "char_pose_neutral_open": "",
     "default_image_mode": "ai_cartoon",  # "ai_cartoon" | "web_search" | "minimal_card"
     "default_art_style": "3d_pixar",    # "3d_pixar" | "2d_flat" | "ghibli" | "claymation" | "cyberpunk"
+    "default_subtitle_style": "clean_floating",  # "clean_floating" (ไร้กรอบ เหลือแต่ตัวหนังสือ) | "paper_card" (การ์ดสติกเกอร์)
+    "default_subtitle_anim": "typewriter",      # "typewriter" (พิมพ์ทีละตัวตามเสียง) | "sentence_pop" (มาทั้งประโยค)
 }
 
 def load_channel_profile() -> dict:

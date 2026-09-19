@@ -414,7 +414,10 @@ with tab_script:
         unsafe_allow_html=True,
     )
 
-    col_cat, col_fw_filter, col_rnd = st.columns([2, 3, 2])
+    if "seen_topics" not in st.session_state:
+        st.session_state.seen_topics = []
+
+    col_cat, col_fw_filter, col_rnd1, col_rnd2 = st.columns([2, 2.5, 2, 2.5])
     with col_cat:
         cat_options = ["ทั้งหมด (สุ่มทุกหมวด)"] + CATEGORIES
         selected_cat = st.selectbox("📂 หมวดหมู่สินค้า", cat_options, index=0, label_visibility="collapsed")
@@ -429,11 +432,14 @@ with tab_script:
             index=0,
             label_visibility="collapsed",
         )
-    with col_rnd:
-        if st.button("🎲 สุ่มหัวข้อไวรัลทันที", use_container_width=True, type="secondary"):
+    with col_rnd1:
+        if st.button("🎲 สุ่มไอเดียไวรัล", use_container_width=True, type="secondary", help="สุ่มจากคลังไอเดียยอดนิยม 60+ หัวข้อ ไม่ซ้ำ"):
             cat_param = None if selected_cat == "ทั้งหมด (สุ่มทุกหมวด)" else selected_cat
             fw_param = None if selected_fw_filter == "all" else selected_fw_filter
-            idea = get_random_idea(category=cat_param, framework=fw_param)
+            idea = get_random_idea(category=cat_param, framework=fw_param, use_ai=False, seen_topics=st.session_state.seen_topics)
+            st.session_state.seen_topics.append(idea["topic"])
+            if len(st.session_state.seen_topics) > 30:
+                st.session_state.seen_topics.pop(0)
             st.session_state.input_topic = idea["topic"]
             st.session_state.input_name_a = idea["name_a"]
             st.session_state.input_name_b = idea["name_b"]
@@ -445,6 +451,25 @@ with tab_script:
             st.session_state.input_aff_b = idea.get("affiliate_b", "")
             st.session_state.input_framework = idea.get("framework", "persona")
             st.rerun()
+
+    with col_rnd2:
+        if st.button("🤖 ให้ AI คิดสดใหม่", use_container_width=True, type="primary", help="ให้ Gemini วิเคราะห์และสร้างหัวข้อเปรียบเทียบสดใหม่ไม่ซ้ำใคร"):
+            cat_param = None if selected_cat == "ทั้งหมด (สุ่มทุกหมวด)" else selected_cat
+            fw_param = None if selected_fw_filter == "all" else selected_fw_filter
+            with st.spinner("🤖 AI กำลังคิดหัวข้อเปรียบเทียบสุดไวรัล..."):
+                idea = get_random_idea(category=cat_param, framework=fw_param, use_ai=True)
+                st.session_state.seen_topics.append(idea["topic"])
+                st.session_state.input_topic = idea["topic"]
+                st.session_state.input_name_a = idea["name_a"]
+                st.session_state.input_name_b = idea["name_b"]
+                st.session_state.input_details_a = idea.get("details_a", "")
+                st.session_state.input_details_b = idea.get("details_b", "")
+                st.session_state.input_target = idea.get("target_audience", "")
+                st.session_state.input_angles = idea.get("key_angles", "")
+                st.session_state.input_aff_a = idea.get("affiliate_a", "")
+                st.session_state.input_aff_b = idea.get("affiliate_b", "")
+                st.session_state.input_framework = idea.get("framework", "persona")
+                st.rerun()
 
     # Input form
     col_t1, col_t2 = st.columns([3, 2], gap="medium")
@@ -619,6 +644,8 @@ with tab_script:
                         watermark_text=wm_text,
                         watermark_opacity=wm_opac,
                         round_assets=round_assets,
+                        subtitle_style=prof.get("default_subtitle_style", "clean_floating"),
+                        subtitle_anim=prof.get("default_subtitle_anim", "typewriter"),
                     )
 
                     cover_path = output_mp4.parent / f"{output_mp4.stem}_cover.jpg"
@@ -864,10 +891,12 @@ with tab_render:
     with st.expander("🎨 ปรับแต่งเฉพาะคลิปนี้ (เสียงพากย์, เพลงคลอ & สีพื้นหลัง)", expanded=False):
         c_ov1, c_ov2 = st.columns(2, gap="large")
         with c_ov1:
+            voice_options = list(TTSEngine.VOICE_PRESETS.keys())
+            cur_voice_idx = voice_options.index(prof.get("default_voice", "edge_niwat")) if prof.get("default_voice") in voice_options else 0
             voice_choice = st.selectbox(
                 "ผู้บรรยายเสียงพากย์:",
-                options=["edge_niwat", "edge_premwadee", "gcloud_neural", "gtts_thai"],
-                index=["edge_niwat", "edge_premwadee", "gcloud_neural", "gtts_thai"].index(prof.get("default_voice", "edge_niwat")),
+                options=voice_options,
+                index=cur_voice_idx,
                 format_func=lambda x: TTSEngine.VOICE_PRESETS[x]["desc"],
             )
             c_rt, c_pt = st.columns(2)
@@ -985,6 +1014,8 @@ with tab_render:
                     watermark_text=wm_text,
                     watermark_opacity=wm_opac,
                     round_assets=round_assets,
+                    subtitle_style=prof.get("default_subtitle_style", "clean_floating"),
+                    subtitle_anim=prof.get("default_subtitle_anim", "typewriter"),
                 )
 
                 st.write("📱 3/3: สร้างภาพปกและบันทึกลงคลัง...")
@@ -1402,25 +1433,37 @@ with tab_settings:
     c_vc1, c_vc2 = st.columns(2, gap="large")
 
     with c_vc1:
+        voice_keys = list(TTSEngine.VOICE_PRESETS.keys())
+        cur_def_v_idx = voice_keys.index(prof.get("default_voice", "edge_senior_male")) if prof.get("default_voice") in voice_keys else 0
         v_def_key = st.selectbox(
             "ผู้บรรยายเสียงพากย์หลัก (Voice):",
-            options=["edge_niwat", "edge_premwadee", "gcloud_neural", "gtts_thai"],
-            index=["edge_niwat", "edge_premwadee", "gcloud_neural", "gtts_thai"].index(prof.get("default_voice", "edge_niwat")),
+            options=voice_keys,
+            index=cur_def_v_idx,
             format_func=lambda x: TTSEngine.VOICE_PRESETS[x]["desc"],
             key="set_def_voice",
         )
+        if st.button("🔊 ทดลองฟังเสียงนี้ทันที (Sample Preview)", key="btn_test_voice"):
+            with st.spinner("กำลังสังเคราะห์ตัวอย่างเสียง..."):
+                try:
+                    t_engine = TTSEngine(voice_key=v_def_key)
+                    sample_p = TEMP_DIR / f"sample_{v_def_key}.mp3"
+                    t_engine.synthesize_segment("สวัสดีครับ ยินดีต้อนรับสู่ช่อง เปรียบเทียบสาระน่ารู้", sample_p)
+                    st.audio(str(sample_p), format="audio/mp3")
+                except Exception as e:
+                    st.error(f"ไม่สามารถเล่นตัวอย่างเสียงได้: {e}")
+
         v_def_emo = st.selectbox(
             "อารมณ์เสียงเริ่มต้น (Emotion):",
             options=list(TTSEngine.EMOTION_PRESETS.keys()),
-            index=list(TTSEngine.EMOTION_PRESETS.keys()).index(prof.get("default_emotion", "viral")) if prof.get("default_emotion") in TTSEngine.EMOTION_PRESETS else 0,
+            index=list(TTSEngine.EMOTION_PRESETS.keys()).index(prof.get("default_emotion", "story")) if prof.get("default_emotion") in TTSEngine.EMOTION_PRESETS else 1,
             format_func=lambda k: TTSEngine.EMOTION_PRESETS[k]["name"],
             key="set_def_emo",
         )
         c_rt2, c_pt2 = st.columns(2)
         with c_rt2:
-            s_def_rate = st.selectbox("ความเร็วเริ่มต้น:", ["-10%", "-5%", "+0%", "+5%", "+10%", "+15%", "+20%"], index=4, key="set_def_rate")
+            s_def_rate = st.selectbox("ความเร็วเริ่มต้น:", ["-10%", "-8%", "-5%", "-2%", "+0%", "+5%", "+10%", "+15%", "+20%"], index=4, key="set_def_rate")
         with c_pt2:
-            s_def_pitch = st.selectbox("ระดับเสียงเริ่มต้น:", ["-5Hz", "-2Hz", "+0Hz", "+1Hz", "+2Hz", "+5Hz"], index=4, key="set_def_pitch")
+            s_def_pitch = st.selectbox("ระดับเสียงเริ่มต้น:", ["-14Hz", "-10Hz", "-8Hz", "-5Hz", "-2Hz", "+0Hz", "+1Hz", "+2Hz", "+5Hz"], index=5, key="set_def_pitch")
 
     with c_vc2:
         s_def_bgm = st.toggle("เปิดเพลงคลอ Lo-Fi BGM เสมอ", value=bool(prof.get("default_enable_bgm", True)), key="set_def_bgm")
@@ -1434,6 +1477,21 @@ with tab_settings:
     c_vs1, c_vs2 = st.columns(2, gap="large")
 
     with c_vs1:
+        s_sub_style = st.selectbox(
+            "สไตล์แสดงผลซับไตเติล (Subtitle Display Style):",
+            options=["clean_floating", "paper_card"],
+            index=0 if prof.get("default_subtitle_style", "clean_floating") == "clean_floating" else 1,
+            format_func=lambda x: "✨ ข้อความลอยโปร่งใส ไร้กรอบ (Clean Floating — สไตล์ TikTok/Reels คมชัด)" if x == "clean_floating" else "📄 การ์ดสติกเกอร์สีขาว (Paper Card — สไตล์เพจแตกต่างกันอย่างไร)",
+            key="set_sub_style",
+            help="เลือกระหว่างข้อความลอยไร้กรอบพื้นหลัง หรือการ์ดสติกเกอร์สีขาว",
+        )
+        s_sub_anim = st.selectbox(
+            "แอนิเมชันตัวหนังสือ (Subtitle Animation):",
+            options=["typewriter", "sentence_pop"],
+            index=0 if prof.get("default_subtitle_anim", "typewriter") == "typewriter" else 1,
+            format_func=lambda x: "⌨️ พิมพ์ทีละตัวอักษรตามเสียงพูด (Typewriter Effect)" if x == "typewriter" else "💬 แสดงทีละทั้งประโยค (Sentence Pop — อ่านสบายตา)",
+            key="set_sub_anim",
+        )
         s_anim_style = st.selectbox(
             "สไตล์ตัวชี้และกรอบไฟ:",
             options=["pointer_and_border", "border_only"],
@@ -1722,6 +1780,8 @@ with tab_settings:
         prof["default_char_mode"] = s_char_mode
         prof["default_image_mode"] = s_img_mode
         prof["default_art_style"] = s_art_style
+        prof["default_subtitle_style"] = s_sub_style
+        prof["default_subtitle_anim"] = s_sub_anim
         save_channel_profile(prof)
         st.session_state.channel_profile = prof
 

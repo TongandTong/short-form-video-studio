@@ -224,59 +224,61 @@ class VideoBuilder:
             lines.append(current_line)
         return lines if lines else [text]
 
-    def _render_subtitle_card(self, text: str, round_label: str = "") -> Image.Image:
-        """Renders subtitle card with high-contrast text and paper-sticker backdrop."""
+    def _render_subtitle_card(self, text: str, round_label: str = "", style: str = "clean_floating") -> Image.Image:
+        """Renders subtitle card with high-contrast text. Supports clean_floating (no card) or paper_card."""
         w, h = SUBTITLE_BOX["w"], SUBTITLE_BOX["h"]
         card = Image.new("RGBA", (w, h), (0, 0, 0, 0))
         draw = ImageDraw.Draw(card)
 
-        # Drop shadow for paper sticker card
-        draw.rounded_rectangle([18, 10, w - 18, h - 2], radius=SUBTITLE_BOX["radius"], fill=(0, 0, 0, 30))
-        # White paper sticker card body
-        draw.rounded_rectangle(
-            [14, 4, w - 14, h - 8],
-            radius=SUBTITLE_BOX["radius"],
-            fill=(255, 255, 255, 250),
-            outline=(225, 220, 210, 240),
-            width=2,
-        )
-
-        # Optional Round / Dimension Badge at the top
-        text_offset_y = 6
-        if round_label:
-            badge_font = self._load_font(20, bold=True)
-            bbox = badge_font.getbbox(round_label)
-            bw = (bbox[2] - bbox[0]) + 30
-            bh = 32
-            bx = (w - bw) // 2
-            by = 12
+        text_offset_y = 4
+        if style == "paper_card":
+            # Drop shadow for paper sticker card
+            draw.rounded_rectangle([18, 10, w - 18, h - 2], radius=SUBTITLE_BOX["radius"], fill=(0, 0, 0, 30))
+            # White paper sticker card body
             draw.rounded_rectangle(
-                [bx, by, bx + bw, by + bh],
-                radius=16,
-                fill=(40, 40, 40, 245),
-                outline=self.highlight_color + (220,),
+                [14, 4, w - 14, h - 8],
+                radius=SUBTITLE_BOX["radius"],
+                fill=(255, 255, 255, 250),
+                outline=(225, 220, 210, 240),
                 width=2,
             )
-            draw.text((w // 2, by + bh // 2), round_label, font=badge_font, fill=(255, 255, 255, 255), anchor="mm")
-            text_offset_y = 22
+
+            # Optional Round / Dimension Badge at the top
+            if round_label:
+                badge_font = self._load_font(20, bold=True)
+                bbox = badge_font.getbbox(round_label)
+                bw = (bbox[2] - bbox[0]) + 30
+                bh = 32
+                bx = (w - bw) // 2
+                by = 12
+                draw.rounded_rectangle(
+                    [bx, by, bx + bw, by + bh],
+                    radius=16,
+                    fill=(40, 40, 40, 245),
+                    outline=self.highlight_color + (220,),
+                    width=2,
+                )
+                draw.text((w // 2, by + bh // 2), round_label, font=badge_font, fill=(255, 255, 255, 255), anchor="mm")
+                text_offset_y = 22
 
         if not text:
             return card
 
-        # Dynamic font sizing based on length to prevent vertical crowding
-        base_size = 36
+        # Dynamic font sizing: In clean_floating mode, text is larger and punchier
+        base_size = 40 if style == "clean_floating" else 36
         if len(text) > 65:
-            base_size = 28
+            base_size = 30 if style == "clean_floating" else 28
         elif len(text) > 42:
-            base_size = 32
+            base_size = 35 if style == "clean_floating" else 32
 
         font = self._load_font(base_size, bold=True)
-        lines = self._wrap_text(text, font, max_width=w - 80)
+        max_txt_w = w - 40 if style == "clean_floating" else w - 80
+        lines = self._wrap_text(text, font, max_width=max_txt_w)
 
         if len(lines) > 2 and base_size > 28:
             base_size = 28
             font = self._load_font(base_size, bold=True)
-            lines = self._wrap_text(text, font, max_width=w - 80)
+            lines = self._wrap_text(text, font, max_width=max_txt_w)
 
         line_height = int(base_size * 1.55)
         total_text_h = len(lines) * line_height
@@ -287,28 +289,66 @@ class VideoBuilder:
         for i, line in enumerate(lines):
             y = start_y + (i * line_height)
 
-            if " " not in line:
-                # Drop shadow
-                draw.text((w // 2 + 1, y + 1), line, font=font, fill=(210, 210, 210, 180), anchor="ma")
-                # Main text
-                draw.text((w // 2, y), line, font=font, fill=COLOR_TEXT_DARK, anchor="ma")
-            else:
-                line_w = int(font.getlength(line)) if hasattr(font, "getlength") else (font.getbbox(line)[2] - font.getbbox(line)[0])
-                curr_x = (w - line_w) // 2
-                words = line.split(" ")
-                for word in words:
-                    if not word:
-                        curr_x += space_w
-                        continue
-                    w_w = int(font.getlength(word)) if hasattr(font, "getlength") else (font.getbbox(word)[2] - font.getbbox(word)[0])
-                    is_num_or_stat = bool(re.search(r"(\d+|Hz|GB|%|บาท|ล้าน|แสน|ปี|เท่า)", word))
-                    word_color = (20, 140, 20) if is_num_or_stat else COLOR_TEXT_DARK
-
+            if style == "clean_floating":
+                # Clean Floating Text: High-contrast white text with bold dark outline and drop shadow
+                if " " not in line:
                     # Drop shadow
-                    draw.text((curr_x + 1, y + 1), word, font=font, fill=(210, 210, 210, 200), anchor="la")
-                    # Main text
-                    draw.text((curr_x, y), word, font=font, fill=word_color, anchor="la")
-                    curr_x += w_w + space_w
+                    draw.text((w // 2 + 2, y + 3), line, font=font, fill=(0, 0, 0, 180), anchor="ma")
+                    # Main text with thick dark outline
+                    draw.text(
+                        (w // 2, y),
+                        line,
+                        font=font,
+                        fill=(255, 255, 255, 255),
+                        stroke_width=4,
+                        stroke_fill=(15, 15, 20, 245),
+                        anchor="ma",
+                    )
+                else:
+                    line_w = int(font.getlength(line)) if hasattr(font, "getlength") else (font.getbbox(line)[2] - font.getbbox(line)[0])
+                    curr_x = (w - line_w) // 2
+                    words = line.split(" ")
+                    for word in words:
+                        if not word:
+                            curr_x += space_w
+                            continue
+                        w_w = int(font.getlength(word)) if hasattr(font, "getlength") else (font.getbbox(word)[2] - font.getbbox(word)[0])
+                        is_num_or_stat = bool(re.search(r"(\d+|Hz|GB|%|บาท|ล้าน|แสน|ปี|เท่า)", word))
+                        word_fill = (255, 220, 50, 255) if is_num_or_stat else (255, 255, 255, 255)
+
+                        # Drop shadow
+                        draw.text((curr_x + 2, y + 3), word, font=font, fill=(0, 0, 0, 180), anchor="la")
+                        # Main text with outline
+                        draw.text(
+                            (curr_x, y),
+                            word,
+                            font=font,
+                            fill=word_fill,
+                            stroke_width=4,
+                            stroke_fill=(15, 15, 20, 245),
+                            anchor="la",
+                        )
+                        curr_x += w_w + space_w
+            else:
+                # Paper Card Mode
+                if " " not in line:
+                    draw.text((w // 2 + 1, y + 1), line, font=font, fill=(210, 210, 210, 180), anchor="ma")
+                    draw.text((w // 2, y), line, font=font, fill=COLOR_TEXT_DARK, anchor="ma")
+                else:
+                    line_w = int(font.getlength(line)) if hasattr(font, "getlength") else (font.getbbox(line)[2] - font.getbbox(line)[0])
+                    curr_x = (w - line_w) // 2
+                    words = line.split(" ")
+                    for word in words:
+                        if not word:
+                            curr_x += space_w
+                            continue
+                        w_w = int(font.getlength(word)) if hasattr(font, "getlength") else (font.getbbox(word)[2] - font.getbbox(word)[0])
+                        is_num_or_stat = bool(re.search(r"(\d+|Hz|GB|%|บาท|ล้าน|แสน|ปี|เท่า)", word))
+                        word_color = (20, 140, 20) if is_num_or_stat else COLOR_TEXT_DARK
+
+                        draw.text((curr_x + 1, y + 1), word, font=font, fill=(210, 210, 210, 200), anchor="la")
+                        draw.text((curr_x, y), word, font=font, fill=word_color, anchor="la")
+                        curr_x += w_w + space_w
 
         return card
 
@@ -544,6 +584,8 @@ class VideoBuilder:
         watermark_text: Optional[str] = None,
         watermark_opacity: float = 0.75,
         round_assets: Optional[Dict[int, Dict[str, Any]]] = None,
+        subtitle_style: str = "clean_floating",
+        subtitle_anim: str = "typewriter",
     ) -> Path:
         """Main video rendering pipeline with animated pointing and synchronized highlights."""
         output_video_path.parent.mkdir(parents=True, exist_ok=True)
@@ -599,29 +641,29 @@ class VideoBuilder:
         border_b_inactive = self._render_box_frame(BOX_B_RECT, is_active=False)
         border_b_active = self._render_box_frame(BOX_B_RECT, is_active=True, pulse_val=1.0)
 
-        # 6. Pre-render Subtitle Cards with Progressive Typewriter Speech Reveal
+        # 6. Pre-render Subtitles with Progressive Typewriter Speech Reveal
+        thai_cluster_re = re.compile(r'[\u0E40-\u0E44]?[\u0E01-\u0E2E][\u0E30-\u0E3A\u0E47-\u0E4E]*|[A-Za-z0-9]+|\s+|.')
         subtitle_progressions: Dict[str, List[Image.Image]] = {}
         for seg in (timeline or []):
             text = seg.text.strip()
             r_lbl = getattr(seg, "round_label", "")
-            words = [w for w in text.split(" ") if w]
+            clusters = thai_cluster_re.findall(text)
             steps = []
-            if len(words) > 1:
-                for w_idx in range(1, len(words) + 1):
-                    partial = " ".join(words[:w_idx])
-                    steps.append(self._render_subtitle_card(partial, r_lbl))
+            if len(clusters) > 1 and subtitle_anim == "typewriter":
+                total_c = len(clusters)
+                num_steps = max(8, min(24, total_c))
+                for s_i in range(1, num_steps + 1):
+                    c_idx = max(1, int(total_c * (s_i / num_steps)))
+                    partial = "".join(clusters[:c_idx])
+                    steps.append(self._render_subtitle_card(partial, r_lbl, style=subtitle_style))
             else:
-                num_slices = max(3, min(8, len(text) // 5))
-                for s_i in range(1, num_slices + 1):
-                    c_end = int(len(text) * (s_i / num_slices))
-                    partial = text[:c_end]
-                    steps.append(self._render_subtitle_card(partial, r_lbl))
+                steps = [self._render_subtitle_card(text, r_lbl, style=subtitle_style)]
 
             if not steps:
-                steps = [self._render_subtitle_card(text, r_lbl)]
+                steps = [self._render_subtitle_card(text, r_lbl, style=subtitle_style)]
             subtitle_progressions[seg.segment_id] = steps
 
-        default_sub_card = self._render_subtitle_card(f"กำลังเปรียบเทียบ: {name_a} vs {name_b}")
+        default_sub_card = self._render_subtitle_card(f"กำลังเปรียบเทียบ: {name_a} vs {name_b}", style=subtitle_style)
 
         # 7. Animated Pointing Indicator
         pointer_img = self._render_pointing_indicator("กำลังพูดถึง 👇")
