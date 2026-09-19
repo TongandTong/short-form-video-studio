@@ -426,10 +426,44 @@ with tab3:
             format_func=lambda x: "ตัวชี้ลอยสลับไปมา + กรอบไฟนีออน (แนะนำ)" if x == "pointer_and_border" else "กรอบไฟนีออนอย่างเดียว",
         )
 
-        st.markdown("#### 📤 อัปโหลดรูปสินค้าและตัวละคร Avatar (Optional)")
-        up_a = st.file_uploader("รูปสินค้า A (1:1 สี่เหลี่ยมจัตุรัส)", type=["png", "jpg", "jpeg"], key="uploader_a")
-        up_b = st.file_uploader("รูปสินค้า B (1:1 สี่เหลี่ยมจัตุรัส)", type=["png", "jpg", "jpeg"], key="uploader_b")
-        up_char = st.file_uploader("รูปตัวละคร Avatar ด้านล่าง (PNG พื้นใส)", type=["png"], key="uploader_char")
+        st.markdown("#### 📤 รูปภาพสินค้า A & B")
+        col_up_a, col_up_b = st.columns(2)
+        with col_up_a:
+            up_a = st.file_uploader("รูปสินค้า A (1:1 สี่เหลี่ยมจัตุรัส)", type=["png", "jpg", "jpeg"], key="uploader_a")
+        with col_up_b:
+            up_b = st.file_uploader("รูปสินค้า B (1:1 สี่เหลี่ยมจัตุรัส)", type=["png", "jpg", "jpeg"], key="uploader_b")
+
+        st.markdown("#### 🧍‍♂️ ตัวละครผู้บรรยาย (Mascot Avatar & Animation)")
+        char_mode = st.radio(
+            "เลือกรูปแบบตัวละครผู้บรรยาย:",
+            options=["builtin", "single_upload", "multi_pose"],
+            format_func=lambda x: {
+                "builtin": "✨ มาสคอตระบบ (ครบ 4 ท่า: จับคางคิด, ชี้ A, ชี้ B, สรุป + ขยับปากพูดอัตโนมัติ)",
+                "single_upload": "🖼️ อัปโหลดรูปเดียว (ระบบสลับชี้ซ้าย-ขวา & ขยับตัวพูดให้อัตโนมัติ)",
+                "multi_pose": "🎨 อัปโหลดแยก 4 ท่าทาง (คิดตาม, ชี้ A, ชี้ B, สรุปฟันธง)",
+            }[x],
+            index=0,
+            help="ระบบจะเปลี่ยนท่าทางและขยับปากพูดให้ตรงกับจังหวะเสียงพากย์ของแต่ละยกโดยอัตโนมัติ",
+        )
+
+        up_char = None
+        up_think = None
+        up_pt_a = None
+        up_pt_b = None
+        up_neutral = None
+
+        if char_mode == "single_upload":
+            up_char = st.file_uploader("อัปโหลดรูปตัวละคร PNG พื้นใส (รูปเดียวใช้ได้ทั้งคลิป):", type=["png"], key="uploader_char_single")
+            st.caption("💡 แนะนำ: หันหน้าตรงหรือชี้ไปทางซ้าย ระบบจะ Flip กลับด้านเวลาชี้สินค้า B ให้เองอัตโนมัติ พร้อมอนิเมชั่นขยับตัวตามจังหวะพูด!")
+        elif char_mode == "multi_pose":
+            st.caption("💡 อัปโหลดภาพ PNG พื้นใสแยกตามแต่ละจังหวะอารมณ์:")
+            col_p1, col_p2 = st.columns(2)
+            with col_p1:
+                up_think = st.file_uploader("1. ท่าจับคางคิด (Hook / ช่วงเปิด):", type=["png"], key="up_pose_think")
+                up_pt_a = st.file_uploader("2. ท่ายกมือชี้ช่อง A (ทางซ้าย):", type=["png"], key="up_pose_a")
+            with col_p2:
+                up_pt_b = st.file_uploader("3. ท่ายกมือชี้ช่อง B (ทางขวา):", type=["png"], key="up_pose_b")
+                up_neutral = st.file_uploader("4. ท่ายิ้มมั่นใจ / สรุปคลิป (Conclusion):", type=["png"], key="up_pose_neutral")
 
 # -------------------------------------------------------------
 # TAB 4: RENDER & PREVIEW
@@ -444,7 +478,8 @@ with tab4:
         • **สินค้า A:** {st.session_state.script_data.get('name_a')}  
         • **สินค้า B:** {st.session_state.script_data.get('name_b')}  
         • **เสียงพากย์:** {TTSEngine.VOICE_PRESETS[voice_choice]['desc']}  
-        • **BGM / SFX:** {'เปิดใช้งาน' if enable_bgm else 'ปิด'} / {'เปิดใช้งาน' if enable_sfx else 'ปิด'}
+        • **BGM / SFX:** {'เปิดใช้งาน' if enable_bgm else 'ปิด'} / {'เปิดใช้งาน' if enable_sfx else 'ปิด'}  
+        • **ตัวละครผู้บรรยาย:** {'มาสคอตระบบ (4 ท่า + ขยับปาก)' if char_mode == 'builtin' else ('รูปเดี่ยวออโต้ฟลิป' if char_mode == 'single_upload' else 'แยก 4 ท่า')}
         """
     )
 
@@ -453,6 +488,7 @@ with tab4:
         path_a = IMAGES_DIR / "item_a_drip.png"
         path_b = IMAGES_DIR / "item_b_capsule.png"
         path_char = IMAGES_DIR / "character_host.png"
+        char_poses_dict = None
 
         if up_a:
             path_a = ASSETS_DIR / "images" / f"up_a_{int(time.time())}.png"
@@ -464,10 +500,33 @@ with tab4:
             with open(path_b, "wb") as f:
                 f.write(up_b.getbuffer())
 
-        if up_char:
+        if char_mode == "single_upload" and up_char:
             path_char = ASSETS_DIR / "images" / f"up_char_{int(time.time())}.png"
             with open(path_char, "wb") as f:
                 f.write(up_char.getbuffer())
+        elif char_mode == "multi_pose":
+            char_poses_dict = {}
+            t_stamp = int(time.time())
+            if up_think:
+                p_th = ASSETS_DIR / "images" / f"up_think_{t_stamp}.png"
+                with open(p_th, "wb") as f:
+                    f.write(up_think.getbuffer())
+                char_poses_dict["thinking"] = p_th
+            if up_pt_a:
+                p_a = ASSETS_DIR / "images" / f"up_pt_a_{t_stamp}.png"
+                with open(p_a, "wb") as f:
+                    f.write(up_pt_a.getbuffer())
+                char_poses_dict["point_a"] = p_a
+            if up_pt_b:
+                p_b = ASSETS_DIR / "images" / f"up_pt_b_{t_stamp}.png"
+                with open(p_b, "wb") as f:
+                    f.write(up_pt_b.getbuffer())
+                char_poses_dict["point_b"] = p_b
+            if up_neutral:
+                p_ne = ASSETS_DIR / "images" / f"up_neu_{t_stamp}.png"
+                with open(p_ne, "wb") as f:
+                    f.write(up_neutral.getbuffer())
+                char_poses_dict["neutral"] = p_ne
 
         output_mp4 = OUTPUT_DIR / f"shorts_{int(time.time())}.mp4"
 
@@ -488,7 +547,7 @@ with tab4:
                 include_sfx=enable_sfx,
             )
 
-            st.write(f"🎨 กำลังเรนเดอร์ Dynamic Animation, กรอบไฟ, ตัวชี้ และซับไตเติล (ความยาว {total_duration:.1f} วินาที)...")
+            st.write(f"🎨 กำลังเรนเดอร์ Dynamic Animation, ท่าทางมาสคอต, ปากขยับพูด และซับไตเติล (ความยาว {total_duration:.1f} วินาที)...")
             bg_rgb = hex_to_rgb(bg_color)
             hl_rgb = hex_to_rgb(highlight_color)
             builder = VideoBuilder(
@@ -508,6 +567,7 @@ with tab4:
                 timeline=timeline,
                 master_audio_path=audio_file,
                 output_video_path=output_mp4,
+                character_poses=char_poses_dict,
             )
             elapsed = time.time() - start_t
             progress_box.update(label=f"✅ เรนเดอร์วิดีโอ 1080x1920 สำเร็จสมบูรณ์ใน {elapsed:.1f} วินาที!", state="complete")

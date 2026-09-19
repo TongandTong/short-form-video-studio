@@ -15,7 +15,7 @@ import math
 import os
 import sys
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
+from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageOps
 from moviepy import VideoClip, AudioFileClip
 
 from config import (
@@ -249,11 +249,101 @@ class VideoBuilder:
 
         return card
 
+    def _prepare_character_poses(
+        self,
+        character_path: Optional[Path] = None,
+        character_poses: Optional[Dict[str, Path]] = None,
+    ) -> Dict[str, Dict[str, Image.Image]]:
+        """
+        Loads character sprites for 4 poses: 'thinking', 'point_a', 'point_b', 'neutral'.
+        For each pose, provides 'closed' and 'open' mouth frames.
+        Supports:
+        1. Explicit pose dictionary (character_poses).
+        2. System sample multi-pose assets in IMAGES_DIR (char_{pose}_{closed|open}.png).
+        3. Single custom image with auto-horizontal mirroring for 'point_b' and auto-talking bounce.
+        """
+        max_w, max_h = CHARACTER_BOX["max_width"], CHARACTER_BOX["max_height"]
+
+        def _load_and_resize(path: Path) -> Image.Image:
+            if not path or not path.exists():
+                return self._generate_sample_character(max_w, max_h)
+            img = Image.open(path).convert("RGBA")
+            img.thumbnail((max_w, max_h), Image.Resampling.LANCZOS)
+            return img
+
+        # 1. If explicit poses dictionary passed
+        if character_poses:
+            poses = {}
+            for pose_name in ["thinking", "point_a", "point_b", "neutral"]:
+                p_file = character_poses.get(pose_name)
+                if p_file and Path(p_file).exists():
+                    open_f = character_poses.get(f"{pose_name}_open")
+                    closed_f = character_poses.get(f"{pose_name}_closed", p_file)
+                    img_closed = _load_and_resize(Path(closed_f))
+                    img_open = _load_and_resize(Path(open_f)) if open_f and Path(open_f).exists() else img_closed
+                    poses[pose_name] = {"closed": img_closed, "open": img_open}
+                else:
+                    poses[pose_name] = None
+
+            base_pose = poses.get("neutral") or poses.get("thinking") or poses.get("point_a")
+            if not base_pose:
+                base_img = self._generate_sample_character(max_w, max_h)
+                base_pose = {"closed": base_img, "open": base_img}
+
+            for p in ["thinking", "point_a", "neutral"]:
+                if not poses.get(p):
+                    poses[p] = base_pose
+
+            if not poses.get("point_b"):
+                ref_closed = poses["point_a"]["closed"]
+                ref_open = poses["point_a"]["open"]
+                poses["point_b"] = {
+                    "closed": ImageOps.mirror(ref_closed),
+                    "open": ImageOps.mirror(ref_open),
+                }
+            return poses
+
+        # 2. If character_path is a custom user-uploaded single image
+        if character_path and character_path.exists() and character_path.name != "character_host.png":
+            base_img = _load_and_resize(character_path)
+            mirrored_img = ImageOps.mirror(base_img)
+            return {
+                "thinking": {"closed": base_img, "open": base_img},
+                "point_a": {"closed": base_img, "open": base_img},
+                "point_b": {"closed": mirrored_img, "open": mirrored_img},
+                "neutral": {"closed": base_img, "open": base_img},
+            }
+
+        # 3. Check for system multi-pose assets in IMAGES_DIR
+        has_sample_poses = all(
+            (IMAGES_DIR / f"char_{p}_closed.png").exists() for p in ["thinking", "point_a", "point_b", "neutral"]
+        )
+        if has_sample_poses:
+            poses = {}
+            for p in ["thinking", "point_a", "point_b", "neutral"]:
+                closed_p = IMAGES_DIR / f"char_{p}_closed.png"
+                open_p = IMAGES_DIR / f"char_{p}_open.png"
+                img_closed = _load_and_resize(closed_p)
+                img_open = _load_and_resize(open_p) if open_p.exists() else img_closed
+                poses[p] = {"closed": img_closed, "open": img_open}
+            return poses
+
+        # 4. Fallback to master character_host.png
+        fallback_path = character_path or (IMAGES_DIR / "character_host.png")
+        base_img = _load_and_resize(fallback_path)
+        mirrored_img = ImageOps.mirror(base_img)
+        return {
+            "thinking": {"closed": base_img, "open": base_img},
+            "point_a": {"closed": base_img, "open": base_img},
+            "point_b": {"closed": mirrored_img, "open": mirrored_img},
+            "neutral": {"closed": base_img, "open": base_img},
+        }
+
     def _prepare_character_sprite(self, char_path: Path) -> Image.Image:
+        """Legacy helper for backwards compatibility."""
         max_w, max_h = CHARACTER_BOX["max_width"], CHARACTER_BOX["max_height"]
         if not char_path.exists():
             return self._generate_sample_character(max_w, max_h)
-
         char_img = Image.open(char_path).convert("RGBA")
         char_img.thumbnail((max_w, max_h), Image.Resampling.LANCZOS)
         return char_img
@@ -282,14 +372,15 @@ class VideoBuilder:
         self,
         image_a_path: Path,
         image_b_path: Path,
-        character_path: Path,
-        topic: str,
-        name_a: str,
-        name_b: str,
-        timeline: List[SegmentTimeline],
-        master_audio_path: Path,
-        output_video_path: Path,
+        character_path: Optional[Path] = None,
+        topic: str = "",
+        name_a: str = "",
+        name_b: str = "",
+        timeline: List[SegmentTimeline] = None,
+        master_audio_path: Path = None,
+        output_video_path: Path = None,
         custom_bg_path: Optional[Path] = None,
+        character_poses: Optional[Dict[str, Path]] = None,
     ) -> Path:
         """Main video rendering pipeline with animated pointing and synchronized highlights."""
         output_video_path.parent.mkdir(parents=True, exist_ok=True)
@@ -327,7 +418,7 @@ class VideoBuilder:
 
         # 6. Pre-render Subtitle Cards
         subtitle_cards: Dict[str, Image.Image] = {}
-        for seg in timeline:
+        for seg in (timeline or []):
             subtitle_cards[seg.segment_id] = self._render_subtitle_card(seg.text, getattr(seg, "round_label", ""))
         default_sub_card = self._render_subtitle_card(f"กำลังเปรียบเทียบ: {name_a} vs {name_b}")
 
@@ -339,11 +430,8 @@ class VideoBuilder:
         pos_x_b = (BOX_B_RECT["x"] + BOX_B_RECT["w"] // 2) - (pointer_w // 2)
         base_pointer_y = BOX_A_RECT["y"] - pointer_h - 10
 
-        # 8. Character Sprite
-        char_sprite = self._prepare_character_sprite(character_path)
-        char_w, char_h = char_sprite.size
-        char_x = (CANVAS_WIDTH - char_w) // 2
-        base_char_y = CANVAS_HEIGHT - char_h + 30
+        # 8. Character Sprite Poses & Mouth Flaps
+        poses = self._prepare_character_poses(character_path=character_path, character_poses=character_poses)
 
         # Read audio duration
         audio_clip = AudioFileClip(str(master_audio_path))
@@ -353,13 +441,17 @@ class VideoBuilder:
         def make_frame(t: float) -> np.ndarray:
             frame = bg_base.copy()
 
+            is_speaking = False
             active_target = "none"
             active_card = default_sub_card
+            active_seg_id = ""
 
-            for seg in timeline:
+            for seg in (timeline or []):
                 if seg.start_time <= t <= seg.end_time:
+                    is_speaking = True
                     active_target = seg.highlight_target
                     active_card = subtitle_cards.get(seg.segment_id, default_sub_card)
+                    active_seg_id = seg.segment_id
                     break
 
             # Composite Borders & Pointer
@@ -384,9 +476,34 @@ class VideoBuilder:
             # Composite Subtitle Card
             frame.paste(active_card, (SUBTITLE_BOX["x"], SUBTITLE_BOX["y"]), active_card)
 
-            # Composite Character Sprite
-            breathe_offset = int(math.sin(t * 3.2) * 5)
-            frame.paste(char_sprite, (char_x, base_char_y + breathe_offset), char_sprite)
+            # 9. Dynamic Mascot Pose Selection & Talking Mouth-Flap
+            if active_target == "A":
+                current_pose_key = "point_a"
+            elif active_target == "B":
+                current_pose_key = "point_b"
+            else:
+                if active_seg_id == "hook" or (not active_seg_id and t < total_duration * 0.20):
+                    current_pose_key = "thinking"
+                elif active_seg_id in ["conclusion", "affiliate_comment"] or (not active_seg_id and t > total_duration * 0.80):
+                    current_pose_key = "neutral"
+                else:
+                    current_pose_key = "thinking"
+
+            # Mouth Flap & Animation Bounce
+            if is_speaking:
+                # Talking flap frequency ~7.5 Hz (matches Thai syllables)
+                mouth_state = "open" if (int(t * 7.5) % 2 == 1) else "closed"
+                char_bob = int(math.sin(t * 16.0) * 4)  # energetic talking bounce
+            else:
+                # Silence gap: mouth stays closed with calm idle breathing
+                mouth_state = "closed"
+                char_bob = int(math.sin(t * 3.2) * 5)
+
+            char_sprite = poses[current_pose_key][mouth_state]
+            char_w, char_h = char_sprite.size
+            char_x = (CANVAS_WIDTH - char_w) // 2
+            char_y = (CANVAS_HEIGHT - char_h + 30) + char_bob
+            frame.paste(char_sprite, (char_x, char_y), char_sprite)
 
             return np.array(frame.convert("RGB"))
 

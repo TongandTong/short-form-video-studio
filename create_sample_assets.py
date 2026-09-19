@@ -46,36 +46,90 @@ def create_sample_assets():
     img_b.save(path_b)
     print(f"Created: {path_b}")
 
-    # 3. Character Sprite Avatar (600x700 with Alpha Transparency)
-    char_img = Image.new("RGBA", (600, 700), (0, 0, 0, 0))
-    draw_c = ImageDraw.Draw(char_img)
-    # Body & shoulders
-    draw_c.ellipse([140, 380, 460, 760], fill=(41, 128, 185, 255))
-    # Shirt Collar
-    draw_c.polygon([(250, 390), (350, 390), (300, 480)], fill=(255, 255, 255, 255))
-    # Modern tie / badge
-    draw_c.rounded_rectangle([285, 460, 315, 600], radius=6, fill=(230, 126, 34, 255))
-    # Head & ears
-    draw_c.ellipse([180, 160, 420, 400], fill=(255, 224, 189, 255))
-    draw_c.ellipse([165, 250, 195, 300], fill=(255, 224, 189, 255))
-    draw_c.ellipse([405, 250, 435, 300], fill=(255, 224, 189, 255))
-    # Hair
-    draw_c.ellipse([170, 100, 430, 260], fill=(44, 62, 80, 255))
-    # Eyes
-    draw_c.ellipse([235, 245, 270, 280], fill=(44, 62, 80, 255))
-    draw_c.ellipse([330, 245, 365, 280], fill=(44, 62, 80, 255))
-    draw_c.ellipse([245, 250, 255, 260], fill=(255, 255, 255, 255))
-    draw_c.ellipse([340, 250, 350, 260], fill=(255, 255, 255, 255))
-    # Cute glasses
-    draw_c.rounded_rectangle([215, 230, 285, 295], radius=12, outline=(30, 30, 30, 255), width=6)
-    draw_c.rounded_rectangle([315, 230, 385, 295], radius=12, outline=(30, 30, 30, 255), width=6)
-    draw_c.line([285, 260, 315, 260], fill=(30, 30, 30, 255), width=6)
-    # Smile
-    draw_c.arc([265, 305, 335, 350], start=15, end=165, fill=(192, 57, 43, 255), width=6)
+    # 3. Multi-Pose Character Mascot with Talking Mouth Flaps (600x720)
+    def draw_mascot(pose="neutral", mouth_open=False, w=600, h=720):
+        img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
 
+        # Body / Suit
+        draw.ellipse([140, 390, 460, 770], fill=(41, 128, 185, 255))
+        # Shirt Collar
+        draw.polygon([(250, 400), (350, 400), (300, 485)], fill=(255, 255, 255, 255))
+        # Modern tie
+        draw.rounded_rectangle([285, 465, 315, 605], radius=6, fill=(230, 126, 34, 255))
+
+        # Arms / Hands based on Pose
+        suit_color = (31, 97, 141, 255)
+        skin_color = (255, 224, 189, 255)
+
+        if pose == "point_a":
+            # Pointing up-left towards Box A
+            draw.line([(180, 430), (90, 320), (50, 210)], fill=suit_color, width=38, joint="curve")
+            draw.ellipse([30, 180, 75, 225], fill=skin_color)
+            draw.line([(55, 195), (35, 145)], fill=skin_color, width=16)  # index finger
+        elif pose == "point_b":
+            # Pointing up-right towards Box B
+            draw.line([(420, 430), (510, 320), (550, 210)], fill=suit_color, width=38, joint="curve")
+            draw.ellipse([525, 180, 570, 225], fill=skin_color)
+            draw.line([(545, 195), (565, 145)], fill=skin_color, width=16)  # index finger
+        elif pose == "thinking":
+            # Hand under chin / contemplating
+            draw.line([(420, 450), (410, 380), (340, 365)], fill=suit_color, width=34, joint="curve")
+            draw.ellipse([320, 345, 360, 385], fill=skin_color)  # hand on chin
+            draw.line([(180, 450), (170, 540)], fill=suit_color, width=34)
+        else:  # neutral
+            draw.line([(180, 440), (150, 560)], fill=suit_color, width=34)
+            draw.line([(420, 440), (450, 560)], fill=suit_color, width=34)
+
+        # Head & Ears
+        draw.ellipse([180, 160, 420, 400], fill=skin_color)
+        draw.ellipse([165, 250, 195, 300], fill=skin_color)
+        draw.ellipse([405, 250, 435, 300], fill=skin_color)
+        # Hair
+        draw.ellipse([170, 100, 430, 260], fill=(44, 62, 80, 255))
+
+        # Eyebrows
+        if pose == "thinking":
+            draw.line([(225, 215), (275, 225)], fill=(30, 30, 30, 255), width=5)
+            draw.line([(325, 220), (375, 210)], fill=(30, 30, 30, 255), width=5)
+        else:
+            draw.line([(225, 220), (275, 220)], fill=(30, 30, 30, 255), width=5)
+            draw.line([(325, 220), (375, 220)], fill=(30, 30, 30, 255), width=5)
+
+        # Eyes
+        eye_offset_y = -10 if pose == "thinking" else 0
+        eye_offset_x = -5 if pose == "point_a" else (5 if pose == "point_b" else 0)
+        draw.ellipse([235 + eye_offset_x, 245 + eye_offset_y, 270 + eye_offset_x, 280 + eye_offset_y], fill=(44, 62, 80, 255))
+        draw.ellipse([330 + eye_offset_x, 245 + eye_offset_y, 365 + eye_offset_x, 280 + eye_offset_y], fill=(44, 62, 80, 255))
+        draw.ellipse([245 + eye_offset_x, 250 + eye_offset_y, 255 + eye_offset_x, 260 + eye_offset_y], fill=(255, 255, 255, 255))
+        draw.ellipse([340 + eye_offset_x, 250 + eye_offset_y, 350 + eye_offset_x, 260 + eye_offset_y], fill=(255, 255, 255, 255))
+
+        # Glasses
+        draw.rounded_rectangle([215, 230, 285, 295], radius=12, outline=(30, 30, 30, 255), width=6)
+        draw.rounded_rectangle([315, 230, 385, 295], radius=12, outline=(30, 30, 30, 255), width=6)
+        draw.line([285, 260, 315, 260], fill=(30, 30, 30, 255), width=6)
+
+        # Mouth (Talking Flap)
+        if mouth_open:
+            draw.ellipse([275, 320, 325, 360], fill=(160, 30, 30, 255))
+            draw.chord([280, 320, 320, 335], start=0, end=180, fill=(255, 255, 255, 255))
+            draw.ellipse([285, 342, 315, 358], fill=(230, 100, 100, 255))
+        else:
+            draw.arc([265, 315, 335, 355], start=15, end=165, fill=(192, 57, 43, 255), width=6)
+
+        return img
+
+    for p in ["thinking", "point_a", "point_b", "neutral"]:
+        for m in [False, True]:
+            img = draw_mascot(pose=p, mouth_open=m)
+            suffix = "open" if m else "closed"
+            save_path = IMAGES_DIR / f"char_{p}_{suffix}.png"
+            img.save(save_path)
+
+    # Master legacy fallback
     path_c = IMAGES_DIR / "character_host.png"
-    char_img.save(path_c)
-    print(f"Created: {path_c}")
+    draw_mascot("neutral", False).save(path_c)
+    print(f"Created all multi-pose mascot sprites and: {path_c}")
 
     # 4. Sample JSON Script with Affiliate Links
     sample_script = {
