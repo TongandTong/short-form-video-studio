@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
 import math
 import os
+import re
 import sys
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageOps
