@@ -248,7 +248,19 @@ def get_active_character_assets(prof: dict = None) -> tuple:
             ("thinking", "char_pose_think"),
         ]:
             val_closed = prof.get(prop, "")
+            if not val_closed or not Path(val_closed).exists():
+                fallback_cl = IMAGES_DIR / f"{prop}.png"
+                if fallback_cl.exists():
+                    val_closed = str(fallback_cl)
+
             val_open = prof.get(f"{prop}_open", "")
+            if not val_open or not Path(val_open).exists():
+                fallback_op = IMAGES_DIR / f"{prop}_open.png"
+                if fallback_op.exists():
+                    val_open = str(fallback_op)
+                else:
+                    val_open = val_closed
+
             if val_closed and Path(val_closed).exists():
                 poses[key] = {
                     "closed": Path(val_closed),

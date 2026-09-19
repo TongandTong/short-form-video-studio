@@ -415,6 +415,7 @@ tab_script, tab_render, tab_autopilot, tab_queue, tab_settings = st.tabs([
 # TAB 1: SCRIPT STUDIO (INPUT, DEEP RESEARCH & REWRITER)
 # =============================================================
 with tab_script:
+    st.markdown("### 📌 ขั้นตอนที่ 1: กำหนดหัวข้อ & กรอบแนวคิด (Topic & Framework)")
     num_fw = len(FRAMEWORK_PRESETS)
     st.markdown(
         f"""
@@ -686,7 +687,7 @@ with tab_script:
     st.markdown("---")
 
     # Script Review Section
-    st.subheader("📝 ตรวจทานบทพูด & สั่ง AI รีไรท์ (Script Studio)")
+    st.markdown("### ✍️ ขั้นตอนที่ 2: ตรวจทานบทพูด & สั่ง AI รีไรท์ (Script Studio)")
     active_fw = st.session_state.script_data.get("framework", selected_fw)
     fw_info = FRAMEWORK_PRESETS.get(active_fw, FRAMEWORK_PRESETS["persona"])
     st.markdown(
@@ -830,7 +831,8 @@ with tab_script:
 
     # Planned Queue Integration for Tab 1
     st.markdown("---")
-    with st.expander("📥 บันทึกบทนี้เข้าคิวผลิตล่วงหน้า (Pre-curated Production Queue)", expanded=True):
+    st.markdown("### 📥 ขั้นตอนที่ 3: ตรวจเลือกรูปสินค้า & ลิงก์ Affiliate บันทึกเข้าคิวผลิต (Pre-curated Queue)")
+    with st.expander("📦 จัดเตรียมรูปภาพและพิกัด Affiliate บันทึกเข้าคิวผลิตล่วงหน้า", expanded=True):
         st.caption("พอใจบทแล้ว? สามารถตรวจเลือกรูปสินค้า A & B ให้ตรงเป๊ะ ใส่ลิงก์ Affiliate แล้วบันทึกเข้าคิวล่วงหน้าไว้ได้ทันที (จัดเก็บได้ไม่จำกัด สั่งเรนเดอร์ทิ้งไว้หรือปล่อยบอททยอยทำได้)")
 
         q_topic = st.session_state.script_data.get("topic", st.session_state.get("input_topic", "หัวข้อเปรียบเทียบ"))
@@ -961,7 +963,7 @@ with tab_render:
     )
 
     # Product Images Selection
-    st.markdown("#### 🖼️ รูปภาพสินค้า A & B")
+    st.markdown("### 🖼️ ขั้นตอนที่ 1: ตรวจสอบรูปภาพสินค้า A & B (รูปจริง / การ์ตูน AI)")
     col_rnd_a, col_rnd_b = st.columns(2, gap="large")
     with col_rnd_a:
         st.markdown(f"**🟢 สินค้า A: {st.session_state.script_data.get('name_a', 'Item A')}**")
@@ -995,7 +997,8 @@ with tab_render:
         )
 
     # Optional Override Expanders
-    with st.expander("🎨 ปรับแต่งเฉพาะคลิปนี้ (เสียงพากย์, เพลงคลอ & สีพื้นหลัง)", expanded=False):
+    st.markdown("### 🎙️ ขั้นตอนที่ 2: ปรับแต่งเฉพาะคลิปนี้ (เสียงพากย์, เพลงคลอ & สีพื้นหลัง)")
+    with st.expander("🎨 ปรับแต่งตัวเลือกเพิ่มเติม (เสียงพากย์, BGM & สไตล์กราฟิก)", expanded=False):
         c_ov1, c_ov2 = st.columns(2, gap="large")
         with c_ov1:
             voice_options = list(TTSEngine.VOICE_PRESETS.keys())
@@ -1029,6 +1032,7 @@ with tab_render:
             ov_wm_enable = st.toggle("เปิดลายน้ำกันก๊อป", value=True)
 
     # Render Action Button
+    st.markdown("### 🎬 ขั้นตอนที่ 3: สั่งเรนเดอร์และรับชมวิดีโอ (1080x1920 Video Player)")
     if st.button("🎥 สั่งเรนเดอร์คลิปวิดีโอ 1080x1920 (9:16)", type="primary", use_container_width=True):
         status_box = st.status("🎬 กำลังเรนเดอร์วิดีโอ 1080x1920 (9:16)...", expanded=True)
         with status_box:
@@ -1796,7 +1800,7 @@ with tab_settings:
     st.caption("ตั้งค่าแบรนด์ อัปโหลดโลโก้เพจ เลือกลายน้ำ เสียงพากย์เริ่มต้น มาสคอต และเชื่อมต่อ API แบบครั้งเดียวจบ ระบบจะจดจำและนำไปใช้กับทุกคลิปอัตโนมัติ")
 
     # SECTION 1: BRANDING & WATERMARK
-    st.markdown("### 🏢 1. แบรนด์เพจ & ลายน้ำกันก๊อป (Branding & Watermark)")
+    st.markdown("### 🏢 หมวดที่ 1: ข้อมูลแบรนด์เพจ & ลายน้ำกันก๊อป (Branding & Watermark)")
     c_br1, c_br2 = st.columns(2, gap="large")
 
     with c_br1:
@@ -1826,7 +1830,7 @@ with tab_settings:
     st.divider()
 
     # SECTION 2: DEFAULT VOICE & BGM
-    st.markdown("### 🎙️ 2. เสียงพากย์ & เพลงคลอ BGM เริ่มต้น (Default Voice & Sound)")
+    st.markdown("### 🎙️ หมวดที่ 2: เสียงพากย์ & เพลงคลอ BGM เริ่มต้น (Default Voice & Sound)")
     c_vc1, c_vc2 = st.columns(2, gap="large")
 
     with c_vc1:
@@ -1870,7 +1874,7 @@ with tab_settings:
     st.divider()
 
     # SECTION 3: VISUALS, BACKGROUND & MASCOT
-    st.markdown("### 🖼️ 3. งานภาพ, สีพื้นหลัง & ตัวละคร Mascot Animation")
+    st.markdown("### 🎭 หมวดที่ 3: งานภาพ, สีพื้นหลัง & ตัวละคร Mascot Animation (8 ท่าทางบันทึกถาวร)")
     c_vs1, c_vs2 = st.columns(2, gap="large")
 
     with c_vs1:
@@ -1992,7 +1996,10 @@ with tab_settings:
                             with open(p_t_cl, "wb") as f:
                                 f.write(up_t_cl.getbuffer())
                         prof["char_pose_think"] = str(p_t_cl)
-                        st.success("✅ อัปโหลดท่าคิด (หุบปาก) สำเร็จ!")
+                        prof["default_char_mode"] = "multi_pose"
+                        save_channel_profile(prof)
+                        st.session_state.channel_profile = prof
+                        st.success("✅ อัปโหลดและบันทึกท่าคิด (หุบปาก) ถาวรแล้ว!")
 
                 with c_t2:
                     cur_t_op = _get_pose_img("char_pose_think_open")
@@ -2008,7 +2015,10 @@ with tab_settings:
                             with open(p_t_op, "wb") as f:
                                 f.write(up_t_op.getbuffer())
                         prof["char_pose_think_open"] = str(p_t_op)
-                        st.success("✅ อัปโหลดท่าคิด (อ้าปาก) สำเร็จ!")
+                        prof["default_char_mode"] = "multi_pose"
+                        save_channel_profile(prof)
+                        st.session_state.channel_profile = prof
+                        st.success("✅ อัปโหลดและบันทึกท่าคิด (อ้าปาก) ถาวรแล้ว!")
 
             # 2. ท่าชี้ A (ซ้าย)
             with st.expander("👈 ท่าที่ 2: ท่าชี้สินค้า A (หันชี้ไปทางซ้าย)", expanded=True):
@@ -2027,7 +2037,10 @@ with tab_settings:
                             with open(p_a_cl, "wb") as f:
                                 f.write(up_a_cl.getbuffer())
                         prof["char_pose_a"] = str(p_a_cl)
-                        st.success("✅ อัปโหลดท่าชี้ A (หุบปาก) สำเร็จ!")
+                        prof["default_char_mode"] = "multi_pose"
+                        save_channel_profile(prof)
+                        st.session_state.channel_profile = prof
+                        st.success("✅ อัปโหลดและบันทึกท่าชี้ A (หุบปาก) ถาวรแล้ว!")
 
                 with c_a2:
                     cur_a_op = _get_pose_img("char_pose_a_open")
@@ -2043,7 +2056,10 @@ with tab_settings:
                             with open(p_a_op, "wb") as f:
                                 f.write(up_a_op.getbuffer())
                         prof["char_pose_a_open"] = str(p_a_op)
-                        st.success("✅ อัปโหลดท่าชี้ A (อ้าปาก) สำเร็จ!")
+                        prof["default_char_mode"] = "multi_pose"
+                        save_channel_profile(prof)
+                        st.session_state.channel_profile = prof
+                        st.success("✅ อัปโหลดและบันทึกท่าชี้ A (อ้าปาก) ถาวรแล้ว!")
 
             # 3. ท่าชี้ B (ขวา)
             with st.expander("👉 ท่าที่ 3: ท่าชี้สินค้า B (หันชี้ไปทางขวา)", expanded=True):
@@ -2062,7 +2078,10 @@ with tab_settings:
                             with open(p_b_cl, "wb") as f:
                                 f.write(up_b_cl.getbuffer())
                         prof["char_pose_b"] = str(p_b_cl)
-                        st.success("✅ อัปโหลดท่าชี้ B (หุบปาก) สำเร็จ!")
+                        prof["default_char_mode"] = "multi_pose"
+                        save_channel_profile(prof)
+                        st.session_state.channel_profile = prof
+                        st.success("✅ อัปโหลดและบันทึกท่าชี้ B (หุบปาก) ถาวรแล้ว!")
 
                 with c_b2:
                     cur_b_op = _get_pose_img("char_pose_b_open")
@@ -2078,7 +2097,10 @@ with tab_settings:
                             with open(p_b_op, "wb") as f:
                                 f.write(up_b_op.getbuffer())
                         prof["char_pose_b_open"] = str(p_b_op)
-                        st.success("✅ อัปโหลดท่าชี้ B (อ้าปาก) สำเร็จ!")
+                        prof["default_char_mode"] = "multi_pose"
+                        save_channel_profile(prof)
+                        st.session_state.channel_profile = prof
+                        st.success("✅ อัปโหลดและบันทึกท่าชี้ B (อ้าปาก) ถาวรแล้ว!")
 
             # 4. ท่ายิ้มสรุป (Conclusion)
             with st.expander("🎉 ท่าที่ 4: ท่ายิ้มสรุป (ใช้ตอนท้ายคลิป สรุปฟันธง)", expanded=True):
@@ -2097,7 +2119,10 @@ with tab_settings:
                             with open(p_n_cl, "wb") as f:
                                 f.write(up_n_cl.getbuffer())
                         prof["char_pose_neutral"] = str(p_n_cl)
-                        st.success("✅ อัปโหลดท่ายิ้มสรุป (หุบปาก) สำเร็จ!")
+                        prof["default_char_mode"] = "multi_pose"
+                        save_channel_profile(prof)
+                        st.session_state.channel_profile = prof
+                        st.success("✅ อัปโหลดและบันทึกท่ายิ้มสรุป (หุบปาก) ถาวรแล้ว!")
 
                 with c_n2:
                     cur_n_op = _get_pose_img("char_pose_neutral_open")
@@ -2113,7 +2138,30 @@ with tab_settings:
                             with open(p_n_op, "wb") as f:
                                 f.write(up_n_op.getbuffer())
                         prof["char_pose_neutral_open"] = str(p_n_op)
-                        st.success("✅ อัปโหลดท่ายิ้มสรุป (อ้าปาก) สำเร็จ!")
+                        prof["default_char_mode"] = "multi_pose"
+                        save_channel_profile(prof)
+                        st.session_state.channel_profile = prof
+                        st.success("✅ อัปโหลดและบันทึกท่ายิ้มสรุป (อ้าปาก) ถาวรแล้ว!")
+
+            st.markdown("##### 💾 บันทึกการตั้งค่ามาสคอตถาวร")
+            if st.button("💾 บันทึกรูปมาสคอตทั้ง 8 ท่าไว้ใช้ตลอดไป (Save All 8 Poses Permanently)", type="primary", use_container_width=True, key="btn_save_all_poses_perm"):
+                prof["default_char_mode"] = "multi_pose"
+                # Scan & ensure all 8 pose keys are strictly linked to the disk files
+                for k in [
+                    "char_pose_think", "char_pose_think_open",
+                    "char_pose_a", "char_pose_a_open",
+                    "char_pose_b", "char_pose_b_open",
+                    "char_pose_neutral", "char_pose_neutral_open",
+                ]:
+                    cur_p = prof.get(k, "")
+                    if not cur_p or not Path(cur_p).exists():
+                        fallback_p = ASSETS_DIR / "images" / f"{k}.png"
+                        if fallback_p.exists():
+                            prof[k] = str(fallback_p)
+                save_channel_profile(prof)
+                st.session_state.channel_profile = prof
+                st.toast("✅ บันทึกรูปมาสคอตทั้ง 8 ท่าไว้ใช้ตลอดไปเรียบร้อยแล้ว!")
+                st.success("🎉 บันทึกรูปมาสคอตประจำเพจครบทั้ง 8 ท่าทางไว้ใช้ตลอดไปเรียบร้อยแล้ว! ข้อมูลจะถูกจดจำไว้ถาวร ไม่ต้องอัปโหลดใหม่อีกต่อไปครับ")
 
         else:
             builtin_p = IMAGES_DIR / "character_host.png"
@@ -2123,7 +2171,7 @@ with tab_settings:
     st.divider()
 
     # SECTION 4: SHOPEE AUTO-AFFILIATE
-    st.markdown("### 🛒 4. ระบบนายหน้า Shopee Auto-Affiliate")
+    st.markdown("### 🛒 หมวดที่ 4: ระบบนายหน้า Shopee Auto-Affiliate")
     shp_cfg = load_shopee_config()
     c_sh1, c_sh2 = st.columns(2, gap="large")
 
@@ -2140,7 +2188,7 @@ with tab_settings:
     st.divider()
 
     # SECTION 5: SOCIAL APIS & GOOGLE DRIVE
-    st.markdown("### 🚀 5. การเชื่อมต่อโซเชียลมีเดีย & Google Drive")
+    st.markdown("### 🚀 หมวดที่ 5: การเชื่อมต่อโซเชียลมีเดีย & Google Drive Sync")
     post_cfg = load_autopost_config()
     gd_cfg = load_gdrive_config()
 
