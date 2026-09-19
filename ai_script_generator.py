@@ -60,6 +60,7 @@ class AIScriptGenerator:
         affiliate_link_b: str = "",
         tone: str = "engaging",
         script_mode: str = "multi_round",  # "multi_round" (60-90s) or "classic" (30s)
+        channel_outro_cta: str = "",
     ) -> Dict[str, Any]:
         """
         Deep-researches comparison points and writes a short-form script in Thai.
@@ -67,6 +68,8 @@ class AIScriptGenerator:
         - "multi_round" (60-90s): 3-Round back-and-forth battle comparing multiple dimensions.
         - "classic" (30s): 4-part concise summary.
         """
+        outro_prompt_hint = f"\n- ข้อความส่งท้ายประจำเพจที่ต้องสอดแทรกไว้ใน conclusion: '{channel_outro_cta}'" if channel_outro_cta else ""
+
         if script_mode == "multi_round":
             prompt = f"""
 คุณเป็น Senior Short-Form Video Producer มืออาชีพ เชี่ยวชาญการทำคลิปเปรียบเทียบมัลติราวด์ (Deep Battle: A vs B) สไตล์ Reels/TikTok/Shorts ความยาวประมาณ 60-90 วินาที ที่คนดูเกาะติดหน้าจอจนจบ
@@ -94,7 +97,7 @@ class AIScriptGenerator:
    - round_3_title: ตั้งชื่อยกที่ 3 สั้นๆ (เช่น "ความคุ้มค่า & ราคา")
    - round_3_a: ความคุ้มค่า/งบประมาณของ {name_a} (1-2 ประโยคกระชับ)
    - round_3_b: สวนกลับด้วยความคุ้มค่า/ค่าใช้จ่ายของ {name_b} (1-2 ประโยคกระชับ)
-5. conclusion: สรุปฟันธงชัดเจนว่าใครควรเลือก A และใครควรเลือก B พร้อม CTA สไตล์ Affiliate เนียนๆ ชวนคนดูโหวต และบอกว่าพิกัดของแท้อยู่ในคอมเมนต์แรก
+5. conclusion: สรุปฟันธงชัดเจนว่าใครควรเลือก A และใครควรเลือก B พร้อม CTA สไตล์ Affiliate เนียนๆ ชวนคนดูโหวต และบอกว่าพิกัดของแท้อยู่ในคอมเมนต์แรก{outro_prompt_hint}
 6. affiliate_comment: ข้อความสำหรับปักหมุดคอมเมนต์แรก รวบรวมพิกัด {name_a} และ {name_b} พร้อมอีโมจิ
 
 สำคัญมาก:
@@ -139,7 +142,7 @@ class AIScriptGenerator:
    - hook: ประโยคเปิดคลิป 1 ประโยค ยิงคำถามหรือประเด็นตรงจุด ชวนสงสัยให้อยู่ดูต่อ
    - item_a: เจาะจุดเด่นของ {name_a} ให้เห็นภาพชัดเจน ทำไมต้องตัวนี้ (1-2 ประโยคกระชับ)
    - item_b: เจาะจุดเด่นของ {name_b} ให้เห็นความต่าง ทำไมต้องตัวนี้ (1-2 ประโยคกระชับ)
-   - conclusion: สรุปฟันธง พร้อมประโยค Call-To-Action (CTA) สไตล์ Affiliate แบบเนียนๆ ชวนคนดูโหวต และบอกว่าพิกัดของแท้อยู่ในคอมเมนต์แรกแล้ว
+   - conclusion: สรุปฟันธง พร้อมประโยค Call-To-Action (CTA) สไตล์ Affiliate แบบเนียนๆ ชวนคนดูโหวต และบอกว่าพิกัดของแท้อยู่ในคอมเมนต์แรกแล้ว{outro_prompt_hint}
 3. affiliate_comment: ข้อความสำหรับปักหมุดคอมเมนต์แรกใต้คลิป รวบรวมพิกัด {name_a} และ {name_b} จัดวางสวยงามพร้อมอีโมจิ
 
 สำคัญ: ห้ามใส่ Enter จริงในค่า JSON string เด็ดขาด ให้ใช้ \\n เท่านั้น ตอบเป็น JSON block:

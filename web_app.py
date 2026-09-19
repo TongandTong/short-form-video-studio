@@ -32,6 +32,9 @@ from config import (
     AUDIO_DIR,
     COLOR_BG_CREAM,
     COLOR_HIGHLIGHT_LIME,
+    load_channel_profile,
+    save_channel_profile,
+    DEFAULT_CHANNEL_PROFILE,
 )
 from ai_script_generator import AIScriptGenerator, get_random_idea
 from tts_engine import TTSEngine
@@ -79,10 +82,36 @@ with st.sidebar:
             "💡 **แชร์ข้ามเน็ตฟรี:** `npx localtunnel --port 8501`"
         )
     st.divider()
+    st.markdown("### 🏢 โปรไฟล์เพจ & ลายน้ำกันก๊อป")
+    if "channel_profile" not in st.session_state:
+        st.session_state.channel_profile = load_channel_profile()
+
+    prof = st.session_state.channel_profile
+    with st.expander("⚙️ ตั้งค่าลายน้ำ & บทส่งท้ายประจำเพจ", expanded=False):
+        p_name = st.text_input("ชื่อเพจ / ช่อง:", value=prof.get("channel_name", "Why It Works"))
+        p_wm = st.text_input("ข้อความลายน้ำ:", value=prof.get("watermark_text", "@WhyItWorks"))
+        p_opac = st.slider("ความชัดลายน้ำ (Opacity):", min_value=0.2, max_value=1.0, value=float(prof.get("watermark_opacity", 0.75)), step=0.05)
+        p_outro = st.text_area("บทส่งท้ายประจำเพจ (Default Outro CTA):", value=prof.get("default_outro_cta", "ถ้าอยากได้ความรู้เปรียบเทียบสนุกๆ แบบนี้ อย่าลืมกดติดตามเพจ Why It Works ไว้นะครับ!"), height=80)
+        p_logo = st.file_uploader("โลโก้เพจ (PNG พื้นใส):", type=["png"], key="side_channel_logo")
+
+        if st.button("💾 บันทึกโปรไฟล์เพจ", use_container_width=True):
+            prof["channel_name"] = p_name
+            prof["watermark_text"] = p_wm
+            prof["watermark_opacity"] = p_opac
+            prof["default_outro_cta"] = p_outro
+            if p_logo:
+                save_logo_p = ASSETS_DIR / "images" / "channel_logo.png"
+                with open(save_logo_p, "wb") as f:
+                    f.write(p_logo.getbuffer())
+                prof["logo_path"] = str(save_logo_p)
+            save_channel_profile(prof)
+            st.session_state.channel_profile = prof
+            st.toast("✅ บันทึกโปรไฟล์เพจและลายน้ำเรียบร้อยแล้ว!")
+
+    st.divider()
     st.markdown("### 🛠️ เครื่องมือในระบบ")
     st.caption("• AI Model: Google Gemini (Deep Research)\n• Voice: Microsoft Edge Neural Thai / Google Cloud\n• Audio: Mixed with Lo-Fi BGM & Pop SFX\n• Video: 1080x1920 30FPS H.264")
 
-# Initialize Session State
 # Initialize Session State
 if "script_data" not in st.session_state:
     st.session_state.script_data = {
@@ -240,6 +269,7 @@ with tab1:
                     affiliate_link_a=aff_a,
                     affiliate_link_b=aff_b,
                     script_mode=selected_mode,
+                    channel_outro_cta=st.session_state.channel_profile.get("default_outro_cta", ""),
                 )
                 st.session_state.script_data = new_data
                 st.success("✅ ทำการวิเคราะห์และสร้างบทเรียบร้อยแล้ว! คลิกไปที่แท็บ '2. ตรวจบท & สั่งรีไรท์' ได้เลยครับ")
@@ -293,6 +323,11 @@ with tab2:
                 s_r3_b = st.text_area(f"🔵 B: {st.session_state.script_data.get('name_b', 'B')}", value=st.session_state.script_data.get("round_3_b", ""), height=75)
 
             s_conclusion = st.text_area("🏁 สรุปฟันธง + Affiliate CTA ปักหมุด", value=st.session_state.script_data.get("conclusion", ""), height=75)
+            if st.button("🔄 ใส่บทส่งท้ายประจำเพจ", key="btn_outro_multi", help="นำประโยคปิดท้ายที่ตั้งไว้ในโปรไฟล์เพจมาต่อท้ายข้อความสรุปทันที"):
+                cur_outro = st.session_state.channel_profile.get("default_outro_cta", "")
+                if cur_outro and cur_outro not in st.session_state.script_data.get("conclusion", ""):
+                    st.session_state.script_data["conclusion"] = (st.session_state.script_data.get("conclusion", "").strip() + " " + cur_outro).strip()
+                    st.rerun()
             s_comment = st.text_area("📌 พิกัด Affiliate ปักหมุดคอมเมนต์แรก", value=st.session_state.script_data.get("affiliate_comment", ""), height=100)
 
             # Sync and package
@@ -412,12 +447,33 @@ with tab3:
         enable_sfx = st.toggle("เปิดเสียง Effect (Pop / Whoosh) ตอนสลับกรอบชี้", value=True)
 
     with c_visual:
-        st.markdown("#### 🖼️ สีและภาพพื้นหลัง")
-        c_bg1, c_bg2 = st.columns(2)
-        with c_bg1:
-            bg_color = st.color_picker("สีพื้นหลัง (Background)", "#F5F2EB")
-        with c_bg2:
-            highlight_color = st.color_picker("สีกรอบไฟไฮไลต์ (Active Lime)", "#32CD32")
+        st.markdown("#### 🖼️ สีและภาพพื้นหลัง (Background)")
+        bg_mode = st.radio(
+            "เลือกรูปแบบพื้นหลัง:",
+            options=["color", "custom_image"],
+            format_func=lambda x: "🎨 สีมินิมอล (Solid Cream / Custom Color)" if x == "color" else "📸 อัปโหลดภาพพื้นหลังเอง (Custom Image 9:16)",
+            index=0,
+            horizontal=True,
+        )
+
+        bg_color = "#F5F2EB"
+        up_bg = None
+
+        if bg_mode == "color":
+            c_bg1, c_bg2 = st.columns(2)
+            with c_bg1:
+                bg_color = st.color_picker("สีพื้นหลัง (Background)", "#F5F2EB")
+            with c_bg2:
+                highlight_color = st.color_picker("สีกรอบไฟไฮไลต์ (Active Lime)", "#32CD32")
+        else:
+            c_bg1, c_bg2 = st.columns(2)
+            with c_bg1:
+                up_bg = st.file_uploader("อัปโหลดภาพพื้นหลัง 9:16 (PNG/JPG)", type=["png", "jpg", "jpeg"], key="uploader_bg")
+            with c_bg2:
+                highlight_color = st.color_picker("สีกรอบไฟไฮไลต์ (Active Lime)", "#32CD32")
+
+        st.markdown("#### 🛡️ ลายน้ำป้องกันการก๊อปปี้คลิป (Anti-Theft Watermark)")
+        enable_watermark = st.toggle("เปิดใช้งานลายน้ำเพจ (ย้ายตำแหน่งปลอดภัยตามยกอัตโนมัติ ไม่ทับจอ)", value=True)
 
         st.markdown("#### 🎯 รูปแบบ Animation การชี้")
         anim_style = st.selectbox(
@@ -479,6 +535,8 @@ with tab4:
         • **สินค้า B:** {st.session_state.script_data.get('name_b')}  
         • **เสียงพากย์:** {TTSEngine.VOICE_PRESETS[voice_choice]['desc']}  
         • **BGM / SFX:** {'เปิดใช้งาน' if enable_bgm else 'ปิด'} / {'เปิดใช้งาน' if enable_sfx else 'ปิด'}  
+        • **พื้นหลัง:** {'ภาพอัปโหลดเอง' if bg_mode == 'custom_image' and up_bg else 'สีมินิมอล'}  
+        • **ลายน้ำกันก๊อป:** {'เปิดใช้งาน (ย้ายจุดตามยก)' if enable_watermark else 'ปิด'}  
         • **ตัวละครผู้บรรยาย:** {'มาสคอตระบบ (4 ท่า + ขยับปาก)' if char_mode == 'builtin' else ('รูปเดี่ยวออโต้ฟลิป' if char_mode == 'single_upload' else 'แยก 4 ท่า')}
         """
     )
@@ -488,7 +546,13 @@ with tab4:
         path_a = IMAGES_DIR / "item_a_drip.png"
         path_b = IMAGES_DIR / "item_b_capsule.png"
         path_char = IMAGES_DIR / "character_host.png"
+        path_custom_bg = None
         char_poses_dict = None
+
+        if bg_mode == "custom_image" and up_bg:
+            path_custom_bg = ASSETS_DIR / "images" / f"up_bg_{int(time.time())}.png"
+            with open(path_custom_bg, "wb") as f:
+                f.write(up_bg.getbuffer())
 
         if up_a:
             path_a = ASSETS_DIR / "images" / f"up_a_{int(time.time())}.png"
@@ -528,6 +592,19 @@ with tab4:
                     f.write(up_neutral.getbuffer())
                 char_poses_dict["neutral"] = p_ne
 
+        # Setup watermark
+        wm_logo = None
+        wm_text = None
+        wm_opac = 0.75
+
+        if enable_watermark:
+            prof = st.session_state.channel_profile
+            wm_text = prof.get("watermark_text", "@WhyItWorks")
+            wm_opac = float(prof.get("watermark_opacity", 0.75))
+            saved_logo = prof.get("logo_path", "")
+            if saved_logo and Path(saved_logo).exists():
+                wm_logo = Path(saved_logo)
+
         output_mp4 = OUTPUT_DIR / f"shorts_{int(time.time())}.mp4"
 
         progress_box = st.status("🎬 เริ่มกระบวนการสร้างวิดีโอ...", expanded=True)
@@ -547,7 +624,7 @@ with tab4:
                 include_sfx=enable_sfx,
             )
 
-            st.write(f"🎨 กำลังเรนเดอร์ Dynamic Animation, ท่าทางมาสคอต, ปากขยับพูด และซับไตเติล (ความยาว {total_duration:.1f} วินาที)...")
+            st.write(f"🎨 กำลังเรนเดอร์ Dynamic Animation, พื้นหลัง, ลายน้ำกันก๊อป และซับไตเติล (ความยาว {total_duration:.1f} วินาที)...")
             bg_rgb = hex_to_rgb(bg_color)
             hl_rgb = hex_to_rgb(highlight_color)
             builder = VideoBuilder(
@@ -567,7 +644,11 @@ with tab4:
                 timeline=timeline,
                 master_audio_path=audio_file,
                 output_video_path=output_mp4,
+                custom_bg_path=path_custom_bg,
                 character_poses=char_poses_dict,
+                watermark_logo_path=wm_logo,
+                watermark_text=wm_text,
+                watermark_opacity=wm_opac,
             )
             elapsed = time.time() - start_t
             progress_box.update(label=f"✅ เรนเดอร์วิดีโอ 1080x1920 สำเร็จสมบูรณ์ใน {elapsed:.1f} วินาที!", state="complete")

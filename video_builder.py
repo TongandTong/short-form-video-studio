@@ -43,6 +43,7 @@ from config import (
     get_regular_font_path,
     OUTPUT_DIR,
     IMAGES_DIR,
+    WATERMARK_SAFE_ZONES,
 )
 from tts_engine import SegmentTimeline
 
@@ -249,6 +250,64 @@ class VideoBuilder:
 
         return card
 
+    def _render_watermark_badge(
+        self,
+        logo_path: Optional[Path] = None,
+        text: Optional[str] = None,
+        opacity: float = 0.75,
+    ) -> Optional[Image.Image]:
+        """Renders an anti-theft branding pill badge with semi-transparency."""
+        if not logo_path and not text:
+            return None
+
+        alpha_int = max(30, min(255, int(255 * opacity)))
+        font = self._load_font(20, bold=True)
+
+        logo_img = None
+        if logo_path and Path(logo_path).exists():
+            try:
+                logo_raw = Image.open(logo_path).convert("RGBA")
+                logo_raw.thumbnail((36, 36), Image.Resampling.LANCZOS)
+                r, g, b, a = logo_raw.split()
+                a = a.point(lambda p: int(p * opacity))
+                logo_img = Image.merge("RGBA", (r, g, b, a))
+            except Exception:
+                logo_img = None
+
+        text_w = 0
+        if text:
+            bbox = font.getbbox(text)
+            text_w = bbox[2] - bbox[0]
+
+        pad_x = 14
+        h = 42
+        w = pad_x * 2 + text_w + (44 if logo_img else 0)
+        w = max(w, 80)
+
+        badge = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(badge)
+
+        # Semi-transparent dark pill background
+        bg_alpha = int(140 * opacity)
+        draw.rounded_rectangle(
+            [0, 0, w, h],
+            radius=h // 2,
+            fill=(20, 20, 20, bg_alpha),
+            outline=(255, 255, 255, int(60 * opacity)),
+            width=1,
+        )
+
+        curr_x = pad_x
+        if logo_img:
+            lw, lh = logo_img.size
+            badge.paste(logo_img, (curr_x, (h - lh) // 2), logo_img)
+            curr_x += lw + 8
+
+        if text:
+            draw.text((curr_x, h // 2), text, font=font, fill=(255, 255, 255, alpha_int), anchor="lm")
+
+        return badge
+
     def _prepare_character_poses(
         self,
         character_path: Optional[Path] = None,
@@ -381,15 +440,20 @@ class VideoBuilder:
         output_video_path: Path = None,
         custom_bg_path: Optional[Path] = None,
         character_poses: Optional[Dict[str, Path]] = None,
+        watermark_logo_path: Optional[Path] = None,
+        watermark_text: Optional[str] = None,
+        watermark_opacity: float = 0.75,
     ) -> Path:
         """Main video rendering pipeline with animated pointing and synchronized highlights."""
         output_video_path.parent.mkdir(parents=True, exist_ok=True)
         print("[VideoBuilder] Pre-rendering visual layers...")
 
         # 1. Base Background
-        if custom_bg_path and custom_bg_path.exists():
+        if custom_bg_path and Path(custom_bg_path).exists():
             bg_base = Image.open(custom_bg_path).convert("RGBA")
             bg_base = bg_base.resize((CANVAS_WIDTH, CANVAS_HEIGHT), Image.Resampling.LANCZOS)
+            dim_overlay = Image.new("RGBA", (CANVAS_WIDTH, CANVAS_HEIGHT), (0, 0, 0, 35))
+            bg_base = Image.alpha_composite(bg_base, dim_overlay)
         else:
             bg_base = Image.new("RGBA", (CANVAS_WIDTH, CANVAS_HEIGHT), self.bg_color + (255,))
 
@@ -432,6 +496,13 @@ class VideoBuilder:
 
         # 8. Character Sprite Poses & Mouth Flaps
         poses = self._prepare_character_poses(character_path=character_path, character_poses=character_poses)
+
+        # 8b. Anti-Theft Dynamic Watermark Badge
+        watermark_badge = self._render_watermark_badge(
+            logo_path=watermark_logo_path,
+            text=watermark_text,
+            opacity=watermark_opacity,
+        )
 
         # Read audio duration
         audio_clip = AudioFileClip(str(master_audio_path))
@@ -504,6 +575,21 @@ class VideoBuilder:
             char_x = (CANVAS_WIDTH - char_w) // 2
             char_y = (CANVAS_HEIGHT - char_h + 30) + char_bob
             frame.paste(char_sprite, (char_x, char_y), char_sprite)
+
+            # 10. Anti-Theft Dynamic Watermark Badge (Relocates safely per round)
+            if watermark_badge:
+                if "round_1" in active_seg_id:
+                    z_idx = 1
+                elif "round_2" in active_seg_id:
+                    z_idx = 2
+                elif "round_3" in active_seg_id:
+                    z_idx = 3
+                elif "conclusion" in active_seg_id:
+                    z_idx = 1
+                else:
+                    z_idx = 0
+                zone = WATERMARK_SAFE_ZONES[z_idx % len(WATERMARK_SAFE_ZONES)]
+                frame.paste(watermark_badge, (zone["x"], zone["y"]), watermark_badge)
 
             return np.array(frame.convert("RGB"))
 

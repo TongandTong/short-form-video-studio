@@ -135,6 +135,44 @@ def get_regular_font_path() -> str:
             return str(font_path)
     return get_font_path("bold")
 
+# Watermark Safe Zones for 9:16 vertical canvas (avoids Header, Boxes, Subtitles, Mascot & Platform UI)
+WATERMARK_SAFE_ZONES = [
+    {"name": "top_left", "x": 60, "y": 140},
+    {"name": "top_right", "x": 820, "y": 140},
+    {"name": "mid_left", "x": 60, "y": 1070},
+    {"name": "mid_right", "x": 820, "y": 1070},
+]
+
+PROFILE_FILE = BASE_DIR / "channel_profile.json"
+
+DEFAULT_CHANNEL_PROFILE = {
+    "channel_name": "Why It Works",
+    "watermark_text": "@WhyItWorks",
+    "watermark_opacity": 0.75,
+    "default_outro_cta": "ถ้าชอบความรู้เปรียบเทียบสนุกๆ แบบนี้ อย่าลืมกดติดตามเพจ Why It Works ไว้นะครับ!",
+    "logo_path": "",
+}
+
+def load_channel_profile() -> dict:
+    """Loads saved channel profile or returns default."""
+    if PROFILE_FILE.exists():
+        try:
+            import json
+            with open(PROFILE_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                res = DEFAULT_CHANNEL_PROFILE.copy()
+                res.update(data)
+                return res
+        except Exception:
+            pass
+    return DEFAULT_CHANNEL_PROFILE.copy()
+
+def save_channel_profile(data: dict) -> None:
+    """Persists channel profile to local JSON."""
+    import json
+    with open(PROFILE_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
 # Auto-delegation if Streamlit Cloud or user executes config.py as main entrypoint
 if __name__ == "__main__":
     import runpy
