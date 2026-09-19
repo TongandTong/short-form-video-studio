@@ -176,13 +176,32 @@ class VideoBuilder:
         draw.text((w // 2, h // 2), text, font=font, fill=COLOR_WHITE, anchor="mm")
         return banner
 
-    def _render_label_badge(self, text: str, bg_color: Tuple[int, int, int], width: int) -> Image.Image:
-        """Renders name label under item box."""
-        badge = Image.new("RGBA", (width, 50), (0, 0, 0, 0))
+    def _render_label_badge(self, text: str, bg_color: Tuple[int, int, int], width: int, height: int = 95) -> Image.Image:
+        """Renders stylish paper-sticker name label above item box."""
+        badge = Image.new("RGBA", (width, height), (0, 0, 0, 0))
         draw = ImageDraw.Draw(badge)
-        draw.rounded_rectangle([20, 0, width - 20, 50], radius=15, fill=bg_color + (255,))
-        font = self._load_font(26, bold=True)
-        draw.text((width // 2, 25), text, font=font, fill=COLOR_WHITE, anchor="mm")
+
+        # Drop shadow for paper sticker
+        draw.rounded_rectangle([16, 8, width - 16, height - 2], radius=18, fill=(0, 0, 0, 26))
+        # Sticker white body
+        draw.rounded_rectangle([14, 4, width - 14, height - 6], radius=18, fill=(255, 255, 255, 250), outline=(225, 220, 210, 240), width=2)
+
+        # Strip prefixes like "A: " or "B: "
+        clean_text = re.sub(r"^[ABab]\s*[:：]\s*", "", text).strip()
+
+        # Split Thai / English if present, e.g. "ลาเต้ (Latte)" or "กาแฟคั่วเข้ม (Dark Roast)"
+        m = re.search(r"^(.*?)\s*[\(\[]([A-Za-z0-9\s\-]+)[\)\]]", clean_text)
+        if m:
+            th_text = m.group(1).strip()
+            en_text = m.group(2).strip()
+            font_th = self._load_font(32, bold=True)
+            font_en = self._load_font(26, bold=True)
+            draw.text((width // 2, (height - 6) // 2 - 14), th_text, font=font_th, fill=(25, 25, 30), anchor="mm")
+            draw.text((width // 2, (height - 6) // 2 + 18), en_text, font=font_en, fill=(80, 80, 90), anchor="mm")
+        else:
+            font = self._load_font(32, bold=True)
+            draw.text((width // 2, (height - 6) // 2), clean_text, font=font, fill=(25, 25, 30), anchor="mm")
+
         return badge
 
     def _wrap_text(self, text: str, font: ImageFont.FreeTypeFont, max_width: int) -> List[str]:
@@ -206,43 +225,49 @@ class VideoBuilder:
         return lines if lines else [text]
 
     def _render_subtitle_card(self, text: str, round_label: str = "") -> Image.Image:
-        """Renders subtitle card with high-contrast text, round badge, and semi-transparent backdrop."""
+        """Renders subtitle card with high-contrast text and paper-sticker backdrop."""
         w, h = SUBTITLE_BOX["w"], SUBTITLE_BOX["h"]
         card = Image.new("RGBA", (w, h), (0, 0, 0, 0))
         draw = ImageDraw.Draw(card)
 
+        # Drop shadow for paper sticker card
+        draw.rounded_rectangle([18, 10, w - 18, h - 2], radius=SUBTITLE_BOX["radius"], fill=(0, 0, 0, 30))
+        # White paper sticker card body
         draw.rounded_rectangle(
-            [0, 0, w, h],
+            [14, 4, w - 14, h - 8],
             radius=SUBTITLE_BOX["radius"],
-            fill=(255, 255, 255, 240),
-            outline=(210, 205, 195, 200),
+            fill=(255, 255, 255, 250),
+            outline=(225, 220, 210, 240),
             width=2,
         )
 
         # Optional Round / Dimension Badge at the top
-        text_offset_y = 15
+        text_offset_y = 6
         if round_label:
-            badge_font = self._load_font(22, bold=True)
+            badge_font = self._load_font(20, bold=True)
             bbox = badge_font.getbbox(round_label)
-            bw = (bbox[2] - bbox[0]) + 32
-            bh = 36
+            bw = (bbox[2] - bbox[0]) + 30
+            bh = 32
             bx = (w - bw) // 2
             by = 12
             draw.rounded_rectangle(
                 [bx, by, bx + bw, by + bh],
-                radius=18,
+                radius=16,
                 fill=(40, 40, 40, 245),
                 outline=self.highlight_color + (220,),
                 width=2,
             )
             draw.text((w // 2, by + bh // 2), round_label, font=badge_font, fill=(255, 255, 255, 255), anchor="mm")
-            text_offset_y = 28
+            text_offset_y = 22
 
-        # Dynamic font sizing based on length to prevent vertical and horizontal crowding
-        base_size = 38
+        if not text:
+            return card
+
+        # Dynamic font sizing based on length to prevent vertical crowding
+        base_size = 36
         if len(text) > 65:
             base_size = 28
-        elif len(text) > 44:
+        elif len(text) > 42:
             base_size = 32
 
         font = self._load_font(base_size, bold=True)
@@ -262,10 +287,9 @@ class VideoBuilder:
         for i, line in enumerate(lines):
             y = start_y + (i * line_height)
 
-            # If line doesn't have spaces (common in Thai), draw whole line centered directly
             if " " not in line:
                 # Drop shadow
-                draw.text((w // 2 + 1, y + 1), line, font=font, fill=(210, 210, 210, 200), anchor="ma")
+                draw.text((w // 2 + 1, y + 1), line, font=font, fill=(210, 210, 210, 180), anchor="ma")
                 # Main text
                 draw.text((w // 2, y), line, font=font, fill=COLOR_TEXT_DARK, anchor="ma")
             else:
@@ -575,16 +599,33 @@ class VideoBuilder:
         border_b_inactive = self._render_box_frame(BOX_B_RECT, is_active=False)
         border_b_active = self._render_box_frame(BOX_B_RECT, is_active=True, pulse_val=1.0)
 
-        # 6. Pre-render Subtitle Cards
-        subtitle_cards: Dict[str, Image.Image] = {}
+        # 6. Pre-render Subtitle Cards with Progressive Typewriter Speech Reveal
+        subtitle_progressions: Dict[str, List[Image.Image]] = {}
         for seg in (timeline or []):
-            subtitle_cards[seg.segment_id] = self._render_subtitle_card(seg.text, getattr(seg, "round_label", ""))
+            text = seg.text.strip()
+            r_lbl = getattr(seg, "round_label", "")
+            words = [w for w in text.split(" ") if w]
+            steps = []
+            if len(words) > 1:
+                for w_idx in range(1, len(words) + 1):
+                    partial = " ".join(words[:w_idx])
+                    steps.append(self._render_subtitle_card(partial, r_lbl))
+            else:
+                num_slices = max(3, min(8, len(text) // 5))
+                for s_i in range(1, num_slices + 1):
+                    c_end = int(len(text) * (s_i / num_slices))
+                    partial = text[:c_end]
+                    steps.append(self._render_subtitle_card(partial, r_lbl))
+
+            if not steps:
+                steps = [self._render_subtitle_card(text, r_lbl)]
+            subtitle_progressions[seg.segment_id] = steps
+
         default_sub_card = self._render_subtitle_card(f"กำลังเปรียบเทียบ: {name_a} vs {name_b}")
 
         # 7. Animated Pointing Indicator
         pointer_img = self._render_pointing_indicator("กำลังพูดถึง 👇")
         pointer_w, pointer_h = pointer_img.size
-        # Target X coordinates (center of Box A = 277, center of Box B = 803)
         pos_x_a = (BOX_A_RECT["x"] + BOX_A_RECT["w"] // 2) - (pointer_w // 2)
         pos_x_b = (BOX_B_RECT["x"] + BOX_B_RECT["w"] // 2) - (pointer_w // 2)
         base_pointer_y = BOX_A_RECT["y"] - pointer_h - 10
@@ -611,14 +652,25 @@ class VideoBuilder:
             active_target = "none"
             active_card = default_sub_card
             active_seg_id = ""
+            active_seg = None
 
             for seg in (timeline or []):
                 if seg.start_time <= t <= seg.end_time:
                     is_speaking = True
                     active_target = seg.highlight_target
-                    active_card = subtitle_cards.get(seg.segment_id, default_sub_card)
                     active_seg_id = seg.segment_id
+                    active_seg = seg
                     break
+
+            if active_seg:
+                step_list = subtitle_progressions.get(active_seg.segment_id, [default_sub_card])
+                dur = max(0.1, active_seg.duration)
+                # Progressive reveal reaches full sentence at 82% of audio duration so viewer can read smoothly
+                rel_p = max(0.0, min(1.0, (t - active_seg.start_time) / (dur * 0.82)))
+                step_idx = min(len(step_list) - 1, int(rel_p * len(step_list)))
+                active_card = step_list[step_idx]
+            else:
+                active_card = default_sub_card
 
             # If multi-round assets are configured, dynamically paste active round images & badges
             if prepared_rounds:

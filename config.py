@@ -56,21 +56,24 @@ TOPIC_BOX = {
     "radius": 35
 }
 
-# Top Section (Y: 150 to 850)
-# Canvas width 1080: Box 500x500 + Box 500x500 + gap 26 + left/right 27
+# Top Section: Paper-Sticker Labels Above Boxes (Y: 110 to 205)
+LABEL_A_RECT = {"x": 30, "y": 110, "w": 490, "h": 95}
+LABEL_B_RECT = {"x": 560, "y": 110, "w": 490, "h": 95}
+
+# Comparison Product Boxes (Y: 220 to 680)
 BOX_A_RECT = {
-    "x": 27,
-    "y": 170,
-    "w": 500,
-    "h": 500,
+    "x": 30,
+    "y": 220,
+    "w": 490,
+    "h": 460,
     "radius": 24
 }
 
 BOX_B_RECT = {
-    "x": 553,
-    "y": 170,
-    "w": 500,
-    "h": 500,
+    "x": 560,
+    "y": 220,
+    "w": 490,
+    "h": 460,
     "radius": 24
 }
 
@@ -78,17 +81,13 @@ BOX_B_RECT = {
 BORDER_WIDTH_DEFAULT = 4
 BORDER_WIDTH_ACTIVE = 10
 
-# Labels under boxes
-LABEL_A_RECT = {"x": 27, "y": 685, "w": 500, "h": 50}
-LABEL_B_RECT = {"x": 553, "y": 685, "w": 500, "h": 50}
-
-# Middle Section - Dynamic Thai Subtitles (Y: 720 to 940)
+# Middle Section - Dynamic Thai Subtitles (Y: 710 to 900)
 SUBTITLE_BOX = {
     "x": 60,
-    "y": 720,
+    "y": 710,
     "w": 960,
-    "h": 220,
-    "radius": 20
+    "h": 190,
+    "radius": 22
 }
 
 # Bottom Section - Full-Body 2D Character Cutout (Elevated & Ground-Anchored)
