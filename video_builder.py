@@ -47,6 +47,7 @@ from config import (
     WATERMARK_SAFE_ZONES,
 )
 from tts_engine import SegmentTimeline
+from image_fetcher import remove_fake_checkerboard_bg
 
 if sys.stdout and hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
@@ -237,31 +238,53 @@ class VideoBuilder:
             draw.text((w // 2, by + bh // 2), round_label, font=badge_font, fill=(255, 255, 255, 255), anchor="mm")
             text_offset_y = 28
 
-        font = self._load_font(38, bold=True)
+        # Dynamic font sizing based on length to prevent vertical and horizontal crowding
+        base_size = 38
+        if len(text) > 65:
+            base_size = 28
+        elif len(text) > 44:
+            base_size = 32
+
+        font = self._load_font(base_size, bold=True)
         lines = self._wrap_text(text, font, max_width=w - 80)
 
-        line_height = 52
+        if len(lines) > 2 and base_size > 28:
+            base_size = 28
+            font = self._load_font(base_size, bold=True)
+            lines = self._wrap_text(text, font, max_width=w - 80)
+
+        line_height = int(base_size * 1.55)
         total_text_h = len(lines) * line_height
         start_y = (h - total_text_h) // 2 + text_offset_y
 
+        space_w = int(font.getlength(" ")) if hasattr(font, "getlength") else 14
+
         for i, line in enumerate(lines):
             y = start_y + (i * line_height)
-            words = line.split(" ")
-            line_bbox = font.getbbox(line)
-            line_w = line_bbox[2] - line_bbox[0]
-            curr_x = (w - line_w) // 2
 
-            for word in words:
-                w_bbox = font.getbbox(word + " ")
-                w_width = w_bbox[2] - w_bbox[0]
-                is_num_or_stat = bool(re.search(r"(\d+|Hz|GB|%|บาท|ล้าน|แสน|ปี|เท่า)", word))
-                word_color = (20, 140, 20) if is_num_or_stat else COLOR_TEXT_DARK
-
+            # If line doesn't have spaces (common in Thai), draw whole line centered directly
+            if " " not in line:
                 # Drop shadow
-                draw.text((curr_x + 1, y + 1), word, font=font, fill=(210, 210, 210, 200), anchor="la")
+                draw.text((w // 2 + 1, y + 1), line, font=font, fill=(210, 210, 210, 200), anchor="ma")
                 # Main text
-                draw.text((curr_x, y), word, font=font, fill=word_color, anchor="la")
-                curr_x += w_width
+                draw.text((w // 2, y), line, font=font, fill=COLOR_TEXT_DARK, anchor="ma")
+            else:
+                line_w = int(font.getlength(line)) if hasattr(font, "getlength") else (font.getbbox(line)[2] - font.getbbox(line)[0])
+                curr_x = (w - line_w) // 2
+                words = line.split(" ")
+                for word in words:
+                    if not word:
+                        curr_x += space_w
+                        continue
+                    w_w = int(font.getlength(word)) if hasattr(font, "getlength") else (font.getbbox(word)[2] - font.getbbox(word)[0])
+                    is_num_or_stat = bool(re.search(r"(\d+|Hz|GB|%|บาท|ล้าน|แสน|ปี|เท่า)", word))
+                    word_color = (20, 140, 20) if is_num_or_stat else COLOR_TEXT_DARK
+
+                    # Drop shadow
+                    draw.text((curr_x + 1, y + 1), word, font=font, fill=(210, 210, 210, 200), anchor="la")
+                    # Main text
+                    draw.text((curr_x, y), word, font=font, fill=word_color, anchor="la")
+                    curr_x += w_w + space_w
 
         return card
 
@@ -338,10 +361,19 @@ class VideoBuilder:
         """
         max_w, max_h = CHARACTER_BOX["max_width"], CHARACTER_BOX["max_height"]
 
-        def _load_and_resize(path: Path) -> Image.Image:
-            if not path or not path.exists():
+        def _load_and_resize(source) -> Image.Image:
+            if isinstance(source, Image.Image):
+                img = source.convert("RGBA")
+            elif not source or not Path(source).exists():
                 return self._generate_sample_character(max_w, max_h)
-            img = Image.open(path).convert("RGBA")
+            else:
+                img = Image.open(source).convert("RGBA")
+
+            try:
+                img = remove_fake_checkerboard_bg(img)
+            except Exception:
+                pass
+
             img.thumbnail((max_w, max_h), Image.Resampling.LANCZOS)
             return img
 
@@ -601,9 +633,9 @@ class VideoBuilder:
             elif active_target == "B":
                 current_pose_key = "point_b"
             else:
-                if active_seg_id == "hook" or (not active_seg_id and t < total_duration * 0.20):
+                if active_seg_id == "hook" or "hook" in active_seg_id or (not active_seg_id and t < total_duration * 0.20):
                     current_pose_key = "thinking"
-                elif active_seg_id in ["conclusion", "affiliate_comment"] or (not active_seg_id and t > total_duration * 0.80):
+                elif active_seg_id in ["conclusion", "affiliate_comment"] or "conclusion" in active_seg_id or (not active_seg_id and t > total_duration * 0.80):
                     current_pose_key = "neutral"
                 else:
                     current_pose_key = "thinking"
@@ -620,6 +652,16 @@ class VideoBuilder:
 
             char_sprite = poses[current_pose_key][mouth_state]
             char_w, char_h = char_sprite.size
+
+            # If user provided a single-image mascot (open == closed), synthesize
+            # energetic cartoon talking squash-and-stretch so the mascot articulates speech!
+            if is_speaking and poses[current_pose_key]["open"] == poses[current_pose_key]["closed"]:
+                if mouth_state == "open":
+                    talk_h = int(char_h * 1.045)
+                    talk_w = int(char_w * 0.98)
+                    char_sprite = char_sprite.resize((talk_w, talk_h), Image.Resampling.BILINEAR)
+                    char_w, char_h = char_sprite.size
+
             char_x = (CANVAS_WIDTH - char_w) // 2
             char_y = (CANVAS_HEIGHT - char_h + 30) + char_bob
             frame.paste(char_sprite, (char_x, char_y), char_sprite)

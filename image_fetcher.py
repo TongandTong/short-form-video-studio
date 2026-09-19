@@ -30,77 +30,135 @@ def _get_font(size: int = 36, bold: bool = True) -> ImageFont.FreeTypeFont:
             return ImageFont.load_default()
 
 
+from collections import deque
+import numpy as np
+
+
+def remove_fake_checkerboard_bg(img: Image.Image) -> Image.Image:
+    """
+    Intelligently detects and removes fake checkerboard patterns (grey & white squares)
+    or near-white solid backgrounds from uploaded mascot PNGs, making them 100% transparent.
+    """
+    img = img.convert("RGBA")
+    arr = np.array(img)
+    h, w = arr.shape[:2]
+
+    # Check if border pixels have light neutral colors (typical fake transparency)
+    def is_bg_pixel(r, g, b):
+        return min(r, g, b) >= 165 and (max(r, g, b) - min(r, g, b)) <= 28
+
+    visited = np.zeros((h, w), dtype=bool)
+    q = deque()
+
+    # Seed from outer perimeter
+    for x in range(w):
+        for y in [0, h - 1]:
+            if is_bg_pixel(*arr[y, x, :3]):
+                q.append((x, y))
+                visited[y, x] = True
+    for y in range(h):
+        for x in [0, w - 1]:
+            if not visited[y, x] and is_bg_pixel(*arr[y, x, :3]):
+                q.append((x, y))
+                visited[y, x] = True
+
+    # Flood fill
+    cleared_count = 0
+    while q:
+        cx, cy = q.popleft()
+        arr[cy, cx, 3] = 0
+        cleared_count += 1
+        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            nx, ny = cx + dx, cy + dy
+            if 0 <= nx < w and 0 <= ny < h and not visited[ny, nx]:
+                if is_bg_pixel(*arr[ny, nx, :3]):
+                    visited[ny, nx] = True
+                    q.append((nx, ny))
+
+    if cleared_count > 50:
+        return Image.fromarray(arr)
+    return img
+
+
 def search_wikimedia_image(query: str) -> Optional[str]:
     """
     Searches Thai and English Wikipedia / Wikimedia Commons for a high-res image.
     Supports bilingual lookup, automatic redirect resolution, and raster thumbnail extraction.
     """
+    eng_term = None
+    m = re.search(r"\(([A-Za-z0-9\s]+)\)", query)
+    if m:
+        eng_term = m.group(1).strip()
+
     clean_q = re.sub(r"\(.*?\)", "", query).strip()
     clean_q = re.sub(r"[^\w\s\u0E00-\u0E7F]", "", clean_q).strip()
-    if not clean_q:
+    if not clean_q and not eng_term:
         return None
 
     headers = {"User-Agent": "VSIFYBot/3.5 (Educational Comparison Studio; contact: admin@vsify.app)"}
 
     # Step 1: Search Thai Wikipedia (fast & accurate for Thai names)
-    try:
-        url_th = (
-            f"https://th.wikipedia.org/w/api.php?action=query&format=json&redirects=1"
-            f"&prop=pageimages&piprop=thumbnail|original&pithumbsize=800&titles={urllib.parse.quote(clean_q)}"
-        )
-        req = urllib.request.Request(url_th, headers=headers)
-        with urllib.request.urlopen(req, timeout=6) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            pages = data.get("query", {}).get("pages", {})
-            for _, pdata in pages.items():
-                if "thumbnail" in pdata and "source" in pdata["thumbnail"]:
-                    return pdata["thumbnail"]["source"]
-                if "original" in pdata and "source" in pdata["original"]:
-                    return pdata["original"]["source"]
-    except Exception:
-        pass
+    if clean_q:
+        try:
+            url_th = (
+                f"https://th.wikipedia.org/w/api.php?action=query&format=json&redirects=1"
+                f"&prop=pageimages&piprop=thumbnail|original&pithumbsize=800&titles={urllib.parse.quote(clean_q)}"
+            )
+            req = urllib.request.Request(url_th, headers=headers)
+            with urllib.request.urlopen(req, timeout=6) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                pages = data.get("query", {}).get("pages", {})
+                for _, pdata in pages.items():
+                    if "thumbnail" in pdata and "source" in pdata["thumbnail"]:
+                        return pdata["thumbnail"]["source"]
+                    if "original" in pdata and "source" in pdata["original"]:
+                        return pdata["original"]["source"]
+        except Exception:
+            pass
 
-    # Step 1b: Thai Wikipedia OpenSearch fallback
-    try:
-        search_th = f"https://th.wikipedia.org/w/api.php?action=opensearch&format=json&search={urllib.parse.quote(clean_q)}&limit=1"
-        req = urllib.request.Request(search_th, headers=headers)
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            s_data = json.loads(resp.read().decode("utf-8"))
-            if len(s_data) > 1 and s_data[1] and s_data[1][0] != clean_q:
-                found_title = s_data[1][0]
-                url_th2 = (
-                    f"https://th.wikipedia.org/w/api.php?action=query&format=json&redirects=1"
-                    f"&prop=pageimages&piprop=thumbnail|original&pithumbsize=800&titles={urllib.parse.quote(found_title)}"
-                )
-                req2 = urllib.request.Request(url_th2, headers=headers)
-                with urllib.request.urlopen(req2, timeout=5) as resp2:
-                    data2 = json.loads(resp2.read().decode("utf-8"))
-                    pages2 = data2.get("query", {}).get("pages", {})
-                    for _, pdata in pages2.items():
-                        if "thumbnail" in pdata and "source" in pdata["thumbnail"]:
-                            return pdata["thumbnail"]["source"]
-                        if "original" in pdata and "source" in pdata["original"]:
-                            return pdata["original"]["source"]
-    except Exception:
-        pass
+        # Step 1b: Thai Wikipedia OpenSearch fallback
+        try:
+            search_th = f"https://th.wikipedia.org/w/api.php?action=opensearch&format=json&search={urllib.parse.quote(clean_q)}&limit=1"
+            req = urllib.request.Request(search_th, headers=headers)
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                s_data = json.loads(resp.read().decode("utf-8"))
+                if len(s_data) > 1 and s_data[1] and s_data[1][0] != clean_q:
+                    found_title = s_data[1][0]
+                    url_th2 = (
+                        f"https://th.wikipedia.org/w/api.php?action=query&format=json&redirects=1"
+                        f"&prop=pageimages&piprop=thumbnail|original&pithumbsize=800&titles={urllib.parse.quote(found_title)}"
+                    )
+                    req2 = urllib.request.Request(url_th2, headers=headers)
+                    with urllib.request.urlopen(req2, timeout=5) as resp2:
+                        data2 = json.loads(resp2.read().decode("utf-8"))
+                        pages2 = data2.get("query", {}).get("pages", {})
+                        for _, pdata in pages2.items():
+                            if "thumbnail" in pdata and "source" in pdata["thumbnail"]:
+                                return pdata["thumbnail"]["source"]
+                            if "original" in pdata and "source" in pdata["original"]:
+                                return pdata["original"]["source"]
+        except Exception:
+            pass
 
-    # Step 2: Search English Wikipedia (for international terms, brand names, concepts)
-    try:
-        url_en = (
-            f"https://en.wikipedia.org/w/api.php?action=query&format=json&redirects=1"
-            f"&prop=pageimages&piprop=thumbnail|original&pithumbsize=800&titles={urllib.parse.quote(clean_q)}"
-        )
-        req = urllib.request.Request(url_en, headers=headers)
-        with urllib.request.urlopen(req, timeout=6) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            pages = data.get("query", {}).get("pages", {})
-            for _, pdata in pages.items():
-                if "thumbnail" in pdata and "source" in pdata["thumbnail"]:
-                    return pdata["thumbnail"]["source"]
-                if "original" in pdata and "source" in pdata["original"]:
-                    return pdata["original"]["source"]
-    except Exception:
-        pass
+    # Step 2: Search English Wikipedia (using English term in parentheses if available, or clean_q)
+    en_queries = [q for q in [eng_term, clean_q] if q]
+    for eq in en_queries:
+        try:
+            url_en = (
+                f"https://en.wikipedia.org/w/api.php?action=query&format=json&redirects=1"
+                f"&prop=pageimages&piprop=thumbnail|original&pithumbsize=800&titles={urllib.parse.quote(eq)}"
+            )
+            req = urllib.request.Request(url_en, headers=headers)
+            with urllib.request.urlopen(req, timeout=6) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                pages = data.get("query", {}).get("pages", {})
+                for _, pdata in pages.items():
+                    if "thumbnail" in pdata and "source" in pdata["thumbnail"]:
+                        return pdata["thumbnail"]["source"]
+                    if "original" in pdata and "source" in pdata["original"]:
+                        return pdata["original"]["source"]
+        except Exception:
+            pass
 
     return None
 
@@ -138,38 +196,61 @@ def generate_ai_cartoon_image(
     """
     Generates a charming stylized cartoon illustration via free AI engine (Pollinations.ai).
     Supports presets: '3d_pixar', '2d_flat', 'ghibli', 'claymation', 'cyberpunk'.
+    Includes bilingual English extraction, randomized seed, and automatic retry.
     """
+    # Extract English term inside parentheses if present (e.g. "Light Roast" in "กาแฟคั่วอ่อน (Light Roast)")
+    eng_match = re.search(r"\(([A-Za-z0-9\s\-]+)\)", item_name)
+    eng_term = eng_match.group(1).strip() if eng_match else ""
+
     clean_name = re.sub(r"\(.*?\)", "", item_name).strip()
+    if not clean_name:
+        clean_name = item_name.strip()
     if not clean_name:
         return None
 
-    style_cfg = CARTOON_STYLES.get(art_style, CARTOON_STYLES["3d_pixar"])
-    prompt = style_cfg["prompt"].format(name=clean_name)
+    ai_subject = f"{eng_term}, {clean_name}" if eng_term else clean_name
 
-    encoded_prompt = urllib.parse.quote(prompt)
-    url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=512&height=512&nologo=true"
+    style_cfg = CARTOON_STYLES.get(art_style, CARTOON_STYLES["3d_pixar"])
+    prompt = style_cfg["prompt"].format(name=ai_subject)
+
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 
-    try:
-        req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=12) as resp:
-            raw_bytes = resp.read()
-            if len(raw_bytes) > 2000:
-                import io
-                with Image.open(io.BytesIO(raw_bytes)) as img:
-                    img = img.convert("RGBA")
-                    w, h = img.size
-                    min_dim = min(w, h)
-                    left = (w - min_dim) // 2
-                    top = (h - min_dim) // 2
-                    cropped = img.crop((left, top, left + min_dim, top + min_dim))
-                    resized = cropped.resize((target_size, target_size), Image.Resampling.LANCZOS)
-                    output_path.parent.mkdir(parents=True, exist_ok=True)
-                    resized.save(output_path, "PNG")
-                    return output_path
-    except Exception as e:
-        print(f"[ImageFetcher] AI cartoon generation skipped ({clean_name}): {e}")
-        pass
+    import random
+    import time
+    seed = random.randint(1000, 999999)
+
+    prompts_to_try = [
+        prompt,
+        f"cute 3D cartoon illustration of {ai_subject}, clean white studio background, vibrant colors, product spotlight",
+    ]
+    if eng_term:
+        prompts_to_try.append(f"3D cute miniature of {eng_term}, clean plain background, high detail render")
+
+    for attempt_idx, p_text in enumerate(prompts_to_try):
+        try:
+            encoded_prompt = urllib.parse.quote(p_text)
+            url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=512&height=512&seed={seed + attempt_idx}&nologo=true"
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=16) as resp:
+                raw_bytes = resp.read()
+                if len(raw_bytes) > 2000:
+                    import io
+                    with Image.open(io.BytesIO(raw_bytes)) as img:
+                        img = img.convert("RGBA")
+                        w, h = img.size
+                        min_dim = min(w, h)
+                        left = (w - min_dim) // 2
+                        top = (h - min_dim) // 2
+                        cropped = img.crop((left, top, left + min_dim, top + min_dim))
+                        resized = cropped.resize((target_size, target_size), Image.Resampling.LANCZOS)
+                        output_path.parent.mkdir(parents=True, exist_ok=True)
+                        resized.save(output_path, "PNG")
+                        return output_path
+        except Exception as e:
+            if attempt_idx < len(prompts_to_try) - 1:
+                time.sleep(0.8)
+                continue
+            print(f"[ImageFetcher] AI cartoon generation failed for ({clean_name}): {e}")
 
     return None
 

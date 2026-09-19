@@ -50,7 +50,7 @@ from ai_script_generator import (
 from tts_engine import TTSEngine
 from video_builder import VideoBuilder
 from pipeline import hex_to_rgb
-from image_fetcher import auto_fetch_or_create_image, CARTOON_STYLES
+from image_fetcher import auto_fetch_or_create_image, CARTOON_STYLES, remove_fake_checkerboard_bg
 from content_history import load_history, add_history_entry, delete_history_entry, update_history_post_status
 from scheduler_daemon import (
     ensure_scheduler_running,
@@ -557,6 +557,7 @@ with tab_script:
                             r_path_a = ASSETS_DIR / "images" / f"auto_a_r{r}_{t_now}.png"
                             r_path_b = ASSETS_DIR / "images" / f"auto_b_r{r}_{t_now}.png"
                             auto_fetch_or_create_image(r_name_a, r_path_a, is_item_b=False, allow_web_search=True, image_mode=img_mode_def, art_style=art_style_def)
+                            time.sleep(0.5)
                             auto_fetch_or_create_image(r_name_b, r_path_b, is_item_b=True, allow_web_search=True, image_mode=img_mode_def, art_style=art_style_def)
                             round_assets[r] = {
                                 "name_a": r_name_a,
@@ -571,6 +572,7 @@ with tab_script:
                         img_a_path = ASSETS_DIR / "images" / f"auto_a_{t_now}.png"
                         img_b_path = ASSETS_DIR / "images" / f"auto_b_{t_now}.png"
                         auto_fetch_or_create_image(in_name_a, img_a_path, is_item_b=False, allow_web_search=True, image_mode=img_mode_def, art_style=art_style_def)
+                        time.sleep(0.5)
                         auto_fetch_or_create_image(in_name_b, img_b_path, is_item_b=True, allow_web_search=True, image_mode=img_mode_def, art_style=art_style_def)
 
                     st.write("🎙️ 3/4: สังเคราะห์เสียงพากย์ Edge Neural + มิกซ์ Lo-Fi BGM & SFX...")
@@ -902,6 +904,7 @@ with tab_render:
                         r_path_a = ASSETS_DIR / "images" / f"item_a_r{r}_{t_stamp}.png"
                         r_path_b = ASSETS_DIR / "images" / f"item_b_r{r}_{t_stamp}.png"
                         auto_fetch_or_create_image(r_name_a, r_path_a, is_item_b=False, allow_web_search=auto_fetch_chk, image_mode=rnd_img_mode, art_style=rnd_art_style)
+                        time.sleep(0.5)
                         auto_fetch_or_create_image(r_name_b, r_path_b, is_item_b=True, allow_web_search=auto_fetch_chk, image_mode=rnd_img_mode, art_style=rnd_art_style)
                         round_assets[r] = {
                             "name_a": r_name_a,
@@ -924,6 +927,8 @@ with tab_render:
                             image_mode=rnd_img_mode,
                             art_style=rnd_art_style,
                         )
+
+                    time.sleep(0.5)
 
                     if up_img_b:
                         img_b = Image.open(up_img_b)
@@ -1474,57 +1479,91 @@ with tab_settings:
         if s_char_mode == "single_upload":
             cur_sp = prof.get("char_single_path", "")
             if cur_sp and Path(cur_sp).exists():
-                st.image(cur_sp, width=110, caption="มาสคอตปัจจุบันที่บันทึกไว้")
-            up_single = st.file_uploader("อัปโหลดรูปมาสคอตเดี่ยว (PNG พื้นใส):", type=["png"], key="set_up_single")
+                c_sp_im, c_sp_act = st.columns([1, 2])
+                with c_sp_im:
+                    st.image(cur_sp, width=110, caption="มาสคอตปัจจุบัน")
+                with c_sp_act:
+                    if st.button("🪄 ลบตารางหมากรุก / สีพื้นหลัง (Auto Clean)", key="clean_mascot_btn", help="คลิกเพื่อลบตารางหมากรุกหรือพื้นหลังสีทึบของรูปมาสคอตให้โปร่งใส 100% ทันที"):
+                        try:
+                            raw_im = Image.open(cur_sp)
+                            clean_im = remove_fake_checkerboard_bg(raw_im)
+                            clean_im.save(cur_sp, "PNG")
+                            st.success("✨ ปรับพื้นหลังให้โปร่งใส 100% สำเร็จ!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"ไม่สามารถปรับแต่งได้: {e}")
+
+            up_single = st.file_uploader("อัปโหลดรูปมาสคอตเดี่ยว (PNG/JPG):", type=["png", "jpg", "jpeg"], key="set_up_single")
             if up_single:
                 sp = ASSETS_DIR / "images" / "character_single.png"
-                with open(sp, "wb") as f:
-                    f.write(up_single.getbuffer())
+                try:
+                    raw_im = Image.open(up_single)
+                    clean_im = remove_fake_checkerboard_bg(raw_im)
+                    clean_im.save(sp, "PNG")
+                except Exception:
+                    with open(sp, "wb") as f:
+                        f.write(up_single.getbuffer())
                 prof["char_single_path"] = str(sp)
-                st.success("✅ อัปโหลดรูปมาสคอตเดี่ยวสำเร็จ!")
+                st.success("✅ อัปโหลดและปรับพื้นหลังโปร่งใสอัตโนมัติสำเร็จ!")
         elif s_char_mode == "multi_pose":
-            st.caption("อัปโหลดรูปแยก 4 ท่าทาง (PNG พื้นใส):")
+            st.caption("อัปโหลดรูปแยก 4 ท่าทาง (ระบบลบพื้นหลังตารางหมากรุกให้อัตโนมัติ):")
             cp1, cp2 = st.columns(2)
             with cp1:
                 cur_think = prof.get("char_pose_think", "")
                 if cur_think and Path(cur_think).exists():
                     st.image(cur_think, width=70, caption="1. ท่าคิด")
-                up_p_think = st.file_uploader("1. ท่าคิด (Hook):", type=["png"], key="set_p_think")
+                up_p_think = st.file_uploader("1. ท่าคิด (Hook):", type=["png", "jpg", "jpeg"], key="set_p_think")
                 if up_p_think:
                     pth = ASSETS_DIR / "images" / "char_pose_think.png"
-                    with open(pth, "wb") as f:
-                        f.write(up_p_think.getbuffer())
+                    try:
+                        clean_im = remove_fake_checkerboard_bg(Image.open(up_p_think))
+                        clean_im.save(pth, "PNG")
+                    except Exception:
+                        with open(pth, "wb") as f:
+                            f.write(up_p_think.getbuffer())
                     prof["char_pose_think"] = str(pth)
 
                 cur_a = prof.get("char_pose_a", "")
                 if cur_a and Path(cur_a).exists():
                     st.image(cur_a, width=70, caption="2. ท่าชี้ A")
-                up_p_a = st.file_uploader("2. ท่าชี้ A (ซ้าย):", type=["png"], key="set_p_a")
+                up_p_a = st.file_uploader("2. ท่าชี้ A (ซ้าย):", type=["png", "jpg", "jpeg"], key="set_p_a")
                 if up_p_a:
                     pth = ASSETS_DIR / "images" / "char_pose_a.png"
-                    with open(pth, "wb") as f:
-                        f.write(up_p_a.getbuffer())
+                    try:
+                        clean_im = remove_fake_checkerboard_bg(Image.open(up_p_a))
+                        clean_im.save(pth, "PNG")
+                    except Exception:
+                        with open(pth, "wb") as f:
+                            f.write(up_p_a.getbuffer())
                     prof["char_pose_a"] = str(pth)
 
             with cp2:
                 cur_b = prof.get("char_pose_b", "")
                 if cur_b and Path(cur_b).exists():
                     st.image(cur_b, width=70, caption="3. ท่าชี้ B")
-                up_p_b = st.file_uploader("3. ท่าชี้ B (ขวา):", type=["png"], key="set_p_b")
+                up_p_b = st.file_uploader("3. ท่าชี้ B (ขวา):", type=["png", "jpg", "jpeg"], key="set_p_b")
                 if up_p_b:
                     pth = ASSETS_DIR / "images" / "char_pose_b.png"
-                    with open(pth, "wb") as f:
-                        f.write(up_p_b.getbuffer())
+                    try:
+                        clean_im = remove_fake_checkerboard_bg(Image.open(up_p_b))
+                        clean_im.save(pth, "PNG")
+                    except Exception:
+                        with open(pth, "wb") as f:
+                            f.write(up_p_b.getbuffer())
                     prof["char_pose_b"] = str(pth)
 
                 cur_neu = prof.get("char_pose_neutral", "")
                 if cur_neu and Path(cur_neu).exists():
                     st.image(cur_neu, width=70, caption="4. ท่ายิ้มสรุป")
-                up_p_neu = st.file_uploader("4. ท่ายิ้มสรุป:", type=["png"], key="set_p_neu")
+                up_p_neu = st.file_uploader("4. ท่ายิ้มสรุป:", type=["png", "jpg", "jpeg"], key="set_p_neu")
                 if up_p_neu:
                     pth = ASSETS_DIR / "images" / "char_pose_neutral.png"
-                    with open(pth, "wb") as f:
-                        f.write(up_p_neu.getbuffer())
+                    try:
+                        clean_im = remove_fake_checkerboard_bg(Image.open(up_p_neu))
+                        clean_im.save(pth, "PNG")
+                    except Exception:
+                        with open(pth, "wb") as f:
+                            f.write(up_p_neu.getbuffer())
                     prof["char_pose_neutral"] = str(pth)
         else:
             builtin_p = IMAGES_DIR / "character_host.png"

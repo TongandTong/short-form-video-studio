@@ -165,6 +165,7 @@ def run_autopilot_cycle(is_manual: bool = False) -> Tuple[bool, str]:
         img_a_path = ASSETS_DIR / "images" / f"auto_a_{t_now}.png"
         img_b_path = ASSETS_DIR / "images" / f"auto_b_{t_now}.png"
         auto_fetch_or_create_image(name_a, img_a_path, is_item_b=False, allow_web_search=allow_search, image_mode=img_mode)
+        time.sleep(0.5)
         auto_fetch_or_create_image(name_b, img_b_path, is_item_b=True, allow_web_search=allow_search, image_mode=img_mode)
 
         # 4. Neural Voice & Audio Mixing

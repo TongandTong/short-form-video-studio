@@ -83,6 +83,56 @@ def preprocess_thai_pacing(text: str) -> str:
     return t.strip()
 
 
+def split_into_spoken_sentences(text: str, max_chars: int = 58) -> List[str]:
+    """
+    Intelligently splits a Thai script segment into bite-sized spoken sentences
+    (30-55 characters) for sentence-by-sentence subtitle presentation and dynamic pacing.
+    """
+    text = text.strip()
+    if not text:
+        return []
+    if len(text) <= max_chars:
+        return [text]
+
+    raw_lines = [l.strip() for l in text.split("\n") if l.strip()]
+    results = []
+
+    for line in raw_lines:
+        # 1. Split on sentence terminators: !, ?, or newline
+        chunks = [c.strip() for c in re.split(r"(?<=[!?])\s*", line) if c.strip()]
+        for c in chunks:
+            if len(c) <= max_chars:
+                results.append(c)
+                continue
+
+            # 2. Split after polite particles with trailing space or punctuation
+            sub_chunks = [sc.strip() for sc in re.split(r"(?<=[ครับค่ะนะ][!.,\s])\s*", c) if sc.strip()]
+            if len(sub_chunks) > 1:
+                for sc in sub_chunks:
+                    if len(sc) <= max_chars:
+                        results.append(sc)
+                    else:
+                        parts = [p.strip() for p in re.split(r"\s+(?=(?:แต่ถ้า|แต่ว่า|แต่|ในขณะที่|ส่วน|คอมเมนต์|พิกัด))", sc) if p.strip()]
+                        results.extend(parts)
+                continue
+
+            # 3. Split before natural conjunctions or contrast markers
+            parts = [p.strip() for p in re.split(r"\s+(?=(?:แต่ถ้า|แต่ว่า|ในขณะที่|ส่วน|คอมเมนต์บอก|พิกัดของแท้))", c) if p.strip()]
+            if len(parts) > 1:
+                results.extend(parts)
+            else:
+                # 4. Fallback: split near middle space if still long
+                words = c.split(" ")
+                if len(words) > 1:
+                    mid = len(words) // 2
+                    results.append(" ".join(words[:mid]))
+                    results.append(" ".join(words[mid:]))
+                else:
+                    results.append(c)
+
+    return [r for r in results if r]
+
+
 class TTSEngine:
     """Manages multi-segment audio generation, measurement, and master track assembly with BGM/SFX."""
 
@@ -231,14 +281,30 @@ class TTSEngine:
             include_sfx = kwargs["enable_sfx"]
         # Dynamic segments support (Multi-Round 60-90s or Classic 30s)
         if "segments" in script_data and isinstance(script_data["segments"], list) and len(script_data["segments"]) > 0:
-            segments_meta = script_data["segments"]
+            raw_segments_meta = script_data["segments"]
         else:
-            segments_meta = [
+            raw_segments_meta = [
                 {"id": "hook", "text": script_data.get("hook", ""), "highlight": "none", "round_label": "🔥 เปิดประเด็น"},
                 {"id": "item_a", "text": script_data.get("item_a", ""), "highlight": "A", "round_label": f"📦 {script_data.get('name_a', 'ไอเทม A')}"},
                 {"id": "item_b", "text": script_data.get("item_b", ""), "highlight": "B", "round_label": f"📦 {script_data.get('name_b', 'ไอเทม B')}"},
                 {"id": "conclusion", "text": script_data.get("conclusion", ""), "highlight": "none", "round_label": "🏁 สรุปฟันธง"},
             ]
+
+        # Expand multi-sentence segments into synchronized bite-sized sub-segments
+        segments_meta = []
+        for seg in raw_segments_meta:
+            seg_text = seg.get("text", "").strip()
+            if not seg_text:
+                continue
+            sub_sentences = split_into_spoken_sentences(seg_text)
+            if len(sub_sentences) <= 1:
+                segments_meta.append(seg)
+            else:
+                for s_idx, s_text in enumerate(sub_sentences):
+                    new_seg = dict(seg)
+                    new_seg["id"] = f"{seg.get('id', 'seg')}_{s_idx+1}"
+                    new_seg["text"] = s_text
+                    segments_meta.append(new_seg)
 
         if output_master_audio is None:
             output_master_audio = AUDIO_DIR / "master_audio.mp3"
