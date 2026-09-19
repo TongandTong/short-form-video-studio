@@ -82,21 +82,21 @@ BORDER_WIDTH_ACTIVE = 10
 LABEL_A_RECT = {"x": 27, "y": 685, "w": 500, "h": 50}
 LABEL_B_RECT = {"x": 553, "y": 685, "w": 500, "h": 50}
 
-# Middle Section - Dynamic Thai Subtitles (Y: 760 to 1080)
+# Middle Section - Dynamic Thai Subtitles (Y: 720 to 940)
 SUBTITLE_BOX = {
-    "x": 50,
-    "y": 770,
-    "w": 980,
-    "h": 280,
+    "x": 60,
+    "y": 720,
+    "w": 960,
+    "h": 220,
     "radius": 20
 }
 
-# Bottom Section - 2D Character Cutout (Y: 1120 to 1920)
+# Bottom Section - Full-Body 2D Character Cutout (Elevated & Ground-Anchored)
 CHARACTER_BOX = {
     "center_x": 540,
-    "bottom_y": 1920,
-    "max_width": 780,
-    "max_height": 780
+    "ground_y": 1780,
+    "max_width": 820,
+    "max_height": 850
 }
 
 # Inter-segment silence gap for TTS (seconds)
@@ -169,6 +169,9 @@ DEFAULT_CHANNEL_PROFILE = {
     "default_anim_style": "pointer_and_border",
     "default_char_mode": "builtin",
     "char_single_path": "",
+    "char_mouth_closed": "",
+    "char_mouth_open": "",
+    "char_gif_path": "",
     "char_pose_think": "",
     "char_pose_a": "",
     "char_pose_b": "",
@@ -202,7 +205,9 @@ def get_active_character_assets(prof: dict = None) -> tuple:
     Returns (character_path, character_poses) based on channel profile.
     Supports:
     - 'builtin': Built-in smart 4-pose character
-    - 'single_upload': Custom single mascot image (system auto-flips/animates)
+    - 'single_upload': Custom single mascot image (system auto-flips for point B)
+    - 'mouth_pair': 2 images (closed mouth + open mouth) with auto-mirroring & talking mouth sync
+    - 'gif_animation': Transparent animated GIF with auto-mirroring
     - 'multi_pose': Custom 4 distinct poses (think, point A, point B, neutral)
     """
     if prof is None:
@@ -215,6 +220,20 @@ def get_active_character_assets(prof: dict = None) -> tuple:
         sp = prof.get("char_single_path", "")
         if sp and Path(sp).exists():
             return Path(sp), None
+    elif char_mode == "mouth_pair":
+        closed_p = prof.get("char_mouth_closed", "") or prof.get("char_single_path", "")
+        open_p = prof.get("char_mouth_open", "")
+        if closed_p and Path(closed_p).exists():
+            poses = {
+                "thinking": {"closed": Path(closed_p), "open": Path(open_p) if open_p and Path(open_p).exists() else Path(closed_p)},
+                "point_a": {"closed": Path(closed_p), "open": Path(open_p) if open_p and Path(open_p).exists() else Path(closed_p)},
+                "neutral": {"closed": Path(closed_p), "open": Path(open_p) if open_p and Path(open_p).exists() else Path(closed_p)},
+            }
+            return Path(closed_p), poses
+    elif char_mode == "gif_animation":
+        gp = prof.get("char_gif_path", "")
+        if gp and Path(gp).exists():
+            return Path(gp), None
     elif char_mode == "multi_pose":
         poses = {}
         for key, prop in [

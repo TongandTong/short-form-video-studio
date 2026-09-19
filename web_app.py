@@ -1466,17 +1466,55 @@ with tab_settings:
     with c_vs2:
         s_char_mode = st.radio(
             "รูปแบบตัวละครมาสคอตพิธีกร (Mascot):",
-            options=["builtin", "single_upload", "multi_pose"],
-            index=["builtin", "single_upload", "multi_pose"].index(prof.get("default_char_mode", "builtin")),
+            options=["builtin", "mouth_pair", "single_upload", "gif_animation", "multi_pose"],
+            index=["builtin", "mouth_pair", "single_upload", "gif_animation", "multi_pose"].index(prof.get("default_char_mode", "builtin")) if prof.get("default_char_mode") in ["builtin", "mouth_pair", "single_upload", "gif_animation", "multi_pose"] else 0,
             format_func=lambda x: {
                 "builtin": "✨ มาสคอตระบบ (4 ท่าครบ + ขยับปากพูดอัตโนมัติ)",
-                "single_upload": "🖼️ อัปโหลดรูปเดียว (ระบบสลับชี้ซ้าย-ขวาให้อัตโนมัติ)",
+                "mouth_pair": "👄 สลับปาก 2 รูป (หุบปาก / อ้าปาก) — แนะนำ! วาดแค่ 2 รูป ระบบสลับชี้ซ้าย-ขวา & ขยับปากพูดให้อัตโนมัติ",
+                "single_upload": "🖼️ รูปเดี่ยวเต็มตัว (ยืนนิ่งสง่า + สลับชี้ซ้าย-ขวาให้อัตโนมัติ)",
+                "gif_animation": "🎬 ไฟล์ GIF พื้นหลังใส (เล่นวนลูปจังหวะพูดอัตโนมัติ)",
                 "multi_pose": "🎨 อัปโหลดแยก 4 ท่าทาง (คิด, ชี้ A, ชี้ B, สรุป)",
             }[x],
             key="set_char_mode",
         )
 
-        if s_char_mode == "single_upload":
+        if s_char_mode == "mouth_pair":
+            st.caption("💡 **วาดแค่ 2 รูปเท่านั้น:** รูปหุบปาก และรูปอ้าปาก (ระบบจะซิงก์ปากพูดตามเสียง และ Mirror ซ้าย-ขวาให้อัตโนมัติ ไม่ต้องวาดแยก 2 ฝั่ง)")
+            c_mp1, c_mp2 = st.columns(2)
+            with c_mp1:
+                cur_cl = prof.get("char_mouth_closed", "") or prof.get("char_single_path", "")
+                if cur_cl and Path(cur_cl).exists():
+                    st.image(cur_cl, width=110, caption="1. ท่าหุบปาก (ปัจจุบัน)")
+                up_cl = st.file_uploader("1. รูปท่ายืน/ชี้ (หุบปาก):", type=["png", "jpg", "jpeg"], key="set_up_closed")
+                if up_cl:
+                    p_cl = ASSETS_DIR / "images" / "char_mouth_closed.png"
+                    try:
+                        clean_im = remove_fake_checkerboard_bg(Image.open(up_cl))
+                        clean_im.save(p_cl, "PNG")
+                    except Exception:
+                        with open(p_cl, "wb") as f:
+                            f.write(up_cl.getbuffer())
+                    prof["char_mouth_closed"] = str(p_cl)
+                    prof["char_single_path"] = str(p_cl)
+                    st.success("✅ อัปโหลดรูปหุบปากสำเร็จ!")
+
+            with c_mp2:
+                cur_op = prof.get("char_mouth_open", "")
+                if cur_op and Path(cur_op).exists():
+                    st.image(cur_op, width=110, caption="2. ท่าอ้าปาก (ปัจจุบัน)")
+                up_op = st.file_uploader("2. รูปท่ายืน/ชี้ (อ้าปาก):", type=["png", "jpg", "jpeg"], key="set_up_open")
+                if up_op:
+                    p_op = ASSETS_DIR / "images" / "char_mouth_open.png"
+                    try:
+                        clean_im = remove_fake_checkerboard_bg(Image.open(up_op))
+                        clean_im.save(p_op, "PNG")
+                    except Exception:
+                        with open(p_op, "wb") as f:
+                            f.write(up_op.getbuffer())
+                    prof["char_mouth_open"] = str(p_op)
+                    st.success("✅ อัปโหลดรูปอ้าปากสำเร็จ!")
+
+        elif s_char_mode == "single_upload":
             cur_sp = prof.get("char_single_path", "")
             if cur_sp and Path(cur_sp).exists():
                 c_sp_im, c_sp_act = st.columns([1, 2])
@@ -1493,7 +1531,7 @@ with tab_settings:
                         except Exception as e:
                             st.error(f"ไม่สามารถปรับแต่งได้: {e}")
 
-            up_single = st.file_uploader("อัปโหลดรูปมาสคอตเดี่ยว (PNG/JPG):", type=["png", "jpg", "jpeg"], key="set_up_single")
+            up_single = st.file_uploader("อัปโหลดรูปมาสคอตเดี่ยวเต็มตัว (PNG/JPG):", type=["png", "jpg", "jpeg"], key="set_up_single")
             if up_single:
                 sp = ASSETS_DIR / "images" / "character_single.png"
                 try:
@@ -1505,6 +1543,19 @@ with tab_settings:
                         f.write(up_single.getbuffer())
                 prof["char_single_path"] = str(sp)
                 st.success("✅ อัปโหลดและปรับพื้นหลังโปร่งใสอัตโนมัติสำเร็จ!")
+
+        elif s_char_mode == "gif_animation":
+            cur_gif = prof.get("char_gif_path", "")
+            if cur_gif and Path(cur_gif).exists():
+                st.image(cur_gif, width=120, caption="GIF ปัจจุบัน")
+            up_gif = st.file_uploader("อัปโหลดไฟล์ GIF พื้นหลังใส (Transparent GIF):", type=["gif"], key="set_up_gif")
+            if up_gif:
+                gp = ASSETS_DIR / "images" / "character_anim.gif"
+                with open(gp, "wb") as f:
+                    f.write(up_gif.getbuffer())
+                prof["char_gif_path"] = str(gp)
+                st.success("✅ อัปโหลดไฟล์ GIF อนิเมชั่นสำเร็จ!")
+
         elif s_char_mode == "multi_pose":
             st.caption("อัปโหลดรูปแยก 4 ท่าทาง (ระบบลบพื้นหลังตารางหมากรุกให้อัตโนมัติ):")
             cp1, cp2 = st.columns(2)

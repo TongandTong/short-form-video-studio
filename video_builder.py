@@ -381,10 +381,14 @@ class VideoBuilder:
         if character_poses:
             poses = {}
             for pose_name in ["thinking", "point_a", "point_b", "neutral"]:
-                p_file = character_poses.get(pose_name)
-                if p_file and Path(p_file).exists():
+                item = character_poses.get(pose_name)
+                if isinstance(item, dict):
+                    img_closed = _load_and_resize(item.get("closed"))
+                    img_open = _load_and_resize(item.get("open") or item.get("closed"))
+                    poses[pose_name] = {"closed": img_closed, "open": img_open}
+                elif item and Path(item).exists():
                     open_f = character_poses.get(f"{pose_name}_open")
-                    closed_f = character_poses.get(f"{pose_name}_closed", p_file)
+                    closed_f = character_poses.get(f"{pose_name}_closed", item)
                     img_closed = _load_and_resize(Path(closed_f))
                     img_open = _load_and_resize(Path(open_f)) if open_f and Path(open_f).exists() else img_closed
                     poses[pose_name] = {"closed": img_closed, "open": img_open}
@@ -409,7 +413,32 @@ class VideoBuilder:
                 }
             return poses
 
-        # 2. If character_path is a custom user-uploaded single image
+        # 2. If character_path is an animated GIF
+        if character_path and character_path.exists() and character_path.suffix.lower() == ".gif":
+            try:
+                gif_im = Image.open(character_path)
+                frames = []
+                for f_i in range(getattr(gif_im, "n_frames", 1)):
+                    gif_im.seek(f_i)
+                    f_rgba = gif_im.convert("RGBA")
+                    f_clean = _load_and_resize(f_rgba)
+                    frames.append(f_clean)
+                if frames:
+                    closed_f = frames[0]
+                    open_f = frames[len(frames) // 2] if len(frames) > 1 else frames[0]
+                    mirrored_closed = ImageOps.mirror(closed_f)
+                    mirrored_open = ImageOps.mirror(open_f)
+                    mirrored_frames = [ImageOps.mirror(f) for f in frames]
+                    return {
+                        "thinking": {"closed": closed_f, "open": open_f, "frames": frames},
+                        "point_a": {"closed": closed_f, "open": open_f, "frames": frames},
+                        "point_b": {"closed": mirrored_closed, "open": mirrored_open, "frames": mirrored_frames},
+                        "neutral": {"closed": closed_f, "open": open_f, "frames": frames},
+                    }
+            except Exception as e:
+                print(f"[VideoBuilder] GIF load error: {e}")
+
+        # 3. If character_path is a custom user-uploaded single image
         if character_path and character_path.exists() and character_path.name != "character_host.png":
             base_img = _load_and_resize(character_path)
             mirrored_img = ImageOps.mirror(base_img)
@@ -627,7 +656,7 @@ class VideoBuilder:
             # Composite Subtitle Card
             frame.paste(active_card, (SUBTITLE_BOX["x"], SUBTITLE_BOX["y"]), active_card)
 
-            # 9. Dynamic Mascot Pose Selection & Talking Mouth-Flap
+            # 9. Dynamic Mascot Pose Selection & Mouth-Flap
             if active_target == "A":
                 current_pose_key = "point_a"
             elif active_target == "B":
@@ -640,30 +669,43 @@ class VideoBuilder:
                 else:
                     current_pose_key = "thinking"
 
-            # Mouth Flap & Animation Bounce
+            # Mouth Flap State
             if is_speaking:
                 # Talking flap frequency ~7.5 Hz (matches Thai syllables)
                 mouth_state = "open" if (int(t * 7.5) % 2 == 1) else "closed"
-                char_bob = int(math.sin(t * 16.0) * 4)  # energetic talking bounce
             else:
-                # Silence gap: mouth stays closed with calm idle breathing
                 mouth_state = "closed"
-                char_bob = int(math.sin(t * 3.2) * 5)
 
-            char_sprite = poses[current_pose_key][mouth_state]
+            # Check for GIF animated frames
+            pose_dict = poses.get(current_pose_key, poses.get("neutral", poses.get("point_a")))
+            if is_speaking and "frames" in pose_dict and len(pose_dict["frames"]) > 1:
+                f_list = pose_dict["frames"]
+                char_sprite = f_list[int(t * 8) % len(f_list)]
+            else:
+                char_sprite = pose_dict.get(mouth_state, pose_dict.get("closed"))
+
             char_w, char_h = char_sprite.size
 
-            # If user provided a single-image mascot (open == closed), synthesize
-            # energetic cartoon talking squash-and-stretch so the mascot articulates speech!
-            if is_speaking and poses[current_pose_key]["open"] == poses[current_pose_key]["closed"]:
-                if mouth_state == "open":
-                    talk_h = int(char_h * 1.045)
-                    talk_w = int(char_w * 0.98)
-                    char_sprite = char_sprite.resize((talk_w, talk_h), Image.Resampling.BILINEAR)
-                    char_w, char_h = char_sprite.size
-
+            # Ground-anchored full-body placement (feet at ground level, head close to subtitles)
+            ground_y = CHARACTER_BOX.get("ground_y", 1780)
             char_x = (CANVAS_WIDTH - char_w) // 2
-            char_y = (CANVAS_HEIGHT - char_h + 30) + char_bob
+            char_y = ground_y - char_h
+
+            # Ensure head doesn't collide into subtitle card
+            sub_bottom = SUBTITLE_BOX["y"] + SUBTITLE_BOX["h"]
+            if char_y < sub_bottom + 12:
+                char_y = sub_bottom + 12
+
+            # Subtle studio contact shadow under feet for a grounded, professional look
+            shadow_w = max(40, int(char_w * 0.55))
+            shadow_h = 24
+            shadow_x = (CANVAS_WIDTH - shadow_w) // 2
+            shadow_y = min(CANVAS_HEIGHT - 30, char_y + char_h - 10)
+            shadow_img = Image.new("RGBA", (shadow_w, shadow_h), (0, 0, 0, 0))
+            s_draw = ImageDraw.Draw(shadow_img)
+            s_draw.ellipse([0, 0, shadow_w, shadow_h], fill=(0, 0, 0, 35))
+            frame.paste(shadow_img, (shadow_x, shadow_y), shadow_img)
+
             frame.paste(char_sprite, (char_x, char_y), char_sprite)
 
             # 10. Anti-Theft Dynamic Watermark Badge (Relocates safely per round)
