@@ -34,6 +34,11 @@ from video_builder import VideoBuilder
 from pipeline import hex_to_rgb
 from image_fetcher import auto_fetch_or_create_image
 from content_history import add_history_entry
+from planned_queue import (
+    load_planned_queue,
+    get_next_ready_queue_item,
+    update_planned_item,
+)
 
 AUTOPILOT_CONFIG_FILE = BASE_DIR / "autopilot_config.json"
 
@@ -93,15 +98,21 @@ def _add_log(cfg: Dict[str, Any], message: str) -> None:
     cfg["history_log"] = logs[:20]
 
 
-def run_autopilot_cycle(is_manual: bool = False) -> Tuple[bool, str]:
+def run_autopilot_cycle(
+    is_manual: bool = False,
+    queue_item_id: Optional[str] = None,
+    force_post_mode: Optional[str] = None,
+) -> Tuple[bool, str]:
     """
     Executes a single autonomous production pipeline run:
-    1. Picks viral topic according to schedule filters.
-    2. Deep AI research & script synthesis with fallback affiliate links.
-    3. Auto-fetches/generates image assets for A and B.
+    1. Checks planned queue first (user-curated assets & affiliate links).
+       Fallback to viral topic template if queue is empty.
+    2. Deep AI research & script synthesis (or uses pre-approved script from queue).
+    3. Uses pre-selected images or auto-fetches image assets for A and B.
     4. Neural Voice synthesis & BGM/SFX audio mastering.
     5. 1080x1920 MP4 Video rendering + Cover thumbnail.
     6. Saves social caption, hashtags, and affiliate comment to history & sidecar JSON.
+    7. Optionally auto-posts or saves only (based on item's post_mode).
     """
     if not _scheduler_lock.acquire(blocking=False):
         return False, "ระบบกำลังเรนเดอร์วิดีโออยู่ กรุณารอสักครู่"
@@ -113,65 +124,134 @@ def run_autopilot_cycle(is_manual: bool = False) -> Tuple[bool, str]:
     _add_log(cfg, f"🚀 เริ่มผลิตคลิป ({trigger_type})")
     save_autopilot_config(cfg)
 
+    curated_item = None
     try:
         t_start = time.time()
         t_now = int(t_start)
 
-        # 1. Pick viral idea
-        cat = cfg.get("target_category", "ทั้งหมด (สุ่มทุกหมวด)")
-        fw = cfg.get("target_framework", "all")
-        dur_mode = cfg.get("target_duration_mode", "standard_3round")
-        template = get_random_idea(category=cat, framework=fw)
-
-        topic = template["topic"]
-        name_a = template["name_a"]
-        name_b = template["name_b"]
-        details_a = template.get("details_a", "")
-        details_b = template.get("details_b", "")
-        target_audience = template.get("target_audience", "")
-        key_angles = template.get("key_angles", "")
-        
-        # Affiliate links with fallback
-        aff_a = template.get("affiliate_link_a") or cfg.get("default_affiliate_a", "https://shopee.co.th")
-        aff_b = template.get("affiliate_link_b") or cfg.get("default_affiliate_b", "https://shopee.co.th")
-        chosen_fw = template.get("framework", fw if fw != "all" else "persona")
+        # 1. Check for Pre-Curated Planned Queue Item first!
+        if queue_item_id:
+            all_q = load_planned_queue()
+            for it in all_q:
+                if it.get("id") == queue_item_id:
+                    curated_item = it
+                    break
+        else:
+            curated_item = get_next_ready_queue_item()
 
         profile = load_channel_profile()
         outro_cta = profile.get("default_outro_cta", "")
 
-        _add_log(cfg, f"🤖 AI Deep Research: '{topic}' ({name_a} vs {name_b})")
-        save_autopilot_config(cfg)
+        if curated_item:
+            # Consume pre-curated planned queue item
+            update_planned_item(curated_item["id"], {"status": "processing"})
+            topic = curated_item["topic"]
+            name_a = curated_item["name_a"]
+            name_b = curated_item["name_b"]
+            details_a = curated_item.get("details_a", "")
+            details_b = curated_item.get("details_b", "")
+            target_audience = curated_item.get("target_audience", "")
+            key_angles = curated_item.get("key_angles", "")
+            aff_a = curated_item.get("affiliate_link_a") or cfg.get("default_affiliate_a", "https://shopee.co.th")
+            aff_b = curated_item.get("affiliate_link_b") or cfg.get("default_affiliate_b", "https://shopee.co.th")
+            chosen_fw = curated_item.get("framework", "persona")
+            dur_mode = curated_item.get("duration_mode", "standard_3round")
+            post_mode = force_post_mode or curated_item.get("post_mode", "render_only")
+            script_data = curated_item.get("script_data")
 
-        # 2. AI Script Generation
-        gen = AIScriptGenerator()
-        script_data = gen.generate_script(
-            topic=topic,
-            name_a=name_a,
-            name_b=name_b,
-            details_a=details_a,
-            details_b=details_b,
-            target_audience=target_audience,
-            key_angles=key_angles,
-            affiliate_link_a=aff_a,
-            affiliate_link_b=aff_b,
-            script_mode=dur_mode,
-            channel_outro_cta=outro_cta,
-            framework=chosen_fw,
-        )
+            _add_log(cfg, f"📋 นำคิวล่วงหน้ามาผลิต: '{topic}' ({name_a} vs {name_b}) [โหมด: {post_mode}]")
+            save_autopilot_config(cfg)
 
-        # 3. Auto-fetch Images
-        allow_search = cfg.get("auto_search_images", True)
-        img_mode = profile.get("default_image_mode", "ai_cartoon")
-        img_a_path = ASSETS_DIR / "images" / f"auto_a_{t_now}.png"
-        img_b_path = ASSETS_DIR / "images" / f"auto_b_{t_now}.png"
-        auto_fetch_or_create_image(name_a, img_a_path, is_item_b=False, allow_web_search=allow_search, image_mode=img_mode)
-        time.sleep(0.5)
-        auto_fetch_or_create_image(name_b, img_b_path, is_item_b=True, allow_web_search=allow_search, image_mode=img_mode)
+            # Generate script if not pre-stored
+            if not script_data or not script_data.get("segments"):
+                gen = AIScriptGenerator()
+                script_data = gen.generate_script(
+                    topic=topic,
+                    name_a=name_a,
+                    name_b=name_b,
+                    details_a=details_a,
+                    details_b=details_b,
+                    target_audience=target_audience,
+                    key_angles=key_angles,
+                    affiliate_link_a=aff_a,
+                    affiliate_link_b=aff_b,
+                    script_mode=dur_mode,
+                    channel_outro_cta=outro_cta,
+                    framework=chosen_fw,
+                )
 
-        # 4. Neural Voice & Audio Mixing
+            # Use verified curated images
+            cur_img_a = curated_item.get("image_a_path")
+            cur_img_b = curated_item.get("image_b_path")
+            if cur_img_a and Path(cur_img_a).exists():
+                img_a_path = Path(cur_img_a)
+            else:
+                allow_search = cfg.get("auto_search_images", True)
+                img_mode = profile.get("default_image_mode", "ai_cartoon")
+                img_a_path = ASSETS_DIR / "images" / f"auto_a_{t_now}.png"
+                auto_fetch_or_create_image(name_a, img_a_path, is_item_b=False, allow_web_search=allow_search, image_mode=img_mode)
+
+            if cur_img_b and Path(cur_img_b).exists():
+                img_b_path = Path(cur_img_b)
+            else:
+                allow_search = cfg.get("auto_search_images", True)
+                img_mode = profile.get("default_image_mode", "ai_cartoon")
+                img_b_path = ASSETS_DIR / "images" / f"auto_b_{t_now}.png"
+                auto_fetch_or_create_image(name_b, img_b_path, is_item_b=True, allow_web_search=allow_search, image_mode=img_mode)
+
+        else:
+            # Fallback: Pick viral idea from template library
+            cat = cfg.get("target_category", "ทั้งหมด (สุ่มทุกหมวด)")
+            fw = cfg.get("target_framework", "all")
+            dur_mode = cfg.get("target_duration_mode", "standard_3round")
+            template = get_random_idea(category=cat, framework=fw)
+
+            topic = template["topic"]
+            name_a = template["name_a"]
+            name_b = template["name_b"]
+            details_a = template.get("details_a", "")
+            details_b = template.get("details_b", "")
+            target_audience = template.get("target_audience", "")
+            key_angles = template.get("key_angles", "")
+            aff_a = template.get("affiliate_link_a") or cfg.get("default_affiliate_a", "https://shopee.co.th")
+            aff_b = template.get("affiliate_link_b") or cfg.get("default_affiliate_b", "https://shopee.co.th")
+            chosen_fw = template.get("framework", fw if fw != "all" else "persona")
+            post_mode = force_post_mode or "render_and_post"
+
+            _add_log(cfg, f"🤖 AI Deep Research: '{topic}' ({name_a} vs {name_b})")
+            save_autopilot_config(cfg)
+
+            gen = AIScriptGenerator()
+            script_data = gen.generate_script(
+                topic=topic,
+                name_a=name_a,
+                name_b=name_b,
+                details_a=details_a,
+                details_b=details_b,
+                target_audience=target_audience,
+                key_angles=key_angles,
+                affiliate_link_a=aff_a,
+                affiliate_link_b=aff_b,
+                script_mode=dur_mode,
+                channel_outro_cta=outro_cta,
+                framework=chosen_fw,
+            )
+
+            allow_search = cfg.get("auto_search_images", True)
+            img_mode = profile.get("default_image_mode", "ai_cartoon")
+            img_a_path = ASSETS_DIR / "images" / f"auto_a_{t_now}.png"
+            img_b_path = ASSETS_DIR / "images" / f"auto_b_{t_now}.png"
+            auto_fetch_or_create_image(name_a, img_a_path, is_item_b=False, allow_web_search=allow_search, image_mode=img_mode)
+            time.sleep(0.5)
+            auto_fetch_or_create_image(name_b, img_b_path, is_item_b=True, allow_web_search=allow_search, image_mode=img_mode)
+
+        # 4. Neural Voice & Audio Mixing (honoring active channel voice settings)
         output_mp4 = OUTPUT_DIR / f"shorts_autopilot_{t_now}.mp4"
         master_audio = output_mp4.parent / f"{output_mp4.stem}_audio.mp3"
-        tts = TTSEngine(voice_key="edge_niwat", speech_rate="+10%", speech_pitch="+2Hz")
+        voice_k = profile.get("default_voice", "edge_niwat")
+        s_rate = profile.get("default_speech_rate", "+10%")
+        s_pitch = profile.get("default_speech_pitch", "+2Hz")
+        tts = TTSEngine(voice_key=voice_k, speech_rate=s_rate, speech_pitch=s_pitch)
         timeline, audio_file, total_duration = tts.build_timeline(
             script_data=script_data,
             output_master_audio=master_audio,
@@ -180,11 +260,15 @@ def run_autopilot_cycle(is_manual: bool = False) -> Tuple[bool, str]:
             include_sfx=True,
         )
 
-        # 5. Video Rendering
+        # 5. Video Rendering (honoring active subtitle styles)
+        sub_style = profile.get("default_subtitle_style", "clean_floating")
+        sub_anim = profile.get("default_subtitle_anim", "typewriter")
         builder = VideoBuilder(
-            bg_color=hex_to_rgb("#F5F2EB"),
-            highlight_color=hex_to_rgb("#32CD32"),
-            animation_style="pointer_and_border",
+            bg_color=hex_to_rgb(profile.get("bg_color", "#F5F2EB")),
+            highlight_color=hex_to_rgb(profile.get("highlight_color", "#32CD32")),
+            animation_style=profile.get("default_mascot_anim", "pointer_and_border"),
+            subtitle_style=sub_style,
+            subtitle_anim=sub_anim,
         )
         wm_text = profile.get("watermark_text", "@WhyItWorks")
         wm_opac = float(profile.get("watermark_opacity", 0.75))
@@ -217,7 +301,6 @@ def run_autopilot_cycle(is_manual: bool = False) -> Tuple[bool, str]:
         hashtags = script_data.get("hashtags") or caption_dict.get("hashtags", "")
         aff_comm = script_data.get("affiliate_comment", "")
 
-        # Save sidecar metadata JSON (ready for auto-posting scripts / webhooks)
         sidecar_meta = {
             "title": topic,
             "video_path": str(final_video),
@@ -231,6 +314,7 @@ def run_autopilot_cycle(is_manual: bool = False) -> Tuple[bool, str]:
             "duration_seconds": round(total_duration, 1),
             "created_at": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(t_now)),
             "autopilot": True,
+            "post_mode": post_mode,
         }
         meta_path = output_mp4.parent / f"{output_mp4.stem}_meta.json"
         try:
@@ -267,21 +351,36 @@ def run_autopilot_cycle(is_manual: bool = False) -> Tuple[bool, str]:
         except Exception as gde:
             _add_log(cfg, f"⚠️ GDrive Sync: {gde}")
 
-        # 9. Fail-safe Multi-Platform Auto-Posting (Facebook Reels, YouTube Shorts, TikTok Webhook)
-        try:
-            from autopost_engine import publish_to_all_enabled
-            post_results = publish_to_all_enabled(
-                video_path=str(final_video),
-                cover_path=str(cover_path) if cover_path.exists() else None,
-                meta_path=str(meta_path) if meta_path.exists() else None,
-            )
-            for plat, (p_ok, p_msg) in post_results.items():
-                p_icon = "🚀" if p_ok else "⚠️"
-                _add_log(cfg, f"{p_icon} [{plat.upper()}] {p_msg}")
-        except Exception as ape:
-            _add_log(cfg, f"⚠️ Auto-Post: {ape}")
+        # 9. Multi-Platform Auto-Posting (ONLY if post_mode == 'render_and_post')
+        if post_mode == "render_and_post":
+            try:
+                from autopost_engine import publish_to_all_enabled
+                post_results = publish_to_all_enabled(
+                    video_path=str(final_video),
+                    cover_path=str(cover_path) if cover_path.exists() else None,
+                    meta_path=str(meta_path) if meta_path.exists() else None,
+                )
+                for plat, (p_ok, p_msg) in post_results.items():
+                    p_icon = "🚀" if p_ok else "⚠️"
+                    _add_log(cfg, f"{p_icon} [{plat.upper()}] {p_msg}")
+            except Exception as ape:
+                _add_log(cfg, f"⚠️ Auto-Post: {ape}")
+        else:
+            _add_log(cfg, f"📦 บันทึกไฟล์สำเร็จ (โหมด Render Only ไม่โพสต์)")
 
-        # 10. Update Scheduler Config
+        # 10. Update Planned Queue item if applicable
+        if curated_item:
+            update_planned_item(
+                curated_item["id"],
+                {
+                    "status": "completed",
+                    "completed_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "video_path": str(final_video),
+                    "cover_path": str(cover_path) if cover_path.exists() else None,
+                },
+            )
+
+        # 11. Update Scheduler Config
         elapsed = round(time.time() - t_start, 1)
         cfg = load_autopilot_config()  # reload fresh
         cfg["status"] = "idle"
@@ -302,6 +401,11 @@ def run_autopilot_cycle(is_manual: bool = False) -> Tuple[bool, str]:
     except Exception as e:
         err_msg = f"เกิดข้อผิดพลาด: {e}"
         print(f"[Scheduler Error] {traceback.format_exc()}")
+        if curated_item:
+            update_planned_item(
+                curated_item["id"],
+                {"status": "error", "error_message": str(e)},
+            )
         cfg = load_autopilot_config()
         cfg["status"] = "error"
         cfg["last_run_status"] = f"เกิดข้อผิดพลาด: {e}"
@@ -392,4 +496,46 @@ def run_autopilot_batch(count: int = 3, progress_callback=None) -> Tuple[int, in
         time.sleep(2)
 
     return success_count, fail_count, results
+
+
+def run_planned_queue_batch(post_mode_override: Optional[str] = None, progress_callback=None) -> Tuple[int, int, list]:
+    """
+    Renders all currently 'ready' items in the planned queue in FIFO/priority order.
+    """
+    import gc
+    queue = load_planned_queue()
+    ready_items = [it for it in queue if it.get("status") == "ready"]
+    total = len(ready_items)
+    if total == 0:
+        return 0, 0, ["ไม่มีรายการในคิวที่สถานะ 'พร้อมเรนเดอร์'"]
+
+    success_count = 0
+    fail_count = 0
+    results = []
+
+    for i, item in enumerate(ready_items, start=1):
+        item_id = item.get("id")
+        topic_title = item.get("topic", "Comparison")
+        msg_start = f"กำลังสร้างคลิปที่ {i}/{total}: {topic_title}..."
+        if progress_callback:
+            progress_callback(i, total, msg_start)
+        print(f"[PlannedBatch] {msg_start}")
+
+        ok, res_msg = run_autopilot_cycle(
+            is_manual=True,
+            queue_item_id=item_id,
+            force_post_mode=post_mode_override,
+        )
+        if ok:
+            success_count += 1
+            results.append(f"คิวที่ {i} ({topic_title}): สำเร็จ")
+        else:
+            fail_count += 1
+            results.append(f"คิวที่ {i} ({topic_title}): ไม่สำเร็จ ({res_msg})")
+
+        gc.collect()
+        time.sleep(2)
+
+    return success_count, fail_count, results
+
 
