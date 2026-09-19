@@ -49,14 +49,159 @@ from video_builder import VideoBuilder
 from pipeline import hex_to_rgb
 from image_fetcher import auto_fetch_or_create_image
 from content_history import load_history, add_history_entry, delete_history_entry
+from scheduler_daemon import (
+    ensure_scheduler_running,
+    load_autopilot_config,
+    save_autopilot_config,
+    run_autopilot_cycle,
+    is_scheduler_alive,
+)
+
+# Start background autonomous daemon
+ensure_scheduler_running()
+
+# iOS Design System Stylesheet
+st.markdown(
+    """
+    <style>
+    /* Apple SF Pro Typography & Clean iOS Base */
+    html, body, [class*="css"] {
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+        letter-spacing: -0.011em;
+    }
+
+    /* iOS Frosted Glass Header */
+    .ios-header {
+        background: linear-gradient(135deg, rgba(28, 28, 30, 0.95) 0%, rgba(44, 44, 46, 0.92) 100%);
+        backdrop-filter: blur(25px) saturate(190%);
+        -webkit-backdrop-filter: blur(25px) saturate(190%);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 20px;
+        padding: 24px 30px;
+        margin-bottom: 22px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+        color: #FFFFFF;
+    }
+    .ios-badge {
+        display: inline-block;
+        background: rgba(0, 122, 255, 0.2);
+        border: 1px solid rgba(0, 122, 255, 0.4);
+        color: #5AC8FA;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        padding: 4px 10px;
+        border-radius: 9999px;
+        margin-bottom: 8px;
+    }
+
+    /* iOS Segmented Control Tabs */
+    div[data-baseweb="tab-list"] {
+        background-color: #E5E5EA !important;
+        border-radius: 14px !important;
+        padding: 4px !important;
+        gap: 4px !important;
+        border: none !important;
+    }
+    div[data-baseweb="tab"] {
+        border-radius: 10px !important;
+        border: none !important;
+        font-weight: 500 !important;
+        color: #3C3C43 !important;
+        padding: 8px 16px !important;
+        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    }
+    div[data-baseweb="tab"]:hover {
+        background-color: rgba(255, 255, 255, 0.5) !important;
+    }
+    div[data-baseweb="tab"][aria-selected="true"] {
+        background-color: #FFFFFF !important;
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.06) !important;
+        color: #000000 !important;
+        font-weight: 600 !important;
+    }
+    div[data-baseweb="tab-highlight"] {
+        display: none !important;
+    }
+
+    /* iOS Rounded Pill Buttons */
+    .stButton > button {
+        border-radius: 9999px !important;
+        font-weight: 600 !important;
+        font-size: 14px !important;
+        padding: 0.5rem 1.3rem !important;
+        border: 1px solid transparent !important;
+        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    }
+    .stButton > button[kind="primary"] {
+        background: linear-gradient(135deg, #007AFF 0%, #0051D5 100%) !important;
+        color: #FFFFFF !important;
+        box-shadow: 0 4px 14px rgba(0, 122, 255, 0.35) !important;
+    }
+    .stButton > button[kind="primary"]:hover {
+        transform: translateY(-1px) scale(1.01) !important;
+        box-shadow: 0 6px 20px rgba(0, 122, 255, 0.45) !important;
+    }
+    .stButton > button[kind="secondary"] {
+        background: #F2F2F7 !important;
+        color: #007AFF !important;
+        border: 1px solid rgba(0, 122, 255, 0.2) !important;
+    }
+    .stButton > button[kind="secondary"]:hover {
+        background: #E5E5EA !important;
+        transform: translateY(-1px) !important;
+    }
+    .stButton > button:active {
+        transform: scale(0.97) !important;
+    }
+
+    /* iOS Cards & Containers */
+    .ios-card {
+        background: rgba(255, 255, 255, 0.88);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        border-radius: 18px;
+        padding: 20px 22px;
+        margin-bottom: 18px;
+        box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04), 0 2px 6px -1px rgba(0, 0, 0, 0.02);
+    }
+
+    /* iOS Rounded Inputs */
+    div[data-baseweb="input"] > div,
+    div[data-baseweb="textarea"] > div,
+    div[data-baseweb="select"] > div {
+        border-radius: 12px !important;
+        border: 1px solid rgba(0, 0, 0, 0.1) !important;
+        transition: border-color 0.2s, box-shadow 0.2s !important;
+    }
+    div[data-baseweb="input"] > div:focus-within,
+    div[data-baseweb="textarea"] > div:focus-within {
+        border-color: #007AFF !important;
+        box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15) !important;
+    }
+
+    /* iOS Expanders */
+    div[data-testid="stExpander"] {
+        border: 1px solid rgba(0, 0, 0, 0.06) !important;
+        border-radius: 16px !important;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02) !important;
+        overflow: hidden !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 # Header
 st.markdown(
     """
-    <div style="background: linear-gradient(135deg, #1E1E2F 0%, #2A2A40 100%); padding: 22px 28px; border-radius: 14px; margin-bottom: 24px; color: white;">
-        <h1 style="margin: 0; font-size: 28px; font-weight: 700;">⚡ Automated Short-Form Video Studio (9:16)</h1>
-        <p style="margin: 6px 0 0 0; color: #B0B0C0; font-size: 15px;">
-            สร้างวิดีโอเปรียบเทียบ A vs B สไตล์ Reels/Shorts/TikTok ด้วย AI Deep Research, เสียง Neural เหมือนคนจริง, Dynamic Highlight & ตัวชี้ และระบบ Affiliate CTA ปักหมุด
+    <div class="ios-header">
+        <div class="ios-badge"> iOS Studio Edition • Automated 9:16 Pipeline</div>
+        <h1 style="margin: 0; font-size: 27px; font-weight: 700; letter-spacing: -0.02em;">⚡ Why It Works — Short-Form Video Studio</h1>
+        <p style="margin: 6px 0 0 0; color: #AEAEB2; font-size: 14.5px; line-height: 1.45;">
+            สตูดิโอสร้างวิดีโอเปรียบเทียบ A vs B อัตโนมัติ: AI Deep Research, เสียง Neural เหมือนคนจริง, Dynamic Highlight & ตัวชี้, แคปชั่นไวรัล และระบบ Auto-Pilot ผลิตคลิป 24 ชั่วโมง
         </p>
     </div>
     """,
@@ -91,16 +236,30 @@ with st.sidebar:
             "💡 **แชร์ข้ามเน็ตฟรี:** `npx localtunnel --port 8501`"
         )
     st.divider()
+    # Auto-Pilot Status Widget in Sidebar
+    auto_cfg = load_autopilot_config()
+    st.markdown("### ⏰ สถานะ Auto-Pilot 24 ชม.")
+    if auto_cfg.get("enabled"):
+        next_ts = auto_cfg.get("next_run_timestamp", 0)
+        remaining_m = max(0, int((next_ts - time.time()) / 60)) if next_ts > 0 else 0
+        rem_str = f"ในอีก {remaining_m // 60} ชม. {remaining_m % 60} นาที" if remaining_m >= 60 else f"ในอีก {remaining_m} นาที"
+        st.success(f"🟢 **ทำงานอยู่** (ทุก {auto_cfg.get('interval_hours')} ชม.)\n\n⏱️ คลิปถัดไป: {rem_str}")
+    else:
+        st.info("⚪ **ปิดอยู่** (ตั้งเวลาที่แท็บ 5 ได้ตลอดเวลา)")
+
+    st.divider()
     st.markdown("### 🏢 โปรไฟล์เพจ & ลายน้ำกันก๊อป")
     if "channel_profile" not in st.session_state:
         st.session_state.channel_profile = load_channel_profile()
 
     prof = st.session_state.channel_profile
-    with st.expander("⚙️ ตั้งค่าลายน้ำ & บทส่งท้ายประจำเพจ", expanded=False):
+    with st.expander("⚙️ ตั้งค่าลายน้ำ & ลิงก์ Affiliate ประจำเพจ", expanded=False):
         p_name = st.text_input("ชื่อเพจ / ช่อง:", value=prof.get("channel_name", "Why It Works"))
         p_wm = st.text_input("ข้อความลายน้ำ:", value=prof.get("watermark_text", "@WhyItWorks"))
         p_opac = st.slider("ความชัดลายน้ำ (Opacity):", min_value=0.2, max_value=1.0, value=float(prof.get("watermark_opacity", 0.75)), step=0.05)
-        p_outro = st.text_area("บทส่งท้ายประจำเพจ (Default Outro CTA):", value=prof.get("default_outro_cta", "ถ้าอยากได้ความรู้เปรียบเทียบสนุกๆ แบบนี้ อย่าลืมกดติดตามเพจ Why It Works ไว้นะครับ!"), height=80)
+        p_outro = st.text_area("บทส่งท้ายประจำเพจ (Default Outro CTA):", value=prof.get("default_outro_cta", "ถ้าอยากได้ความรู้เปรียบเทียบสนุกๆ แบบนี้ อย่าลืมกดติดตามเพจ Why It Works ไว้นะครับ!"), height=70)
+        p_aff_a = st.text_input("🔗 ลิงก์ Affiliate เริ่มต้น A (Default Aff A):", value=prof.get("default_affiliate_a", "https://shopee.co.th"))
+        p_aff_b = st.text_input("🔗 ลิงก์ Affiliate เริ่มต้น B (Default Aff B):", value=prof.get("default_affiliate_b", "https://shopee.co.th"))
         p_logo = st.file_uploader("โลโก้เพจ (PNG พื้นใส):", type=["png"], key="side_channel_logo")
 
         if st.button("💾 บันทึกโปรไฟล์เพจ", use_container_width=True):
@@ -108,6 +267,8 @@ with st.sidebar:
             prof["watermark_text"] = p_wm
             prof["watermark_opacity"] = p_opac
             prof["default_outro_cta"] = p_outro
+            prof["default_affiliate_a"] = p_aff_a
+            prof["default_affiliate_b"] = p_aff_b
             if p_logo:
                 save_logo_p = ASSETS_DIR / "images" / "channel_logo.png"
                 with open(save_logo_p, "wb") as f:
@@ -115,7 +276,7 @@ with st.sidebar:
                 prof["logo_path"] = str(save_logo_p)
             save_channel_profile(prof)
             st.session_state.channel_profile = prof
-            st.toast("✅ บันทึกโปรไฟล์เพจและลายน้ำเรียบร้อยแล้ว!")
+            st.toast("✅ บันทึกโปรไฟล์เพจและลิงก์ Affiliate เรียบร้อยแล้ว!")
 
     st.divider()
     st.markdown("### 📚 คลังประวัติคลิปที่สร้าง")
@@ -180,6 +341,9 @@ if "script_data" not in st.session_state:
 if "rendered_video_path" not in st.session_state:
     st.session_state.rendered_video_path = None
 
+if "script_version" not in st.session_state:
+    st.session_state.script_version = 1
+
 # Initialize Form Keys if not present
 if "input_topic" not in st.session_state:
     st.session_state.input_topic = st.session_state.script_data.get("topic", "กาแฟดริป VS กาแฟแคปซูล")
@@ -203,11 +367,12 @@ if "input_framework" not in st.session_state:
     st.session_state.input_framework = st.session_state.script_data.get("framework", "persona")
 
 # Tabs Navigation
-tab1, tab2, tab3, tab4 = st.tabs([
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "1. 🔍 ป้อนข้อมูล & ค้นหาเจาะลึก",
     "2. 📝 ตรวจบท & สั่งรีไรท์",
     "3. 🎨 ตั้งค่าเสียง, BGM & ภาพ",
     "4. 🎬 เรนเดอร์ & พรีวิวคลิป",
+    "5. ⏰ Auto-Pilot ผลิตอัตโนมัติ 24 ชม.",
 ])
 
 # -------------------------------------------------------------
@@ -260,6 +425,7 @@ with tab1:
             st.session_state.input_aff_b = template.get("affiliate_link_b", "")
             if "framework" in template:
                 st.session_state.input_framework = template["framework"]
+            st.session_state.script_version += 1
             st.toast(f"สุ่มได้หัวข้อ: {template['topic']} สำเร็จ!")
             st.rerun()
 
@@ -336,6 +502,7 @@ with tab1:
                         framework=selected_fw,
                     )
                     st.session_state.script_data = new_data
+                    st.session_state.script_version += 1
                     st.success("✅ ทำการวิเคราะห์และสร้างบทเรียบร้อยแล้ว! คลิกไปที่แท็บ '2. ตรวจบท & สั่งรีไรท์' ได้เลยครับ")
                 except Exception as e:
                     st.error(f"เกิดข้อผิดพลาดในการเรียก AI: {e}")
@@ -363,6 +530,7 @@ with tab1:
                         framework=selected_fw,
                     )
                     st.session_state.script_data = new_data
+                    st.session_state.script_version += 1
 
                     # 2. Auto-fetch or generate images
                     st.write(f"📸 2/4: กำลังค้นหารูปภาพอัตโนมัติสำหรับ '{in_name_a}' และ '{in_name_b}'...")
@@ -470,6 +638,8 @@ with tab2:
         or "round_1_a" in st.session_state.script_data
     )
 
+    v = st.session_state.get("script_version", 1)
+
     with col_script:
         if is_multi:
             num_rounds = st.session_state.script_data.get("num_rounds")
@@ -485,7 +655,7 @@ with tab2:
 
             mode_label = DURATION_MODES.get(st.session_state.script_data.get("mode"), {}).get("name", f"{num_rounds} ยก")
             st.markdown(f"#### 🥊 บทพากย์ {num_rounds} ยก สลับชี้ A vs B ({mode_label})")
-            s_hook = st.text_area("🎯 Hook (เปิดประเด็นชวนสงสัย)", value=st.session_state.script_data.get("hook", ""), height=65)
+            s_hook = st.text_area("🎯 Hook (เปิดประเด็นชวนสงสัย)", value=st.session_state.script_data.get("hook", ""), height=65, key=f"inp_hook_v{v}")
 
             round_data = {}
             for r in range(1, num_rounds + 1):
@@ -494,22 +664,23 @@ with tab2:
                 st.markdown(f"##### 🥊 ยกที่ {r}: {r_title_val}")
                 col_ra, col_rb = st.columns(2)
                 with col_ra:
-                    s_ra = st.text_area(f"🟢 A: {st.session_state.script_data.get('name_a', 'A')}", value=st.session_state.script_data.get(f"round_{r}_a", ""), height=75, key=f"inp_r{r}_a")
+                    s_ra = st.text_area(f"🟢 A: {st.session_state.script_data.get('name_a', 'A')}", value=st.session_state.script_data.get(f"round_{r}_a", ""), height=75, key=f"inp_r{r}_a_v{v}")
                 with col_rb:
-                    s_rb = st.text_area(f"🔵 B: {st.session_state.script_data.get('name_b', 'B')}", value=st.session_state.script_data.get(f"round_{r}_b", ""), height=75, key=f"inp_r{r}_b")
+                    s_rb = st.text_area(f"🔵 B: {st.session_state.script_data.get('name_b', 'B')}", value=st.session_state.script_data.get(f"round_{r}_b", ""), height=75, key=f"inp_r{r}_b_v{v}")
                 round_data[r] = {
                     "title": r_title_val,
                     "a": s_ra,
                     "b": s_rb,
                 }
 
-            s_conclusion = st.text_area("🏁 สรุปฟันธง + Affiliate CTA ปักหมุด", value=st.session_state.script_data.get("conclusion", ""), height=75)
-            if st.button("🔄 ใส่บทส่งท้ายประจำเพจ", key="btn_outro_multi", help="นำประโยคปิดท้ายที่ตั้งไว้ในโปรไฟล์เพจมาต่อท้ายข้อความสรุปทันที"):
+            s_conclusion = st.text_area("🏁 สรุปฟันธง + Affiliate CTA ปักหมุด", value=st.session_state.script_data.get("conclusion", ""), height=75, key=f"inp_conc_v{v}")
+            if st.button("🔄 ใส่บทส่งท้ายประจำเพจ", key=f"btn_outro_multi_v{v}", help="นำประโยคปิดท้ายที่ตั้งไว้ในโปรไฟล์เพจมาต่อท้ายข้อความสรุปทันที"):
                 cur_outro = st.session_state.channel_profile.get("default_outro_cta", "")
                 if cur_outro and cur_outro not in st.session_state.script_data.get("conclusion", ""):
                     st.session_state.script_data["conclusion"] = (st.session_state.script_data.get("conclusion", "").strip() + " " + cur_outro).strip()
+                    st.session_state.script_version += 1
                     st.rerun()
-            s_comment = st.text_area("📌 พิกัด Affiliate ปักหมุดคอมเมนต์แรก", value=st.session_state.script_data.get("affiliate_comment", ""), height=100)
+            s_comment = st.text_area("📌 พิกัด Affiliate ปักหมุดคอมเมนต์แรก", value=st.session_state.script_data.get("affiliate_comment", ""), height=100, key=f"inp_aff_v{v}")
 
             # Sync and package
             st.session_state.script_data["hook"] = s_hook
@@ -534,11 +705,11 @@ with tab2:
             st.session_state.script_data["segments"] = new_segments
         else:
             st.markdown("#### ✍️ บทพากย์ 4 ท่อน (แก้ไขได้โดยตรง)")
-            s_hook = st.text_area("🎯 ท่อนที่ 1: Hook (เปิดประเด็นชวนสงสัย)", value=st.session_state.script_data.get("hook", ""), height=70)
-            s_item_a = st.text_area(f"🟢 ท่อนที่ 2: จุดเด่น {st.session_state.script_data.get('name_a', 'Item A')}", value=st.session_state.script_data.get("item_a", ""), height=90)
-            s_item_b = st.text_area(f"🔵 ท่อนที่ 3: จุดเด่น {st.session_state.script_data.get('name_b', 'Item B')}", value=st.session_state.script_data.get("item_b", ""), height=90)
-            s_conclusion = st.text_area("🏁 ท่อนที่ 4: สรุปฟันธง + Affiliate CTA", value=st.session_state.script_data.get("conclusion", ""), height=90)
-            s_comment = st.text_area("📌 ข้อความสำหรับปักหมุดคอมเมนต์แรก", value=st.session_state.script_data.get("affiliate_comment", ""), height=120)
+            s_hook = st.text_area("🎯 ท่อนที่ 1: Hook (เปิดประเด็นชวนสงสัย)", value=st.session_state.script_data.get("hook", ""), height=70, key=f"inp_hook_v{v}")
+            s_item_a = st.text_area(f"🟢 ท่อนที่ 2: จุดเด่น {st.session_state.script_data.get('name_a', 'Item A')}", value=st.session_state.script_data.get("item_a", ""), height=90, key=f"inp_item_a_v{v}")
+            s_item_b = st.text_area(f"🔵 ท่อนที่ 3: จุดเด่น {st.session_state.script_data.get('name_b', 'Item B')}", value=st.session_state.script_data.get("item_b", ""), height=90, key=f"inp_item_b_v{v}")
+            s_conclusion = st.text_area("🏁 ท่อนที่ 4: สรุปฟันธง + Affiliate CTA", value=st.session_state.script_data.get("conclusion", ""), height=90, key=f"inp_conc_v{v}")
+            s_comment = st.text_area("📌 ข้อความสำหรับปักหมุดคอมเมนต์แรก", value=st.session_state.script_data.get("affiliate_comment", ""), height=120, key=f"inp_aff_v{v}")
 
             st.session_state.script_data["hook"] = s_hook
             st.session_state.script_data["item_a"] = s_item_a
@@ -585,6 +756,7 @@ with tab2:
                         tone=rewrite_tone,
                     )
                     st.session_state.script_data.update(rewritten)
+                    st.session_state.script_version += 1
                     st.success("รีไรท์สำเร็จแล้ว!")
                     st.rerun()
                 except Exception as e:
@@ -916,3 +1088,170 @@ with tab4:
 
             st.markdown("#### 📌 ข้อความสำหรับปักหมุดคอมเมนต์แรก (Auto-Pin Comment):")
             st.code(st.session_state.script_data.get("affiliate_comment", ""), language="text")
+
+# -------------------------------------------------------------
+# TAB 5: AUTOPILOT 24/7 AUTONOMOUS SCHEDULER
+# -------------------------------------------------------------
+with tab5:
+    st.subheader("⏰ Auto-Pilot 24 Hours — ผลิตคลิปอัตโนมัติตามเวลา")
+    st.caption("ระบบทำงานในพื้นหลังตลอด 24 ชั่วโมง สุ่มหัวข้อไวรัล ค้นภาพ สังเคราะห์เสียง Neural ตัดต่อวิดีโอ 9:16 แคปชั่น แฮชแท็ก และปักหมุด Affiliate เตรียมพร้อมนำไปโพสต์ได้ทันที")
+
+    auto_cfg = load_autopilot_config()
+    prof = st.session_state.channel_profile
+
+    # Top Status Cards (iOS Style)
+    col_st1, col_st2, col_st3 = st.columns([1, 1, 1])
+    with col_st1:
+        is_active = auto_cfg.get("enabled", False)
+        badge_color = "#34C759" if is_active else "#8E8E93"
+        badge_title = "🟢 เปิดทำงาน (Active)" if is_active else "⚪ ปิดทำงาน (Paused)"
+        st.markdown(
+            f"""
+            <div class="ios-card" style="border-left: 5px solid {badge_color};">
+                <div style="font-size: 13px; color: #8E8E93; font-weight: 600;">สถานะระบบ Auto-Pilot</div>
+                <div style="font-size: 19px; font-weight: 700; color: {badge_color}; margin-top: 4px;">{badge_title}</div>
+                <div style="font-size: 12px; color: #636366; margin-top: 5px;">Worker Daemon: {'🟢 ออนไลน์' if is_scheduler_alive() else '🟡 กำลังเตรียมพร้อม'}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with col_st2:
+        next_ts = auto_cfg.get("next_run_timestamp", 0)
+        if is_active and next_ts > 0:
+            diff_m = max(0, int((next_ts - time.time()) / 60))
+            if diff_m >= 60:
+                timer_txt = f"ในอีก {diff_m // 60} ชม. {diff_m % 60} นาที"
+            else:
+                timer_txt = f"ในอีก {diff_m} นาที"
+            scheduled_clock = time.strftime("%H:%M น.", time.localtime(next_ts))
+        else:
+            timer_txt = "—"
+            scheduled_clock = "ยังไม่ได้เปิดใช้งาน"
+
+        st.markdown(
+            f"""
+            <div class="ios-card" style="border-left: 5px solid #007AFF;">
+                <div style="font-size: 13px; color: #8E8E93; font-weight: 600;">รอบการผลิตคลิปถัดไป</div>
+                <div style="font-size: 19px; font-weight: 700; color: #007AFF; margin-top: 4px;">{timer_txt}</div>
+                <div style="font-size: 12px; color: #636366; margin-top: 5px;">เวลาประมาณ {scheduled_clock}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with col_st3:
+        total_gen = auto_cfg.get("total_generated", 0)
+        last_topic_str = auto_cfg.get("last_topic") or "ยังไม่มีคลิป"
+        st.markdown(
+            f"""
+            <div class="ios-card" style="border-left: 5px solid #FF9500;">
+                <div style="font-size: 13px; color: #8E8E93; font-weight: 600;">ยอดผลิตสะสม</div>
+                <div style="font-size: 19px; font-weight: 700; color: #FF9500; margin-top: 4px;">{total_gen} คลิป</div>
+                <div style="font-size: 12px; color: #636366; margin-top: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">ล่าสุด: {last_topic_str}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("#### ⚙️ ตั้งค่าความถี่ & เงื่อนไขการผลิต (Schedule Configuration)")
+    c_form1, c_form2 = st.columns(2, gap="large")
+
+    with c_form1:
+        auto_toggle = st.toggle("🚀 เปิดใช้งานระบบผลิตอัตโนมัติตามเวลา (Auto-Pilot)", value=bool(auto_cfg.get("enabled", False)))
+
+        interval_choices = [1.0, 2.0, 3.0, 4.0, 6.0, 8.0, 12.0, 24.0]
+        cur_int = float(auto_cfg.get("interval_hours", 3.0))
+        int_idx = interval_choices.index(cur_int) if cur_int in interval_choices else 2
+        selected_interval = st.selectbox(
+            "⏱️ สร้างคลิปใหม่ทุกๆ:",
+            options=interval_choices,
+            index=int_idx,
+            format_func=lambda h: f"ทุก {int(h) if h.is_integer() else h} ชั่วโมง ({int(24/h)} คลิปต่อวัน)",
+            help="กำหนดระยะเวลาที่จะให้ระบบตื่นขึ้นมาสร้างคลิปใหม่ เช่น ทุก 3 ชั่วโมง",
+        )
+
+        all_cats = ["ทั้งหมด (สุ่มทุกหมวด)"] + CATEGORIES
+        cur_cat = auto_cfg.get("target_category", "ทั้งหมด (สุ่มทุกหมวด)")
+        cat_idx = all_cats.index(cur_cat) if cur_cat in all_cats else 0
+        selected_cat = st.selectbox(
+            "📂 หมวดหมู่สินค้าเป้าหมาย:",
+            options=all_cats,
+            index=cat_idx,
+            help="ระบบจะสุ่มหัวข้อจากหมวดนี้ หรือเลือก 'ทั้งหมด' เพื่อให้คอนเทนต์หลากหลาย",
+        )
+
+        fw_list = ["all"] + list(FRAMEWORK_PRESETS.keys())
+        cur_fw = auto_cfg.get("target_framework", "all")
+        fw_idx = fw_list.index(cur_fw) if cur_fw in fw_list else 0
+        selected_fw = st.selectbox(
+            "🎯 กรอบแนวทาง Framework ไวรัล:",
+            options=fw_list,
+            index=fw_idx,
+            format_func=lambda k: f"สุ่มทุกแนวทาง ({len(FRAMEWORK_PRESETS)} Frameworks)" if k == "all" else FRAMEWORK_PRESETS[k]["name"],
+            help="เลือกแนวทางจิตวิทยาการเปรียบเทียบ",
+        )
+
+    with c_form2:
+        dur_list = list(DURATION_MODES.keys())
+        cur_dur = auto_cfg.get("target_duration_mode", "standard_3round")
+        dur_idx = dur_list.index(cur_dur) if cur_dur in dur_list else 1
+        selected_dur = st.selectbox(
+            "⏱️ รูปแบบความยาวคลิป:",
+            options=dur_list,
+            index=dur_idx,
+            format_func=lambda k: DURATION_MODES[k]["name"],
+        )
+
+        auto_img_fetch = st.checkbox("📸 ค้นหาและบันทึกภาพสินค้าจากเว็บฟรีอัตโนมัติ", value=bool(auto_cfg.get("auto_search_images", True)))
+
+        st.markdown("##### 🔗 พิกัด Affiliate สำรองเริ่มต้น (Default Affiliate Links)")
+        st.caption("ระบบจะนำลิงก์นี้ไปใส่ในแคปชั่นและปักหมุดคอมเมนต์แรกอัตโนมัติ สำหรับทุกคลิปที่สร้างโดยระบบออโต้")
+        def_aff_a = st.text_input("ลิงก์ Affiliate สินค้า A เริ่มต้น:", value=auto_cfg.get("default_affiliate_a", prof.get("default_affiliate_a", "https://shopee.co.th")))
+        def_aff_b = st.text_input("ลิงก์ Affiliate สินค้า B เริ่มต้น:", value=auto_cfg.get("default_affiliate_b", prof.get("default_affiliate_b", "https://shopee.co.th")))
+
+    c_btn_save, c_btn_run = st.columns([1, 1], gap="medium")
+    with c_btn_save:
+        if st.button("💾 บันทึกการตั้งค่า Auto-Pilot", type="secondary", use_container_width=True):
+            auto_cfg["enabled"] = auto_toggle
+            auto_cfg["interval_hours"] = float(selected_interval)
+            auto_cfg["target_category"] = selected_cat
+            auto_cfg["target_framework"] = selected_fw
+            auto_cfg["target_duration_mode"] = selected_dur
+            auto_cfg["auto_search_images"] = auto_img_fetch
+            auto_cfg["default_affiliate_a"] = def_aff_a
+            auto_cfg["default_affiliate_b"] = def_aff_b
+            if auto_toggle and auto_cfg.get("next_run_timestamp", 0) <= time.time():
+                auto_cfg["next_run_timestamp"] = int(time.time() + float(selected_interval) * 3600)
+            save_autopilot_config(auto_cfg)
+            st.toast("✅ บันทึกการตั้งค่า Auto-Pilot สำเร็จแล้ว!")
+            st.rerun()
+
+    with c_btn_run:
+        if st.button("⚡ ทดสอบสร้างอัตโนมัติ 1 คลิปทันที (Run 1 Clip Now)", type="primary", use_container_width=True):
+            auto_cfg["interval_hours"] = float(selected_interval)
+            auto_cfg["target_category"] = selected_cat
+            auto_cfg["target_framework"] = selected_fw
+            auto_cfg["target_duration_mode"] = selected_dur
+            auto_cfg["auto_search_images"] = auto_img_fetch
+            auto_cfg["default_affiliate_a"] = def_aff_a
+            auto_cfg["default_affiliate_b"] = def_aff_b
+            save_autopilot_config(auto_cfg)
+
+            with st.spinner("🤖 กำลังรันกระบวนการผลิตคลิปอัตโนมัติครบวงจร (Research -> Script -> Audio -> Video 1080x1920 -> Social Caption)..."):
+                ok, res_msg = run_autopilot_cycle(is_manual=True)
+                if ok:
+                    st.success(f"🎉 {res_msg}")
+                    st.rerun()
+                else:
+                    st.error(f"❌ {res_msg}")
+
+    # Activity Feed / Logs
+    st.divider()
+    st.markdown("#### 📜 บันทึกกิจกรรมระบบอัตโนมัติ (Activity Feed & Logs)")
+    logs = auto_cfg.get("history_log", [])
+    if not logs:
+        st.caption("ยังไม่มีบันทึกกิจกรรมในระบบ")
+    else:
+        st.text_area("Live Production Activity", value="\n".join(logs), height=180, disabled=True)
+

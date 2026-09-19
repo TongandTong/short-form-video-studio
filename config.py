@@ -152,6 +152,8 @@ DEFAULT_CHANNEL_PROFILE = {
     "watermark_text": "@WhyItWorks",
     "watermark_opacity": 0.75,
     "default_outro_cta": "ถ้าชอบความรู้เปรียบเทียบสนุกๆ แบบนี้ อย่าลืมกดติดตามเพจ Why It Works ไว้นะครับ!",
+    "default_affiliate_a": "https://shopee.co.th",
+    "default_affiliate_b": "https://shopee.co.th",
     "logo_path": "",
 }
 

@@ -3,3 +3,6 @@ __pycache__/
 *.pyc
 output/
 temp/
+autopilot_config.json
+content_history.json
+*.png
