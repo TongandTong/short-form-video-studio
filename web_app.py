@@ -37,6 +37,7 @@ from config import (
     load_channel_profile,
     save_channel_profile,
     DEFAULT_CHANNEL_PROFILE,
+    get_active_character_assets,
 )
 from ai_script_generator import (
     AIScriptGenerator,
@@ -540,12 +541,13 @@ with tab_script:
                     st.session_state.script_data = new_data
                     st.session_state.script_version += 1
 
-                    st.write(f"📸 2/4: กำลังค้นหารูปภาพสำหรับ '{in_name_a}' และ '{in_name_b}'...")
+                    st.write(f"📸 2/4: กำลังค้นหา/สร้างรูปภาพสำหรับ '{in_name_a}' และ '{in_name_b}'...")
                     t_now = int(time.time())
                     img_a_path = ASSETS_DIR / "images" / f"auto_a_{t_now}.png"
                     img_b_path = ASSETS_DIR / "images" / f"auto_b_{t_now}.png"
-                    auto_fetch_or_create_image(in_name_a, img_a_path, is_item_b=False, allow_web_search=True)
-                    auto_fetch_or_create_image(in_name_b, img_b_path, is_item_b=True, allow_web_search=True)
+                    img_mode_def = prof.get("default_image_mode", "ai_cartoon")
+                    auto_fetch_or_create_image(in_name_a, img_a_path, is_item_b=False, allow_web_search=True, image_mode=img_mode_def)
+                    auto_fetch_or_create_image(in_name_b, img_b_path, is_item_b=True, allow_web_search=True, image_mode=img_mode_def)
 
                     st.write("🎙️ 3/4: สังเคราะห์เสียงพากย์ Edge Neural + มิกซ์ Lo-Fi BGM & SFX...")
                     v_key = prof.get("default_voice", "edge_niwat")
@@ -574,10 +576,13 @@ with tab_script:
                     saved_logo = prof.get("logo_path", "")
                     wm_logo = Path(saved_logo) if saved_logo and Path(saved_logo).exists() else None
 
+                    char_path, char_poses = get_active_character_assets(prof)
+
                     final_video = builder.build_video(
                         image_a_path=img_a_path,
                         image_b_path=img_b_path,
-                        character_path=IMAGES_DIR / "character_host.png",
+                        character_path=char_path,
+                        character_poses=char_poses,
                         topic=new_data.get("topic"),
                         name_a=new_data.get("name_a"),
                         name_b=new_data.get("name_b"),
@@ -804,7 +809,21 @@ with tab_render:
         st.markdown(f"**🔵 สินค้า B: {st.session_state.script_data.get('name_b', 'Item B')}**")
         up_img_b = st.file_uploader("อัปโหลดรูป B (1:1 จัตุรัส PNG/JPG):", type=["png", "jpg", "jpeg"], key="rnd_up_b")
 
-    auto_fetch_chk = st.checkbox("📸 ค้นหาและบันทึกรูปภาพจากเว็บฟรีอัตโนมัติ (หากไม่ได้อัปโหลดรูป)", value=True)
+    c_fetch1, c_fetch2 = st.columns([1, 1])
+    with c_fetch1:
+        auto_fetch_chk = st.checkbox("📸 ดึง/สร้างรูปภาพอัตโนมัติ (หากไม่ได้อัปโหลดรูป)", value=True)
+    with c_fetch2:
+        rnd_img_mode = st.selectbox(
+            "สไตล์ภาพอัตโนมัติ:",
+            options=["ai_cartoon", "web_search", "minimal_card"],
+            index=["ai_cartoon", "web_search", "minimal_card"].index(prof.get("default_image_mode", "ai_cartoon")),
+            format_func=lambda x: {
+                "ai_cartoon": "✨ สร้างภาพการ์ตูน 3D AI ตามธีมเพจ (แนะนำ)",
+                "web_search": "🌐 ค้นหาภาพจริงจากเว็บ/วิกิพีเดีย",
+                "minimal_card": "🔲 การ์ดข้อความกราฟิกโมเดิร์น",
+            }[x],
+            label_visibility="collapsed",
+        )
 
     # Optional Override Expanders
     with st.expander("🎨 ปรับแต่งเฉพาะคลิปนี้ (เสียงพากย์, เพลงคลอ & สีพื้นหลัง)", expanded=False):
@@ -842,13 +861,25 @@ with tab_render:
                     img_a = Image.open(up_img_a)
                     img_a.save(img_a_path)
                 else:
-                    auto_fetch_or_create_image(st.session_state.script_data.get("name_a"), img_a_path, is_item_b=False, allow_web_search=auto_fetch_chk)
+                    auto_fetch_or_create_image(
+                        st.session_state.script_data.get("name_a"),
+                        img_a_path,
+                        is_item_b=False,
+                        allow_web_search=auto_fetch_chk,
+                        image_mode=rnd_img_mode,
+                    )
 
                 if up_img_b:
                     img_b = Image.open(up_img_b)
                     img_b.save(img_b_path)
                 else:
-                    auto_fetch_or_create_image(st.session_state.script_data.get("name_b"), img_b_path, is_item_b=True, allow_web_search=auto_fetch_chk)
+                    auto_fetch_or_create_image(
+                        st.session_state.script_data.get("name_b"),
+                        img_b_path,
+                        is_item_b=True,
+                        allow_web_search=auto_fetch_chk,
+                        image_mode=rnd_img_mode,
+                    )
 
                 st.write("🎙️ 1/3: สังเคราะห์เสียงพากย์ Edge Neural...")
                 tts = TTSEngine(voice_key=voice_choice, speech_rate=ov_rate, speech_pitch=ov_pitch)
@@ -875,10 +906,13 @@ with tab_render:
                 saved_logo = prof.get("logo_path", "")
                 wm_logo = Path(saved_logo) if (ov_wm_enable and saved_logo and Path(saved_logo).exists()) else None
 
+                char_path, char_poses = get_active_character_assets(prof)
+
                 final_video = builder.build_video(
                     image_a_path=img_a_path,
                     image_b_path=img_b_path,
-                    character_path=IMAGES_DIR / "character_host.png",
+                    character_path=char_path,
+                    character_poses=char_poses,
                     topic=st.session_state.script_data.get("topic"),
                     name_a=st.session_state.script_data.get("name_a"),
                     name_b=st.session_state.script_data.get("name_b"),
@@ -1344,6 +1378,17 @@ with tab_settings:
             format_func=lambda x: "ตัวชี้ลอยสลับไปมา + กรอบไฟนีออน (แนะนำ)" if x == "pointer_and_border" else "กรอบไฟนีออนอย่างเดียว",
             key="set_anim_style",
         )
+        s_img_mode = st.selectbox(
+            "โหมดสร้างรูปภาพคู่เปรียบเทียบ A & B เริ่มต้น:",
+            options=["ai_cartoon", "web_search", "minimal_card"],
+            index=["ai_cartoon", "web_search", "minimal_card"].index(prof.get("default_image_mode", "ai_cartoon")),
+            format_func=lambda x: {
+                "ai_cartoon": "✨ สร้างภาพการ์ตูน 3D AI ตามธีมเพจ (แนะนำ)",
+                "web_search": "🌐 ค้นหาภาพจริงจากเว็บ/วิกิพีเดีย (Wikipedia & Web)",
+                "minimal_card": "🔲 การ์ดข้อความกราฟิกโมเดิร์น (Minimal Graphic Card)",
+            }[x],
+            key="set_img_mode",
+        )
         s_bg_color = st.color_picker("สีพื้นหลังเริ่มต้น (Solid Cream):", value=prof.get("default_bg_color", "#F5F2EB"), key="set_bg_color")
         s_hl_color = st.color_picker("สีกรอบไฟไฮไลต์นีออน (Active Lime):", value=prof.get("default_highlight_color", "#32CD32"), key="set_hl_color")
 
@@ -1361,22 +1406,64 @@ with tab_settings:
         )
 
         if s_char_mode == "single_upload":
+            cur_sp = prof.get("char_single_path", "")
+            if cur_sp and Path(cur_sp).exists():
+                st.image(cur_sp, width=110, caption="มาสคอตปัจจุบันที่บันทึกไว้")
             up_single = st.file_uploader("อัปโหลดรูปมาสคอตเดี่ยว (PNG พื้นใส):", type=["png"], key="set_up_single")
             if up_single:
                 sp = ASSETS_DIR / "images" / "character_single.png"
                 with open(sp, "wb") as f:
                     f.write(up_single.getbuffer())
                 prof["char_single_path"] = str(sp)
-                st.success("✅ อัปโหลดรูปมาสคอตสำเร็จ!")
+                st.success("✅ อัปโหลดรูปมาสคอตเดี่ยวสำเร็จ!")
         elif s_char_mode == "multi_pose":
             st.caption("อัปโหลดรูปแยก 4 ท่าทาง (PNG พื้นใส):")
             cp1, cp2 = st.columns(2)
             with cp1:
+                cur_think = prof.get("char_pose_think", "")
+                if cur_think and Path(cur_think).exists():
+                    st.image(cur_think, width=70, caption="1. ท่าคิด")
                 up_p_think = st.file_uploader("1. ท่าคิด (Hook):", type=["png"], key="set_p_think")
+                if up_p_think:
+                    pth = ASSETS_DIR / "images" / "char_pose_think.png"
+                    with open(pth, "wb") as f:
+                        f.write(up_p_think.getbuffer())
+                    prof["char_pose_think"] = str(pth)
+
+                cur_a = prof.get("char_pose_a", "")
+                if cur_a and Path(cur_a).exists():
+                    st.image(cur_a, width=70, caption="2. ท่าชี้ A")
                 up_p_a = st.file_uploader("2. ท่าชี้ A (ซ้าย):", type=["png"], key="set_p_a")
+                if up_p_a:
+                    pth = ASSETS_DIR / "images" / "char_pose_a.png"
+                    with open(pth, "wb") as f:
+                        f.write(up_p_a.getbuffer())
+                    prof["char_pose_a"] = str(pth)
+
             with cp2:
+                cur_b = prof.get("char_pose_b", "")
+                if cur_b and Path(cur_b).exists():
+                    st.image(cur_b, width=70, caption="3. ท่าชี้ B")
                 up_p_b = st.file_uploader("3. ท่าชี้ B (ขวา):", type=["png"], key="set_p_b")
+                if up_p_b:
+                    pth = ASSETS_DIR / "images" / "char_pose_b.png"
+                    with open(pth, "wb") as f:
+                        f.write(up_p_b.getbuffer())
+                    prof["char_pose_b"] = str(pth)
+
+                cur_neu = prof.get("char_pose_neutral", "")
+                if cur_neu and Path(cur_neu).exists():
+                    st.image(cur_neu, width=70, caption="4. ท่ายิ้มสรุป")
                 up_p_neu = st.file_uploader("4. ท่ายิ้มสรุป:", type=["png"], key="set_p_neu")
+                if up_p_neu:
+                    pth = ASSETS_DIR / "images" / "char_pose_neutral.png"
+                    with open(pth, "wb") as f:
+                        f.write(up_p_neu.getbuffer())
+                    prof["char_pose_neutral"] = str(pth)
+        else:
+            builtin_p = IMAGES_DIR / "character_host.png"
+            if builtin_p.exists():
+                st.image(str(builtin_p), width=100, caption="มาสคอตระบบ VSIFY Host")
 
     st.divider()
 
@@ -1474,6 +1561,7 @@ with tab_settings:
         prof["default_bg_color"] = s_bg_color
         prof["default_highlight_color"] = s_hl_color
         prof["default_char_mode"] = s_char_mode
+        prof["default_image_mode"] = s_img_mode
         save_channel_profile(prof)
         st.session_state.channel_profile = prof
 

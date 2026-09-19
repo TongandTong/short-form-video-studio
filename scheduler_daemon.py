@@ -19,6 +19,7 @@ from config import (
     ASSETS_DIR,
     IMAGES_DIR,
     load_channel_profile,
+    get_active_character_assets,
 )
 from ai_script_generator import (
     AIScriptGenerator,
@@ -160,10 +161,11 @@ def run_autopilot_cycle(is_manual: bool = False) -> Tuple[bool, str]:
 
         # 3. Auto-fetch Images
         allow_search = cfg.get("auto_search_images", True)
+        img_mode = profile.get("default_image_mode", "ai_cartoon")
         img_a_path = ASSETS_DIR / "images" / f"auto_a_{t_now}.png"
         img_b_path = ASSETS_DIR / "images" / f"auto_b_{t_now}.png"
-        auto_fetch_or_create_image(name_a, img_a_path, is_item_b=False, allow_web_search=allow_search)
-        auto_fetch_or_create_image(name_b, img_b_path, is_item_b=True, allow_web_search=allow_search)
+        auto_fetch_or_create_image(name_a, img_a_path, is_item_b=False, allow_web_search=allow_search, image_mode=img_mode)
+        auto_fetch_or_create_image(name_b, img_b_path, is_item_b=True, allow_web_search=allow_search, image_mode=img_mode)
 
         # 4. Neural Voice & Audio Mixing
         output_mp4 = OUTPUT_DIR / f"shorts_autopilot_{t_now}.mp4"
@@ -188,10 +190,13 @@ def run_autopilot_cycle(is_manual: bool = False) -> Tuple[bool, str]:
         saved_logo = profile.get("logo_path", "")
         wm_logo = Path(saved_logo) if saved_logo and Path(saved_logo).exists() else None
 
+        char_path, char_poses = get_active_character_assets(profile)
+
         final_video = builder.build_video(
             image_a_path=img_a_path,
             image_b_path=img_b_path,
-            character_path=IMAGES_DIR / "character_host.png",
+            character_path=char_path,
+            character_poses=char_poses,
             topic=topic,
             name_a=name_a,
             name_b=name_b,

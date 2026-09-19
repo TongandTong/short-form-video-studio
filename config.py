@@ -173,6 +173,7 @@ DEFAULT_CHANNEL_PROFILE = {
     "char_pose_a": "",
     "char_pose_b": "",
     "char_pose_neutral": "",
+    "default_image_mode": "ai_cartoon",  # "ai_cartoon" | "web_search" | "minimal_card"
 }
 
 def load_channel_profile() -> dict:
@@ -194,6 +195,41 @@ def save_channel_profile(data: dict) -> None:
     import json
     with open(PROFILE_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
+def get_active_character_assets(prof: dict = None) -> tuple:
+    """
+    Returns (character_path, character_poses) based on channel profile.
+    Supports:
+    - 'builtin': Built-in smart 4-pose character
+    - 'single_upload': Custom single mascot image (system auto-flips/animates)
+    - 'multi_pose': Custom 4 distinct poses (think, point A, point B, neutral)
+    """
+    if prof is None:
+        prof = load_channel_profile()
+
+    char_mode = prof.get("default_char_mode", "builtin")
+    builtin_path = IMAGES_DIR / "character_host.png"
+
+    if char_mode == "single_upload":
+        sp = prof.get("char_single_path", "")
+        if sp and Path(sp).exists():
+            return Path(sp), None
+    elif char_mode == "multi_pose":
+        poses = {}
+        for key, prop in [
+            ("neutral", "char_pose_neutral"),
+            ("point_a", "char_pose_a"),
+            ("point_b", "char_pose_b"),
+            ("think", "char_pose_think"),
+        ]:
+            val = prof.get(prop, "")
+            if val and Path(val).exists():
+                poses[key] = Path(val)
+        if poses:
+            base_p = poses.get("neutral") or list(poses.values())[0]
+            return base_p, poses
+
+    return builtin_path, None
 
 # Auto-delegation if Streamlit Cloud or user executes config.py as main entrypoint
 if __name__ == "__main__":

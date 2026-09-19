@@ -546,14 +546,10 @@ class VideoBuilder:
             if active_target == "A":
                 frame.paste(border_a_active, (BOX_A_RECT["x"] - pad, BOX_A_RECT["y"] - pad), border_a_active)
                 frame.paste(border_b_inactive, (BOX_B_RECT["x"] - pad, BOX_B_RECT["y"] - pad), border_b_inactive)
-                # Show pointer above Box A
-                frame.paste(pointer_img, (pos_x_a, base_pointer_y + bob), pointer_img)
 
             elif active_target == "B":
                 frame.paste(border_a_inactive, (BOX_A_RECT["x"] - pad, BOX_A_RECT["y"] - pad), border_a_inactive)
                 frame.paste(border_b_active, (BOX_B_RECT["x"] - pad, BOX_B_RECT["y"] - pad), border_b_active)
-                # Show pointer above Box B
-                frame.paste(pointer_img, (pos_x_b, base_pointer_y + bob), pointer_img)
 
             else:
                 frame.paste(border_a_inactive, (BOX_A_RECT["x"] - pad, BOX_A_RECT["y"] - pad), border_a_inactive)

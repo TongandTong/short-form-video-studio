@@ -31,39 +31,129 @@ def _get_font(size: int = 36, bold: bool = True) -> ImageFont.FreeTypeFont:
 
 
 def search_wikimedia_image(query: str) -> Optional[str]:
-    """Searches Wikimedia Commons for a high-res image URL (100% free, no key)."""
+    """
+    Searches Thai and English Wikipedia / Wikimedia Commons for a high-res image.
+    Supports bilingual lookup, automatic redirect resolution, and raster thumbnail extraction.
+    """
     clean_q = re.sub(r"\(.*?\)", "", query).strip()
     clean_q = re.sub(r"[^\w\s\u0E00-\u0E7F]", "", clean_q).strip()
     if not clean_q:
         return None
 
-    url = (
-        f"https://en.wikipedia.org/w/api.php?action=query&format=json"
-        f"&prop=pageimages&piprop=original&titles={urllib.parse.quote(clean_q)}"
-    )
-    headers = {"User-Agent": "ShortsStudioBot/3.0 (Educational Content Generator)"}
+    headers = {"User-Agent": "VSIFYBot/3.5 (Educational Comparison Studio; contact: admin@vsify.app)"}
 
+    # Step 1: Search Thai Wikipedia (fast & accurate for Thai names)
     try:
-        req = urllib.request.Request(url, headers=headers)
+        url_th = (
+            f"https://th.wikipedia.org/w/api.php?action=query&format=json&redirects=1"
+            f"&prop=pageimages&piprop=thumbnail|original&pithumbsize=800&titles={urllib.parse.quote(clean_q)}"
+        )
+        req = urllib.request.Request(url_th, headers=headers)
         with urllib.request.urlopen(req, timeout=6) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             pages = data.get("query", {}).get("pages", {})
             for _, pdata in pages.items():
+                if "thumbnail" in pdata and "source" in pdata["thumbnail"]:
+                    return pdata["thumbnail"]["source"]
                 if "original" in pdata and "source" in pdata["original"]:
                     return pdata["original"]["source"]
     except Exception:
         pass
 
-    # Secondary search via Wikipedia opensearch
+    # Step 1b: Thai Wikipedia OpenSearch fallback
     try:
-        search_url = f"https://en.wikipedia.org/w/api.php?action=opensearch&format=json&search={urllib.parse.quote(clean_q)}&limit=1"
-        req = urllib.request.Request(search_url, headers=headers)
-        with urllib.request.urlopen(search_url, timeout=5) as resp:
+        search_th = f"https://th.wikipedia.org/w/api.php?action=opensearch&format=json&search={urllib.parse.quote(clean_q)}&limit=1"
+        req = urllib.request.Request(search_th, headers=headers)
+        with urllib.request.urlopen(req, timeout=5) as resp:
             s_data = json.loads(resp.read().decode("utf-8"))
-            if len(s_data) > 1 and s_data[1]:
-                first_title = s_data[1][0]
-                return search_wikimedia_image(first_title)
+            if len(s_data) > 1 and s_data[1] and s_data[1][0] != clean_q:
+                found_title = s_data[1][0]
+                url_th2 = (
+                    f"https://th.wikipedia.org/w/api.php?action=query&format=json&redirects=1"
+                    f"&prop=pageimages&piprop=thumbnail|original&pithumbsize=800&titles={urllib.parse.quote(found_title)}"
+                )
+                req2 = urllib.request.Request(url_th2, headers=headers)
+                with urllib.request.urlopen(req2, timeout=5) as resp2:
+                    data2 = json.loads(resp2.read().decode("utf-8"))
+                    pages2 = data2.get("query", {}).get("pages", {})
+                    for _, pdata in pages2.items():
+                        if "thumbnail" in pdata and "source" in pdata["thumbnail"]:
+                            return pdata["thumbnail"]["source"]
+                        if "original" in pdata and "source" in pdata["original"]:
+                            return pdata["original"]["source"]
     except Exception:
+        pass
+
+    # Step 2: Search English Wikipedia (for international terms, brand names, concepts)
+    try:
+        url_en = (
+            f"https://en.wikipedia.org/w/api.php?action=query&format=json&redirects=1"
+            f"&prop=pageimages&piprop=thumbnail|original&pithumbsize=800&titles={urllib.parse.quote(clean_q)}"
+        )
+        req = urllib.request.Request(url_en, headers=headers)
+        with urllib.request.urlopen(req, timeout=6) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            pages = data.get("query", {}).get("pages", {})
+            for _, pdata in pages.items():
+                if "thumbnail" in pdata and "source" in pdata["thumbnail"]:
+                    return pdata["thumbnail"]["source"]
+                if "original" in pdata and "source" in pdata["original"]:
+                    return pdata["original"]["source"]
+    except Exception:
+        pass
+
+    return None
+
+
+def generate_ai_cartoon_image(
+    item_name: str,
+    output_path: Path,
+    target_size: int = 500,
+    art_style: str = "3d_pixar",
+) -> Optional[Path]:
+    """
+    Generates a charming 3D stylized cartoon illustration via free AI engine (Pollinations.ai).
+    Produces cohesive, vibrant visuals matching the VSIFY channel aesthetic.
+    """
+    clean_name = re.sub(r"\(.*?\)", "", item_name).strip()
+    if not clean_name:
+        return None
+
+    # Style prompts tuned for comparison video cards
+    if art_style == "3d_pixar":
+        prompt = (
+            f"3D cute stylized cartoon illustration of {clean_name}, vibrant soft colors, "
+            f"Pixar 3D animation style, clean white studio background, smooth lighting, octane render, 4k"
+        )
+    else:
+        prompt = (
+            f"Modern flat vector cartoon illustration of {clean_name}, cute kawaii icon, "
+            f"vibrant bold colors, clean isolated background, high quality"
+        )
+
+    encoded_prompt = urllib.parse.quote(prompt)
+    url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=512&height=512&nologo=true"
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            raw_bytes = resp.read()
+            if len(raw_bytes) > 2000:
+                import io
+                with Image.open(io.BytesIO(raw_bytes)) as img:
+                    img = img.convert("RGBA")
+                    w, h = img.size
+                    min_dim = min(w, h)
+                    left = (w - min_dim) // 2
+                    top = (h - min_dim) // 2
+                    cropped = img.crop((left, top, left + min_dim, top + min_dim))
+                    resized = cropped.resize((target_size, target_size), Image.Resampling.LANCZOS)
+                    output_path.parent.mkdir(parents=True, exist_ok=True)
+                    resized.save(output_path, "PNG")
+                    return output_path
+    except Exception as e:
+        print(f"[ImageFetcher] AI cartoon generation skipped ({clean_name}): {e}")
         pass
 
     return None
@@ -196,31 +286,44 @@ def auto_fetch_or_create_image(
     output_path: Path,
     is_item_b: bool = False,
     allow_web_search: bool = True,
+    image_mode: str = "ai_cartoon",  # "ai_cartoon" | "web_search" | "minimal_card"
 ) -> Path:
     """
-    Orchestrates fetching:
-    1. Tries Wikimedia Commons / Web.
-    2. If downloaded & cropped successfully, returns path.
-    3. Else, falls back to generating a gorgeous typographic badge card.
+    Orchestrates smart image acquisition:
+    - 'ai_cartoon': Generates 3D Pixar stylized illustration via AI, with web fallback.
+    - 'web_search': Searches Thai/English Wikipedia & Wikimedia Commons for real photos.
+    - 'minimal_card': Instant modern minimalist typographic card.
     """
-    if allow_web_search and item_name:
-        # 1. Try Wikimedia
+    if not item_name:
+        return generate_fallback_badge(
+            item_name="Item A" if not is_item_b else "Item B",
+            output_path=output_path,
+            is_item_b=is_item_b,
+        )
+
+    # 1. Mode: AI Cartoon Illustration (Zero-touch 3D Render)
+    if image_mode == "ai_cartoon" and allow_web_search:
+        ai_res = generate_ai_cartoon_image(item_name, output_path)
+        if ai_res and ai_res.exists() and ai_res.stat().st_size > 1500:
+            return ai_res
+
+    # 2. Mode: Web Search (Wikimedia Thai/English + DuckDuckGo)
+    if allow_web_search and image_mode in ("ai_cartoon", "web_search"):
         wiki_url = search_wikimedia_image(item_name)
         if wiki_url:
             res = download_and_crop_square(wiki_url, output_path)
             if res and res.exists() and res.stat().st_size > 1000:
                 return res
 
-        # 2. Try DuckDuckGo
         ddg_url = search_duckduckgo_image(item_name)
         if ddg_url:
             res = download_and_crop_square(ddg_url, output_path)
             if res and res.exists() and res.stat().st_size > 1000:
                 return res
 
-    # 3. Fallback Graphic Card
+    # 3. Mode: Typographic Minimalist Card Fallback
     return generate_fallback_badge(
-        item_name=item_name or ("Item A" if not is_item_b else "Item B"),
+        item_name=item_name,
         output_path=output_path,
         is_item_b=is_item_b,
     )
