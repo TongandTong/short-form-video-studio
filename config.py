@@ -239,13 +239,17 @@ def get_active_character_assets(prof: dict = None) -> tuple:
             ("neutral", "char_pose_neutral"),
             ("point_a", "char_pose_a"),
             ("point_b", "char_pose_b"),
-            ("think", "char_pose_think"),
+            ("thinking", "char_pose_think"),
         ]:
-            val = prof.get(prop, "")
-            if val and Path(val).exists():
-                poses[key] = Path(val)
+            val_closed = prof.get(prop, "")
+            val_open = prof.get(f"{prop}_open", "")
+            if val_closed and Path(val_closed).exists():
+                poses[key] = {
+                    "closed": Path(val_closed),
+                    "open": Path(val_open) if val_open and Path(val_open).exists() else Path(val_closed),
+                }
         if poses:
-            base_p = poses.get("neutral") or list(poses.values())[0]
+            base_p = list(poses.values())[0]["closed"]
             return base_p, poses
 
     return builtin_path, None
