@@ -189,11 +189,12 @@ tab1, tab2, tab3, tab4 = st.tabs([
 # -------------------------------------------------------------
 with tab1:
     # Viral Idea Helper Banner
+    num_fw = len(FRAMEWORK_PRESETS)
     st.markdown(
-        """
+        f"""
         <div style="background: rgba(50, 205, 50, 0.08); border: 1px solid rgba(50, 205, 50, 0.3); border-radius: 12px; padding: 14px 18px; margin-bottom: 16px;">
-            <div style="font-weight: 700; font-size: 16px; color: #1F1F1F; margin-bottom: 4px;">💡 คิดไม่ออก? สุ่มหัวข้อไวรัลยอดฮิตในคลิกเดียว (คัดสรร 10 กรอบเนื้อหา)</div>
-            <div style="font-size: 13px; color: #555;">ดึงหัวข้อคู่เปรียบเทียบที่มีการค้นหาสูง พร้อมสเปก กลุ่มเป้าหมาย และกรอบความคิดไวรัลมาเติมให้ทันที</div>
+            <div style="font-weight: 700; font-size: 16px; color: #1F1F1F; margin-bottom: 4px;">💡 คิดไม่ออก? สุ่มหัวข้อไวรัลยอดฮิตในคลิกเดียว (คัดสรร {num_fw} กรอบเนื้อหา & 10 หมวดหมู่)</div>
+            <div style="font-size: 13px; color: #555;">ดึงหัวข้อคู่เปรียบเทียบและการจับคู่เคมีลงตัว พร้อมสเปก กลุ่มเป้าหมาย และกรอบความคิดไวรัลมาเติมให้ทันที</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -209,7 +210,7 @@ with tab1:
             label_visibility="collapsed",
         )
     with col_fw_filter:
-        fw_filter_options = [("all", "🎯 สุ่มทุกแนวทาง (10 Frameworks)")] + [
+        fw_filter_options = [("all", f"🎯 สุ่มทุกแนวทาง ({num_fw} Frameworks)")] + [
             (k, FRAMEWORK_PRESETS[k]["name"]) for k in FRAMEWORK_PRESETS
         ]
         selected_fw_filter = st.selectbox(

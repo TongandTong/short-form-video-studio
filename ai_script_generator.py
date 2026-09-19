@@ -124,6 +124,36 @@ FRAMEWORK_PRESETS: Dict[str, Dict[str, str]] = {
         "r3_focus": "ความสม่ำเสมอและความคุ้มค่าในการทำซ้ำ",
         "conclusion_guide": "ฟันธงว่าสูตรไวรัลคุ้มค่าที่จะลองไหม หรือวิธีมาตรฐานคือคำตอบที่ดีที่สุด",
     },
+    "country_matchup": {
+        "id": "country_matchup",
+        "name": "🌍 Country Matchup (ศึกสองชาติ / ศักยภาพประเทศ)",
+        "desc": "เทียบศักยภาพระดับชาติ กองทัพ เศรษฐกิจ การศึกษา ด้วยสถิติและดัชนีระดับโลกอย่างเป็นกลาง",
+        "hook_guide": "เปิดด้วยประเด็นเทียบหมัดต่อหมัดระหว่าง 2 ชาติเพื่อนบ้านหรือมหาอำนาจ สถิติจริงใครเหนือกว่ากัน?",
+        "r1_focus": "แสนยานุภาพกองทัพ งบประมาณ & กำลังพล (Military Power & Defense)",
+        "r2_focus": "พลังเศรษฐกิจ ขนาด GDP & อุตสาหกรรมหลัก (Economy & GDP per Capita)",
+        "r3_focus": "ระบบการศึกษา คุณภาพชีวิต & ดัชนีทุนมนุษย์ (Education & Human Development Index)",
+        "conclusion_guide": "สรุปจุดแข็งของแต่ละประเทศและมุมมองการเติบโตอย่างเป็นกลาง ไร้อคติดราม่า",
+    },
+    "era_timeline": {
+        "id": "era_timeline",
+        "name": "⏳ Era Timeline (ข้ามยุคสมัย อดีต vs ปัจจุบัน)",
+        "desc": "เทียบการเปลี่ยนแปลงข้ามกาลเวลา ยุค 90s vs ปัจจุบัน, ยุคก่อน vs ยุคนี้, เจนเก่า vs เจนใหม่",
+        "hook_guide": "ย้อนวันวานเทียบปัจจุบัน! 20-30 ปีผ่านไป สิ่งนี้เปลี่ยนไปขนาดไหน คนยุคนี้จะเชื่อไหม?",
+        "r1_focus": "วิถีชีวิต ความคลาสสิก & ข้อจำกัดในอดีต (Past Lifestyle & Nostalgia)",
+        "r2_focus": "ความสะดวกสบาย นวัตกรรม & การเปลี่ยนแปลงปัจจุบัน (Modern Efficiency & Tech)",
+        "r3_focus": "สิ่งที่ได้มาเทียบกับเสน่ห์ที่หายไป (What We Gained vs What We Lost)",
+        "conclusion_guide": "ฟันธงว่าคุณคิดถึงเสน่ห์ยุคก่อน หรือชอบความง่ายของยุคนี้มากกว่ากัน ชวนคนดูแชร์ความทรงจำ",
+    },
+    "perfect_pairing": {
+        "id": "perfect_pairing",
+        "name": "🤝 Perfect Pairing (จับคู่ของที่เข้ากัน: A + B เคมีลงตัว)",
+        "desc": "วิเคราะห์ทำไม 2 สิ่งนี้อยู่ด้วยกันแล้วปัง เช่น กาแฟ+มะพร้าว, หมูสามชั้น+กิมจิ, อุปกรณ์คู่ใจ",
+        "hook_guide": "เคยสงสัยไหมว่าทำไม 2 สิ่งนี้พอกินหรือใช้คู่กันแล้วเข้ากันอย่างเหลือเชื่อ? ความลับทางวิทยาศาสตร์อยู่ตรงนี้!",
+        "r1_focus": "กลไกเคมี รสสัมผัส หรือฟังก์ชันที่เสริมกัน (Chemical & Flavor Synergy)",
+        "r2_focus": "ผลลัพธ์ทวีคูณ (1+1 มากกว่า 2) ทั้งประโยชน์และประสบการณ์ (Boosted Benefits)",
+        "r3_focus": "สัดส่วนทองคำ & ทริกการจับคู่ให้ฟินที่สุด (Golden Ratio & Best Practice)",
+        "conclusion_guide": "ฟันธงเหตุผลที่ 2 สิ่งนี้คือคู่แท้ที่ต้องลอง และแนะนำให้คนดูลองทำตาม",
+    },
 }
 
 
@@ -243,23 +273,38 @@ class AIScriptGenerator:
 - ทิศทางสรุปฟันธง: {fw['conclusion_guide']}
 """
 
+        is_pairing = fw.get("id") == "perfect_pairing"
         round_prompts = []
         json_fields = []
         for r in range(1, num_rounds + 1):
             f_title = round_focus_map.get(r, f"มิติที่ {r}")
-            round_prompts.append(
-                f"{r}. ยกที่ {r} ({f_title}):\n"
-                f"   - round_{r}_title: ตั้งชื่อยกที่ {r} สั้นๆ (ให้สอดคล้องกับ {f_title})\n"
-                f"   - round_{r}_a: จุดเด่นด้านนี้ของ {name_a} (1-2 ประโยคกระชับ ชัดเจน มีน้ำหนัก)\n"
-                f"   - round_{r}_b: สวนกลับด้วยจุดต่างด้านนี้ของ {name_b} (1-2 ประโยคกระชับ)"
-            )
+            if is_pairing:
+                round_prompts.append(
+                    f"{r}. ยกที่ {r} ({f_title}):\n"
+                    f"   - round_{r}_title: ตั้งชื่อยกที่ {r} สั้นๆ (ให้สอดคล้องกับ {f_title})\n"
+                    f"   - round_{r}_a: บทบาท/รสสัมผัส/คุณสมบัติเด่นของ {name_a} ในมิตินี้ (1-2 ประโยคกระชับ)\n"
+                    f"   - round_{r}_b: บทบาทของ {name_b} ที่เข้ามาเสริม/ตัดเลี่ยน/ทำงานร่วมกันจนลงตัว (1-2 ประโยคกระชับ)"
+                )
+            else:
+                round_prompts.append(
+                    f"{r}. ยกที่ {r} ({f_title}):\n"
+                    f"   - round_{r}_title: ตั้งชื่อยกที่ {r} สั้นๆ (ให้สอดคล้องกับ {f_title})\n"
+                    f"   - round_{r}_a: ข้อมูล/จุดเด่นด้านนี้ของ {name_a} (1-2 ประโยคกระชับ ชัดเจน มีน้ำหนัก)\n"
+                    f"   - round_{r}_b: สวนกลับด้วยข้อมูล/จุดต่างด้านนี้ของ {name_b} (1-2 ประโยคกระชับ)"
+                )
             json_fields.append(f'  "round_{r}_title": "{f_title}",\n  "round_{r}_a": "...",\n  "round_{r}_b": "..."')
 
         rounds_instruction_str = "\n".join(round_prompts)
         json_rounds_str = ",\n".join(json_fields)
 
+        producer_role = (
+            f"คุณเป็น Senior Short-Form Video Producer มืออาชีพ เชี่ยวชาญการทำคลิปวิเคราะห์การจับคู่ที่ลงตัว (Synergy Pairing: ทำไม A + B ถึงเข้ากันขั้นสุด) สไตล์ Reels/TikTok/Shorts ความยาวจำนวน {num_rounds} ยก ที่คนดูเกาะติดหน้าจอจนจบ"
+            if is_pairing
+            else f"คุณเป็น Senior Short-Form Video Producer มืออาชีพ เชี่ยวชาญการทำคลิปเปรียบเทียบแบบสลับชี้ A vs B สไตล์ Reels/TikTok/Shorts ความยาวจำนวน {num_rounds} ยก ที่คนดูเกาะติดหน้าจอจนจบ"
+        )
+
         prompt = f"""
-คุณเป็น Senior Short-Form Video Producer มืออาชีพ เชี่ยวชาญการทำคลิปเปรียบเทียบแบบสลับชี้ A vs B สไตล์ Reels/TikTok/Shorts ความยาวจำนวน {num_rounds} ยก ที่คนดูเกาะติดหน้าจอจนจบ
+{producer_role}
 
 โจทย์เปรียบเทียบ:
 - หัวข้อ: {topic}
@@ -801,6 +846,102 @@ TRENDING_COMPARISON_TEMPLATES = [
         "key_angles": "กระแสทอดไร้น้ำมันที่คนฮิต เทียบกับความหลากหลายและคุ้มค่าของเตาอบจริง",
         "affiliate_link_a": "https://shopee.co.th/airfryer_deal",
         "affiliate_link_b": "https://shopee.co.th/oven_deal",
+    },
+    # 🌍 Country Matchup
+    {
+        "framework": "country_matchup",
+        "category": "🌍 ภูมิรัฐศาสตร์ & ยุคสมัย",
+        "topic": "ไทย VS กัมพูชา (เทียบศักยภาพ กองทัพ, เศรษฐกิจ, การศึกษา)",
+        "name_a": "ประเทศไทย (Thailand)",
+        "name_b": "ประเทศกัมพูชา (Cambodia)",
+        "details_a": "อันดับ Global Firepower สูงกว่า งบประมาณกลาโหม 2 แสนล้าน ขนาด GDP 5 แสนล้านดอลลาร์ อุตสาหกรรมรถยนต์และการแพทย์ชั้นนำ",
+        "details_b": "อัตราการเติบโตทางเศรษฐกิจ (GDP Growth) รวดเร็ว มีแรงดึงดูดการลงทุนจากจีน และค่าจ้างแรงงานที่แข่งขันได้",
+        "target_audience": "คนที่สนใจสถานการณ์รอบบ้าน การเมืองระหว่างประเทศ และข้อเท็จจริงเชิงสถิติ",
+        "key_angles": "สถิติอันดับกองทัพโลก ขนาดเศรษฐกิจ GDP ต่อหัว และดัชนีการศึกษาแบบเป็นกลาง",
+        "affiliate_link_a": "https://shopee.co.th/world_atlas_book",
+        "affiliate_link_b": "https://shopee.co.th/asean_history_book",
+    },
+    {
+        "framework": "country_matchup",
+        "category": "🌍 ภูมิรัฐศาสตร์ & ยุคสมัย",
+        "topic": "ไทย VS เวียดนาม (ศึกแย่งชิงฐานการผลิตและ FDI)",
+        "name_a": "ประเทศไทย (Thailand)",
+        "name_b": "ประเทศเวียดนาม (Vietnam)",
+        "details_a": "โครงสร้างพื้นฐานคมนาคมยอดเยี่ยม โลจิสติกส์เชื่อมต่อ EEC และซัพพลายเชนชิ้นส่วนยานยนต์ที่แข็งแกร่งที่สุดในอาเซียน",
+        "details_b": "ประชากรวัยแรงงานมหาศาล ข้อตกลงการค้าเสรี (FTA) กับยุโรป-สหรัฐฯ และฐานผลิตอิเล็กทรอนิกส์/เซมิคอนดักเตอร์ระดับโลก",
+        "target_audience": "วัยทำงาน นักลงทุน และคนที่ติดตามทิศทางเศรษฐกิจอาเซียน",
+        "key_angles": "โครงสร้างพื้นฐาน กำลังคน ค่าแรง และการดึงดูดทุนต่างชาติ (FDI)",
+        "affiliate_link_a": "https://shopee.co.th/investment_book_thai",
+        "affiliate_link_b": "https://shopee.co.th/economy_trend_book",
+    },
+
+    # ⏳ Era Timeline
+    {
+        "framework": "era_timeline",
+        "category": "🌍 ภูมิรัฐศาสตร์ & ยุคสมัย",
+        "topic": "วิถีชีวิตไทยยุค 90s VS ยุคปัจจุบัน 2020s",
+        "name_a": "ชีวิตยุค 90s (Slow Life & Analog)",
+        "name_b": "ชีวิตยุค 2020s (Fast Pace & Digital)",
+        "details_a": "โทรศัพท์บ้าน รอฟังเพลงจากวิทยุ ตู้เกม เพจเจอร์ ความสัมพันธ์แบบไม่เร่งรีบ มีเสน่ห์ความทรงจำ",
+        "details_b": "สมาร์ตโฟน อินเทอร์เน็ต 5G สั่งอาหารส่งถึงหน้าบ้าน ทำงานแบบ Remote สบายกว่าแต่สมาธิสั้นลง",
+        "target_audience": "วัยรุ่นยุค 90s คนเจน Y/Z และคนที่ชอบเรื่องราว Nostalgia ย้อนวันวาน",
+        "key_angles": "เสน่ห์ความผูกพันในอดีต เทียบกับความสะดวกสบายขั้นสุดในยุคดิจิทัล",
+        "affiliate_link_a": "https://shopee.co.th/retro_game_console",
+        "affiliate_link_b": "https://shopee.co.th/smart_gadget_deal",
+    },
+
+    # 🤝 Perfect Pairing (จับคู่ของที่เข้ากัน)
+    {
+        "framework": "perfect_pairing",
+        "category": "🤝 จับคู่ของที่เข้ากัน (Perfect Pairing)",
+        "topic": "กาแฟดำ + น้ำมะพร้าว (ทำไมคู่นี้ถึงฮิตระเบิด)",
+        "name_a": "กาแฟดำ (Black Coffee / Espresso)",
+        "name_b": "น้ำมะพร้าวสด (Fresh Coconut Water)",
+        "details_a": "ความเข้ม ขม หอมกรุ่นของกาแฟคั่ว และคาเฟอีนช่วยปลุกสมอง",
+        "details_b": "ความหวานละมุนธรรมชาติ กลิ่นหอมนุ่ม และเกลือแร่โพแทสเซียมช่วยเติมความสดชื่น ตัดความขมของกาแฟได้กลมกล่อม",
+        "target_audience": "สายสุขภาพ คอกาแฟ และคนที่อยากดื่มกาแฟสดชื่นแบบไม่ใส่น้ำตาลสังเคราะห์",
+        "key_angles": "ความขมตัดความหวานธรรมชาติ กลไกคาเฟอีนเสริมเกลือแร่ ดื่มง่ายไม่อ้วน",
+        "affiliate_link_a": "https://shopee.co.th/coffee_beans_deal",
+        "affiliate_link_b": "https://shopee.co.th/coconut_water_100",
+    },
+    {
+        "framework": "perfect_pairing",
+        "category": "🤝 จับคู่ของที่เข้ากัน (Perfect Pairing)",
+        "topic": "มัทฉะแท้ + นมข้าวโอ๊ต (Oat Milk Matcha Latte)",
+        "name_a": "มัทฉะเกรดพิธีการ (Ceremonial Matcha)",
+        "name_b": "นมข้าวโอ๊ต (Barista Oat Milk)",
+        "details_a": "รสอูมามิแท้ กลิ่นหอมใบชาเข้มข้น และสาร L-Theanine ช่วยให้โฟกัสนิ่ง",
+        "details_b": "เนื้อสัมผัสครีมมี่ รสมอลต์หวานธรรมชาติ ไม่กลบกลิ่นหญ้าและกลิ่นชาเขียวเหมือนนมวัว",
+        "target_audience": "สายมัทฉะ คนแพ้นมวัว (Lactose Intolerance) และสายคาเฟ่",
+        "key_angles": "การชูรสอูมามิของมัทฉะ ความครีมมี่ของนมโอ๊ตที่ไม่บดบังกลิ่นชา",
+        "affiliate_link_a": "https://shopee.co.th/ceremonial_matcha",
+        "affiliate_link_b": "https://shopee.co.th/oat_milk_barista",
+    },
+    {
+        "framework": "perfect_pairing",
+        "category": "🤝 จับคู่ของที่เข้ากัน (Perfect Pairing)",
+        "topic": "หมูสามชั้นย่าง + กิมจิหมักสด (ทำไมกินคู่กันแล้วไม่เลี่ยน)",
+        "name_a": "หมูสามชั้นย่างเกรียม (Grilled Pork Belly)",
+        "name_b": "กิมจิผักกาดขาวหมักสด (Fresh Kimchi)",
+        "details_a": "ความมัน ฉ่ำ กรอบนอกนุ่มใน รสเค็มมันเข้มข้นจากเนื้อและไขมัน",
+        "details_b": "กรดแลคติกตามธรรมชาติ ความเปรี้ยวซ่า เผ็ดร้อน ช่วยตัดเลี่ยนไขมันทันที พร้อมโพรไบโอติกช่วยย่อย",
+        "target_audience": "สายปิ้งย่าง สายอาหารเกาหลี และคนชอบกินของอร่อย",
+        "key_angles": "กลไกกรดเปรี้ยวซ่าตัดเลี่ยนไขมัน ความลงตัวของรสสัมผัสและสุขภาพทางเดินอาหาร",
+        "affiliate_link_a": "https://shopee.co.th/bbq_grill_pan",
+        "affiliate_link_b": "https://shopee.co.th/korean_kimchi_fresh",
+    },
+    {
+        "framework": "perfect_pairing",
+        "category": "🤝 จับคู่ของที่เข้ากัน (Perfect Pairing)",
+        "topic": "iPhone + Apple Watch (ทำไมใช้คู่กันแล้วตัดไม่ขาด)",
+        "name_a": "iPhone (ศูนย์กลางการทำงานและประมวลผล)",
+        "name_b": "Apple Watch (ส่วนขยายติดข้อมือตลอด 24 ชม.)",
+        "details_a": "แอปพลิเคชัน กล้อง การเชื่อมต่อ และการจัดการข้อมูลหลัก",
+        "details_b": "ตรวจจับการเต้นหัวใจ การนอนหลับ รับสายด่วน ปลดล็อกเครื่องอัตโนมัติ ไม่ต้องหยิบมือถือ",
+        "target_audience": "สายเทคโนโลยี คนทำงาน และคนที่ใส่ใจสุขภาพ",
+        "key_angles": "Ecosystem Synergy ความสะดวกสบายของการเชื่อมต่อที่ไร้รอยต่อ",
+        "affiliate_link_a": "https://shopee.co.th/iphone_official",
+        "affiliate_link_b": "https://shopee.co.th/apple_watch_official",
     },
 ]
 
