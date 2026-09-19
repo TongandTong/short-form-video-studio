@@ -4,5 +4,7 @@ __pycache__/
 output/
 temp/
 autopilot_config.json
+gdrive_config.json
+autopost_config.json
 content_history.json
 *.png

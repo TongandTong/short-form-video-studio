@@ -248,7 +248,34 @@ def run_autopilot_cycle(is_manual: bool = False) -> Tuple[bool, str]:
             duration_seconds=total_duration,
         )
 
-        # 8. Update Scheduler Config
+        # 8. Fail-safe Google Drive Sync
+        try:
+            from gdrive_sync import sync_video_to_gdrive
+            gd_ok, gd_msg = sync_video_to_gdrive(
+                video_path=str(final_video),
+                cover_path=str(cover_path) if cover_path.exists() else None,
+                meta_path=str(meta_path) if meta_path.exists() else None,
+            )
+            if gd_ok:
+                _add_log(cfg, f"☁️ GDrive: {gd_msg}")
+        except Exception as gde:
+            _add_log(cfg, f"⚠️ GDrive Sync: {gde}")
+
+        # 9. Fail-safe Multi-Platform Auto-Posting (Facebook Reels, YouTube Shorts, TikTok Webhook)
+        try:
+            from autopost_engine import publish_to_all_enabled
+            post_results = publish_to_all_enabled(
+                video_path=str(final_video),
+                cover_path=str(cover_path) if cover_path.exists() else None,
+                meta_path=str(meta_path) if meta_path.exists() else None,
+            )
+            for plat, (p_ok, p_msg) in post_results.items():
+                p_icon = "🚀" if p_ok else "⚠️"
+                _add_log(cfg, f"{p_icon} [{plat.upper()}] {p_msg}")
+        except Exception as ape:
+            _add_log(cfg, f"⚠️ Auto-Post: {ape}")
+
+        # 10. Update Scheduler Config
         elapsed = round(time.time() - t_start, 1)
         cfg = load_autopilot_config()  # reload fresh
         cfg["status"] = "idle"

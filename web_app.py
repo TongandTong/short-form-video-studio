@@ -56,6 +56,21 @@ from scheduler_daemon import (
     run_autopilot_cycle,
     is_scheduler_alive,
 )
+from gdrive_sync import (
+    load_gdrive_config,
+    save_gdrive_config,
+    sync_video_to_gdrive,
+    test_gdrive_connection,
+    is_local_gdrive_path,
+)
+from autopost_engine import (
+    load_autopost_config,
+    save_autopost_config,
+    publish_to_all_enabled,
+    test_facebook_connection,
+    test_youtube_connection,
+    test_webhook_connection,
+)
 
 # Start background autonomous daemon
 ensure_scheduler_running()
@@ -367,12 +382,13 @@ if "input_framework" not in st.session_state:
     st.session_state.input_framework = st.session_state.script_data.get("framework", "persona")
 
 # Tabs Navigation
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "1. 🔍 ป้อนข้อมูล & ค้นหาเจาะลึก",
     "2. 📝 ตรวจบท & สั่งรีไรท์",
     "3. 🎨 ตั้งค่าเสียง, BGM & ภาพ",
     "4. 🎬 เรนเดอร์ & พรีวิวคลิป",
     "5. ⏰ Auto-Pilot ผลิตอัตโนมัติ 24 ชม.",
+    "6. 🚀 ออโต้โพสต์ & Google Drive",
 ])
 
 # -------------------------------------------------------------
@@ -1254,4 +1270,194 @@ with tab5:
         st.caption("ยังไม่มีบันทึกกิจกรรมในระบบ")
     else:
         st.text_area("Live Production Activity", value="\n".join(logs), height=180, disabled=True)
+
+# -------------------------------------------------------------
+# TAB 6: GOOGLE DRIVE SYNC & MULTI-PLATFORM AUTO-POST
+# -------------------------------------------------------------
+with tab6:
+    st.subheader("🚀 Cloud Sync & Multi-Platform Auto-Post — ซิงก์ Google Drive & โพสต์อัตโนมัติ")
+    st.caption("เชื่อมต่อระบบเข้ากับ Google Drive และเครือข่ายโซเชียลมีเดีย (Facebook Page Reels, YouTube Shorts, TikTok Webhook) เพื่อให้ระบบนำคลิปที่สร้างเสร็จไปซิงก์และโพสต์ให้อัตโนมัติ")
+
+    gd_cfg = load_gdrive_config()
+    post_cfg = load_autopost_config()
+
+    # Part 1: Google Drive Synchronization Card
+    st.markdown(
+        """
+        <div class="ios-card">
+            <div style="font-size: 17px; font-weight: 700; color: #1C1C1E; margin-bottom: 6px;">
+                ☁️ 1. ระบบซิงก์ Google Drive (Google Drive Auto-Sync)
+            </div>
+            <div style="font-size: 13.5px; color: #636366; line-height: 1.4;">
+                นำคลิปวิดีโอ MP4, ภาพหน้าปก และแคปชั่นไปเก็บไว้ใน Google Drive ทันทีที่ผลิตเสร็จ สะดวกสำหรับเปิดดูในมือถือหรือสำรองข้อมูล
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    is_local, local_msg = is_local_gdrive_path()
+    if is_local:
+        st.success(f"🟢 **ตรวจพบ Google Drive for Desktop ในเครื่อง:** {local_msg}\n\nทุกคลิปที่บันทึกใน `output/` จะถูก Sync ขึ้น Google Drive บนมือถือและคลาวด์ของคุณอัตโนมัติอยู่แล้วครับ!")
+    else:
+        st.info("ℹ️ กำลังรันบน Cloud หรือโฟลเดอร์ภายนอก สามารถตั้งค่า Webhook ด้านล่างเพื่อให้ระบบอัปโหลดเข้า Drive ได้โดยตรง")
+
+    c_gd1, c_gd2 = st.columns(2, gap="large")
+    with c_gd1:
+        gd_enable = st.toggle("เปิดระบบซิงก์ Google Drive อัตโนมัติ", value=bool(gd_cfg.get("enabled", True)))
+        gd_mode_options = [("auto", "อัตโนมัติ (Auto Detect)"), ("local", "Google Drive for Desktop ในเครื่อง"), ("webhook", "Webhook / Google Apps Script (สำหรับ Cloud 24h)")]
+        cur_gd_mode = gd_cfg.get("sync_mode", "auto")
+        gd_mode_idx = [x[0] for x in gd_mode_options].index(cur_gd_mode) if cur_gd_mode in [x[0] for x in gd_mode_options] else 0
+        gd_mode = st.selectbox(
+            "เลือกรูปแบบการซิงก์:",
+            options=[x[0] for x in gd_mode_options],
+            index=gd_mode_idx,
+            format_func=lambda k: dict(gd_mode_options).get(k, k),
+        )
+
+    with c_gd2:
+        gd_webhook = st.text_input("Webhook URL (Google Apps Script / Make.com):", value=gd_cfg.get("webhook_url", ""), placeholder="https://script.google.com/macros/s/.../exec")
+        gd_folder_id = st.text_input("Google Drive Folder ID (ไม่บังคับ):", value=gd_cfg.get("folder_id", ""), placeholder="เช่น 1A2b3C4d5E6f...")
+
+    c_gdb1, c_gdb2 = st.columns(2, gap="medium")
+    with c_gdb1:
+        if st.button("🧪 ทดสอบการเชื่อมต่อ Google Drive", type="secondary", use_container_width=True):
+            gd_cfg["enabled"] = gd_enable
+            gd_cfg["sync_mode"] = gd_mode
+            gd_cfg["webhook_url"] = gd_webhook
+            gd_cfg["folder_id"] = gd_folder_id
+            save_gdrive_config(gd_cfg)
+            ok, msg = test_gdrive_connection()
+            if ok:
+                st.success(f"✅ {msg}")
+            else:
+                st.error(f"❌ {msg}")
+    with c_gdb2:
+        if st.button("💾 บันทึกการตั้งค่า Google Drive", type="secondary", use_container_width=True):
+            gd_cfg["enabled"] = gd_enable
+            gd_cfg["sync_mode"] = gd_mode
+            gd_cfg["webhook_url"] = gd_webhook
+            gd_cfg["folder_id"] = gd_folder_id
+            save_gdrive_config(gd_cfg)
+            st.toast("✅ บันทึกการตั้งค่า Google Drive สำเร็จ!")
+
+    st.divider()
+
+    # Part 2: Multi-Platform Auto-Post Card
+    st.markdown(
+        """
+        <div class="ios-card">
+            <div style="font-size: 17px; font-weight: 700; color: #1C1C1E; margin-bottom: 6px;">
+                🚀 2. ระบบ Auto-Post โซเชียลมีเดีย (Facebook Page, YouTube Shorts, TikTok)
+            </div>
+            <div style="font-size: 13.5px; color: #636366; line-height: 1.4;">
+                สั่งให้ระบบนำคลิปที่ตัดต่อเสร็จพร้อมแคปชั่นและแฮชแท็ก ไปเผยแพร่บนโซเชียลมีเดียทันที ทุกแพลตฟอร์มมีระบบ Fail-safe แยกอิสระ หากไม่เปิดใช้งานระบบจะเซฟคลิปเก็บไว้ตามปกติ
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # Accordions for each platform
+    with st.expander("🔵 Facebook Page Reels + ปักหมุด Affiliate อัตโนมัติ", expanded=False):
+        fb_enable = st.toggle("เปิดใช้งานโพสต์ Facebook Reels อัตโนมัติ", value=bool(post_cfg.get("facebook_enabled", False)), key="tog_fb")
+        fb_page_id = st.text_input("Facebook Page ID:", value=post_cfg.get("facebook_page_id", ""), placeholder="เช่น 108928374829102", key="inp_fb_pid")
+        fb_token = st.text_input("Page Access Token (Long-lived Token):", value=post_cfg.get("facebook_access_token", ""), type="password", key="inp_fb_tok")
+        fb_comm = st.checkbox("📌 ปักหมุดลิงก์ Affiliate ในคอมเมนต์แรกทันทีหลังคลิปโพสต์เสร็จ (แนะนำ)", value=bool(post_cfg.get("facebook_auto_comment", True)), key="chk_fb_comm")
+
+        if st.button("🧪 ทดสอบการเชื่อมต่อ Facebook Page", key="btn_test_fb"):
+            post_cfg["facebook_page_id"] = fb_page_id
+            post_cfg["facebook_access_token"] = fb_token
+            save_autopost_config(post_cfg)
+            ok, msg = test_facebook_connection()
+            if ok:
+                st.success(f"✅ {msg}")
+            else:
+                st.error(f"❌ {msg}")
+
+    with st.expander("🔴 YouTube Shorts (YouTube Data API v3)", expanded=False):
+        yt_enable = st.toggle("เปิดใช้งานโพสต์ YouTube Shorts อัตโนมัติ", value=bool(post_cfg.get("youtube_enabled", False)), key="tog_yt")
+        yt_token = st.text_input("YouTube OAuth 2.0 Access Token:", value=post_cfg.get("youtube_access_token", ""), type="password", key="inp_yt_tok")
+        yt_priv_options = [("unlisted", "Unlisted (ไม่เป็นสาธารณะ เพื่อตรวจดูก่อน)"), ("public", "Public (สาธารณะทันที)"), ("private", "Private (ส่วนตัว)")]
+        cur_yt_priv = post_cfg.get("youtube_privacy_status", "unlisted")
+        priv_idx = [x[0] for x in yt_priv_options].index(cur_yt_priv) if cur_yt_priv in [x[0] for x in yt_priv_options] else 0
+        yt_privacy = st.selectbox("สถานะการเผยแพร่คลิป:", options=[x[0] for x in yt_priv_options], index=priv_idx, format_func=lambda k: dict(yt_priv_options).get(k, k), key="sel_yt_priv")
+
+        if st.button("🧪 ทดสอบการเชื่อมต่อ YouTube Data API", key="btn_test_yt"):
+            post_cfg["youtube_access_token"] = yt_token
+            save_autopost_config(post_cfg)
+            ok, msg = test_youtube_connection()
+            if ok:
+                st.success(f"✅ {msg}")
+            else:
+                st.error(f"❌ {msg}")
+
+    with st.expander("⚫ TikTok & Multi-Platform Webhook (Buffer / Make.com / Zapier)", expanded=False):
+        wh_enable = st.toggle("เปิดใช้งาน Webhook ส่งคลิปไป TikTok / โซเชียลอื่นๆ", value=bool(post_cfg.get("webhook_enabled", False)), key="tog_wh")
+        wh_url = st.text_input("Social Webhook URL:", value=post_cfg.get("webhook_url", ""), placeholder="https://hook.eu1.make.com/... หรือ https://api.bufferapp.com/...", key="inp_wh_url")
+        wh_secret = st.text_input("Webhook Secret Header (ถ้ามี):", value=post_cfg.get("webhook_secret", ""), type="password", key="inp_wh_sec")
+
+        if st.button("🧪 ทดสอบยิง Webhook จำลอง", key="btn_test_wh"):
+            post_cfg["webhook_url"] = wh_url
+            post_cfg["webhook_secret"] = wh_secret
+            save_autopost_config(post_cfg)
+            ok, msg = test_webhook_connection()
+            if ok:
+                st.success(f"✅ {msg}")
+            else:
+                st.error(f"❌ {msg}")
+
+    # Action buttons for social settings
+    c_pbtn1, c_pbtn2 = st.columns([1, 1], gap="medium")
+    with c_pbtn1:
+        if st.button("💾 บันทึกการตั้งค่า Auto-Post ทั้งหมด", type="secondary", use_container_width=True):
+            post_cfg["facebook_enabled"] = fb_enable
+            post_cfg["facebook_page_id"] = fb_page_id
+            post_cfg["facebook_access_token"] = fb_token
+            post_cfg["facebook_auto_comment"] = fb_comm
+            post_cfg["youtube_enabled"] = yt_enable
+            post_cfg["youtube_access_token"] = yt_token
+            post_cfg["youtube_privacy_status"] = yt_privacy
+            post_cfg["webhook_enabled"] = wh_enable
+            post_cfg["webhook_url"] = wh_url
+            post_cfg["webhook_secret"] = wh_secret
+            save_autopost_config(post_cfg)
+            st.toast("✅ บันทึกการตั้งค่าโซเชียลทั้งหมดเรียบร้อยแล้ว!")
+            st.rerun()
+
+    with c_pbtn2:
+        if st.button("🚀 ทดสอบส่งคลิปล่าสุดโพสต์ลงโซเชียลทันที (Publish Latest)", type="primary", use_container_width=True):
+            # Find latest generated video
+            out_videos = sorted(OUTPUT_DIR.glob("shorts_*.mp4"), key=os.path.getmtime, reverse=True)
+            if not out_videos:
+                st.warning("ยังไม่มีไฟล์วิดีโอในโฟลเดอร์ output/ กรุณาสร้างคลิปก่อน 1 คลิปครับ")
+            else:
+                latest_vid = out_videos[0]
+                latest_meta = latest_vid.parent / f"{latest_vid.stem}_meta.json"
+                latest_cover = latest_vid.parent / f"{latest_vid.stem}_cover.jpg"
+
+                with st.spinner(f"🚀 กำลังส่งคลิป '{latest_vid.name}' ไปยังโซเชียลแพลตฟอร์มที่เปิดใช้งาน..."):
+                    results = publish_to_all_enabled(
+                        video_path=str(latest_vid),
+                        cover_path=str(latest_cover) if latest_cover.exists() else None,
+                        meta_path=str(latest_meta) if latest_meta.exists() else None,
+                    )
+                    if not results:
+                        st.info("ℹ️ ยังไม่ได้เปิดใช้งานแพลตฟอร์มใดๆ (กรุณาเปิดใช้งานและกรอก Token ก่อนครับ)")
+                    else:
+                        for p_name, (p_ok, p_msg) in results.items():
+                            if p_ok:
+                                st.success(f"[{p_name.upper()}] ✅ {p_msg}")
+                            else:
+                                st.error(f"[{p_name.upper()}] ❌ {p_msg}")
+
+    # Logs section
+    st.divider()
+    st.markdown("#### 📜 ประวัติการส่งโพสต์โซเชียล (Live Auto-Post Logs)")
+    p_logs = post_cfg.get("post_log", [])
+    if not p_logs:
+        st.caption("ยังไม่มีประวัติการส่งโพสต์ในระบบ")
+    else:
+        st.text_area("Social Post Activity", value="\n".join(p_logs), height=180, disabled=True)
+
 
