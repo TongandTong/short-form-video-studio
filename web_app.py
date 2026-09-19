@@ -506,21 +506,27 @@ with tab_script:
     )
     st.caption(f"💡 {DURATION_MODES[selected_mode]['desc']}")
 
-    st.markdown("##### 🟢 4. ข้อมูลสินค้า / ตัวเลือกฝั่ง A")
-    in_name_a = st.text_input("ชื่อสินค้า/ตัวเลือก A:", value=st.session_state.input_name_a, placeholder="เช่น กาแฟดริป")
-    in_details_a = st.text_area("จุดเด่น / สเปก / ข้อดี A:", value=st.session_state.input_details_a, height=65, placeholder="จุดเด่น สเปก หรือข้อดีของสินค้า A")
-    aff_a = st.text_input("🔗 ลิงก์ Shopee สินค้า A:", value=st.session_state.input_aff_a, placeholder="ลิงก์สินค้า A เช่น https://shopee.co.th/...")
+    st.markdown("##### 📦 4. ข้อมูลสินค้า / ตัวเลือกเปรียบเทียบ (ฝั่ง A vs ฝั่ง B)")
+    col_a, col_b = st.columns(2, gap="medium")
+    with col_a:
+        st.markdown("###### 🟢 ฝั่ง A")
+        in_name_a = st.text_input("ชื่อสินค้า/ตัวเลือก A:", value=st.session_state.input_name_a, placeholder="เช่น กาแฟดริป", key="in_name_a")
+        in_details_a = st.text_area("จุดเด่น / สเปก / ข้อดี A:", value=st.session_state.input_details_a, height=75, placeholder="จุดเด่น สเปก หรือข้อดีของสินค้า A", key="in_details_a")
+        aff_a = st.text_input("🔗 ลิงก์ Shopee สินค้า A:", value=st.session_state.input_aff_a, placeholder="ลิงก์สินค้า A เช่น https://shopee.co.th/...", key="aff_a")
+    with col_b:
+        st.markdown("###### 🔵 ฝั่ง B")
+        in_name_b = st.text_input("ชื่อสินค้า/ตัวเลือก B:", value=st.session_state.input_name_b, placeholder="เช่น กาแฟแคปซูล", key="in_name_b")
+        in_details_b = st.text_area("จุดเด่น / สเปก / ข้อดี B:", value=st.session_state.input_details_b, height=75, placeholder="จุดเด่น สเปก หรือข้อดีของสินค้า B", key="in_details_b")
+        aff_b = st.text_input("🔗 ลิงก์ Shopee สินค้า B:", value=st.session_state.input_aff_b, placeholder="ลิงก์สินค้า B เช่น https://shopee.co.th/...", key="aff_b")
 
-    st.markdown("##### 🔵 5. ข้อมูลสินค้า / ตัวเลือกฝั่ง B")
-    in_name_b = st.text_input("ชื่อสินค้า/ตัวเลือก B:", value=st.session_state.input_name_b, placeholder="เช่น กาแฟแคปซูล")
-    in_details_b = st.text_area("จุดเด่น / สเปก / ข้อดี B:", value=st.session_state.input_details_b, height=65, placeholder="จุดเด่น สเปก หรือข้อดีของสินค้า B")
-    aff_b = st.text_input("🔗 ลิงก์ Shopee สินค้า B:", value=st.session_state.input_aff_b, placeholder="ลิงก์สินค้า B เช่น https://shopee.co.th/...")
+    st.markdown("##### 🎯 5. กลุ่มเป้าหมาย & มุมมองที่เน้น")
+    col_tgt, col_ang = st.columns(2, gap="medium")
+    with col_tgt:
+        in_target = st.text_input("กลุ่มเป้าหมาย (เช่น สายประหยัด, คอกาแฟ):", value=st.session_state.input_target, placeholder="ระบุกลุ่มคนที่สนใจคลิปนี้", key="in_target")
+    with col_ang:
+        in_angles = st.text_input("มุมมองที่ต้องการเน้น (เช่น ความคุ้มค่า, พกพาสะดวก):", value=st.session_state.input_angles, placeholder="ระบุมุมมองเปรียบเทียบที่ต้องการเน้น", key="in_angles")
 
-    st.markdown("##### 🎯 6. กลุ่มเป้าหมาย & มุมมองที่เน้น")
-    in_target = st.text_input("กลุ่มเป้าหมาย (เช่น สายประหยัด, คอกาแฟ, มือใหม่):", value=st.session_state.input_target, placeholder="ระบุกลุ่มคนที่สนใจคลิปนี้")
-    in_angles = st.text_input("มุมมองที่ต้องการเน้น (เช่น ความคุ้มค่า, พกพาสะดวก, ความเร็ว):", value=st.session_state.input_angles, placeholder="ระบุมุมมองเปรียบเทียบที่ต้องการเน้น")
-
-    st.markdown("##### 🚀 7. สั่ง AI ผลิตบทพากย์")
+    st.markdown("##### 🚀 6. สั่ง AI ผลิตบทพากย์")
     if st.button("🚀 สั่ง Gemini ร่างบททันที (พร้อมค้นหาข้อมูลเชิงลึก)", type="primary", use_container_width=True):
         with st.spinner("🤖 Gemini กำลังทำ Deep Research วิเคราะห์สเปก จุดแข็ง จุดด้อย และร่างบทตาม Framework..."):
             try:
@@ -724,8 +730,11 @@ with tab_script:
             r_title_key = f"round_{r}_title"
             r_title_val = st.session_state.script_data.get(r_title_key, f"มิติที่ {r}")
             st.markdown(f"##### 🥊 ยกที่ {r}: {r_title_val}")
-            s_ra = st.text_area(f"🟢 ฝั่ง A ({st.session_state.script_data.get('name_a', 'A')}):", value=st.session_state.script_data.get(f"round_{r}_a", ""), height=75, key=f"inp_r{r}_a_v{v}")
-            s_rb = st.text_area(f"🔵 ฝั่ง B ({st.session_state.script_data.get('name_b', 'B')}):", value=st.session_state.script_data.get(f"round_{r}_b", ""), height=75, key=f"inp_r{r}_b_v{v}")
+            col_ra, col_rb = st.columns(2, gap="medium")
+            with col_ra:
+                s_ra = st.text_area(f"🟢 ฝั่ง A ({st.session_state.script_data.get('name_a', 'A')}):", value=st.session_state.script_data.get(f"round_{r}_a", ""), height=75, key=f"inp_r{r}_a_v{v}")
+            with col_rb:
+                s_rb = st.text_area(f"🔵 ฝั่ง B ({st.session_state.script_data.get('name_b', 'B')}):", value=st.session_state.script_data.get(f"round_{r}_b", ""), height=75, key=f"inp_r{r}_b_v{v}")
             round_data[r] = {"title": r_title_val, "a": s_ra, "b": s_rb}
 
         s_conclusion = st.text_area("🏁 สรุปฟันธง + CTA ติดตามช่อง:", value=st.session_state.script_data.get("conclusion", ""), height=75, key=f"inp_conc_v{v}")
@@ -758,8 +767,11 @@ with tab_script:
     else:
         st.markdown("#### ✍️ บทพากย์ 4 ท่อน")
         s_hook = st.text_area("🎯 Hook:", value=st.session_state.script_data.get("hook", ""), height=70, key=f"inp_hook_v{v}")
-        s_item_a = st.text_area(f"🟢 จุดเด่น {st.session_state.script_data.get('name_a', 'Item A')}:", value=st.session_state.script_data.get("item_a", ""), height=85, key=f"inp_item_a_v{v}")
-        s_item_b = st.text_area(f"🔵 จุดเด่น {st.session_state.script_data.get('name_b', 'Item B')}:", value=st.session_state.script_data.get("item_b", ""), height=85, key=f"inp_item_b_v{v}")
+        col_ia, col_ib = st.columns(2, gap="medium")
+        with col_ia:
+            s_item_a = st.text_area(f"🟢 จุดเด่น {st.session_state.script_data.get('name_a', 'Item A')}:", value=st.session_state.script_data.get("item_a", ""), height=85, key=f"inp_item_a_v{v}")
+        with col_ib:
+            s_item_b = st.text_area(f"🔵 จุดเด่น {st.session_state.script_data.get('name_b', 'Item B')}:", value=st.session_state.script_data.get("item_b", ""), height=85, key=f"inp_item_b_v{v}")
         s_conclusion = st.text_area("🏁 สรุปฟันธง + CTA:", value=st.session_state.script_data.get("conclusion", ""), height=85, key=f"inp_conc_v{v}")
         s_comment = st.text_area("📌 ปักหมุดคอมเมนต์:", value=st.session_state.script_data.get("affiliate_comment", ""), height=85, key=f"inp_aff_v{v}")
 
@@ -823,27 +835,29 @@ with tab_script:
         q_name_a = st.session_state.script_data.get("name_a", st.session_state.get("input_name_a", "สินค้า A"))
         q_name_b = st.session_state.script_data.get("name_b", st.session_state.get("input_name_b", "สินค้า B"))
 
-        st.markdown(f"##### 🟢 ข้อมูลและรูปภาพสินค้า A: **{q_name_a}**")
-        exist_img_a = ASSETS_DIR / "images" / "item_a.png"
-        if exist_img_a.exists():
-            st.image(str(exist_img_a), width=180, caption=f"ภาพปัจจุบัน: {q_name_a}")
-        q_file_a = st.file_uploader(f"📁 อัปโหลดรูปจริง {q_name_a} (ไม่บังคับ):", type=["png", "jpg", "jpeg", "webp"], key="t1_queue_img_a")
-        q_aff_a = st.text_input(
-            f"🔗 ลิงก์ Affiliate สินค้า A ({q_name_a}):",
-            value=st.session_state.get("input_aff_a", "") or "https://shopee.co.th",
-            key="t1_queue_aff_a",
-        )
-
-        st.markdown(f"##### 🔵 ข้อมูลและรูปภาพสินค้า B: **{q_name_b}**")
-        exist_img_b = ASSETS_DIR / "images" / "item_b.png"
-        if exist_img_b.exists():
-            st.image(str(exist_img_b), width=180, caption=f"ภาพปัจจุบัน: {q_name_b}")
-        q_file_b = st.file_uploader(f"📁 อัปโหลดรูปจริง {q_name_b} (ไม่บังคับ):", type=["png", "jpg", "jpeg", "webp"], key="t1_queue_img_b")
-        q_aff_b = st.text_input(
-            f"🔗 ลิงก์ Affiliate สินค้า B ({q_name_b}):",
-            value=st.session_state.get("input_aff_b", "") or "https://shopee.co.th",
-            key="t1_queue_aff_b",
-        )
+        col_qa, col_qb = st.columns(2, gap="medium")
+        with col_qa:
+            st.markdown(f"##### 🟢 ข้อมูลและรูปภาพสินค้า A: **{q_name_a}**")
+            exist_img_a = ASSETS_DIR / "images" / "item_a.png"
+            if exist_img_a.exists():
+                st.image(str(exist_img_a), width=180, caption=f"ภาพปัจจุบัน: {q_name_a}")
+            q_file_a = st.file_uploader(f"📁 อัปโหลดรูปจริง {q_name_a} (ไม่บังคับ):", type=["png", "jpg", "jpeg", "webp"], key="t1_queue_img_a")
+            q_aff_a = st.text_input(
+                f"🔗 ลิงก์ Affiliate สินค้า A ({q_name_a}):",
+                value=st.session_state.get("input_aff_a", "") or "https://shopee.co.th",
+                key="t1_queue_aff_a",
+            )
+        with col_qb:
+            st.markdown(f"##### 🔵 ข้อมูลและรูปภาพสินค้า B: **{q_name_b}**")
+            exist_img_b = ASSETS_DIR / "images" / "item_b.png"
+            if exist_img_b.exists():
+                st.image(str(exist_img_b), width=180, caption=f"ภาพปัจจุบัน: {q_name_b}")
+            q_file_b = st.file_uploader(f"📁 อัปโหลดรูปจริง {q_name_b} (ไม่บังคับ):", type=["png", "jpg", "jpeg", "webp"], key="t1_queue_img_b")
+            q_aff_b = st.text_input(
+                f"🔗 ลิงก์ Affiliate สินค้า B ({q_name_b}):",
+                value=st.session_state.get("input_aff_b", "") or "https://shopee.co.th",
+                key="t1_queue_aff_b",
+            )
 
         st.markdown("##### ⚙️ ตัวเลือกการผลิตเมื่อถึงคิว:")
         q_post_mode = st.radio(
@@ -942,11 +956,13 @@ with tab_render:
 
     # Product Images Selection
     st.markdown("### 🖼️ ขั้นตอนที่ 1: ตรวจสอบรูปภาพสินค้า A & B (รูปจริง / การ์ตูน AI)")
-    st.markdown(f"**🟢 สินค้า A: {st.session_state.script_data.get('name_a', 'Item A')}**")
-    up_img_a = st.file_uploader("อัปโหลดรูป A (1:1 จัตุรัส PNG/JPG):", type=["png", "jpg", "jpeg"], key="rnd_up_a")
-
-    st.markdown(f"**🔵 สินค้า B: {st.session_state.script_data.get('name_b', 'Item B')}**")
-    up_img_b = st.file_uploader("อัปโหลดรูป B (1:1 จัตุรัส PNG/JPG):", type=["png", "jpg", "jpeg"], key="rnd_up_b")
+    col_rnd_a, col_rnd_b = st.columns(2, gap="medium")
+    with col_rnd_a:
+        st.markdown(f"**🟢 สินค้า A: {st.session_state.script_data.get('name_a', 'Item A')}**")
+        up_img_a = st.file_uploader("อัปโหลดรูป A (1:1 จัตุรัส PNG/JPG):", type=["png", "jpg", "jpeg"], key="rnd_up_a")
+    with col_rnd_b:
+        st.markdown(f"**🔵 สินค้า B: {st.session_state.script_data.get('name_b', 'Item B')}**")
+        up_img_b = st.file_uploader("อัปโหลดรูป B (1:1 จัตุรัส PNG/JPG):", type=["png", "jpg", "jpeg"], key="rnd_up_b")
 
     auto_fetch_chk = st.checkbox("📸 ดึง/สร้างรูปภาพอัตโนมัติ (หากไม่ได้อัปโหลดรูป)", value=True)
     rnd_img_mode = st.selectbox(
@@ -1140,29 +1156,36 @@ with tab_render:
         cover_path = v_path.parent / f"{v_path.stem}_cover.jpg"
 
         st.markdown("---")
-        st.subheader("📱 ตัวอย่างวิดีโอที่สร้างเสร็จสมบูรณ์")
+        st.subheader("📱 ตัวอย่างวิดีโอและภาพปกที่สร้างเสร็จสมบูรณ์")
 
-        st.video(str(v_path))
-        with open(v_path, "rb") as f:
-            st.download_button(
-                "⬇️ ดาวน์โหลดวิดีโอ MP4 (1080x1920)",
-                data=f,
-                file_name=v_path.name,
-                mime="video/mp4",
-                use_container_width=True,
-                type="primary",
-            )
-
-        if cover_path.exists():
-            st.image(str(cover_path), caption="ภาพปกคลิปอัตโนมัติ (Cover Thumbnail)", use_container_width=True)
-            with open(cover_path, "rb") as f:
-                st.download_button(
-                    "⬇️ ดาวน์โหลดภาพปกคลิป",
-                    data=f,
-                    file_name=cover_path.name,
-                    mime="image/jpeg",
-                    use_container_width=True,
-                )
+        with st.container(border=True):
+            col_vid, col_cover = st.columns([1, 1], gap="medium")
+            with col_vid:
+                st.markdown("##### 🎬 คลิปวิดีโอ (1080x1920)")
+                st.video(str(v_path))
+                with open(v_path, "rb") as f:
+                    st.download_button(
+                        "⬇️ ดาวน์โหลดวิดีโอ MP4",
+                        data=f,
+                        file_name=v_path.name,
+                        mime="video/mp4",
+                        use_container_width=True,
+                        type="primary",
+                    )
+            with col_cover:
+                st.markdown("##### 🖼️ ภาพปกคลิป (Cover Thumbnail)")
+                if cover_path.exists():
+                    st.image(str(cover_path), caption=f"ภาพปก: {cover_path.name}", use_container_width=True)
+                    with open(cover_path, "rb") as f:
+                        st.download_button(
+                            "⬇️ ดาวน์โหลดภาพปกคลิป",
+                            data=f,
+                            file_name=cover_path.name,
+                            mime="image/jpeg",
+                            use_container_width=True,
+                        )
+                else:
+                    st.info("ยังไม่มีไฟล์ภาพปกสำหรับคลิปนี้ (จะถูกสร้างอัตโนมัติเมื่อเรนเดอร์)")
 
         st.markdown("#### 📱 แคปชั่น & แฮชแท็กสำหรับโพสต์ลงโซเชียล:")
         social_cap = st.session_state.script_data.get("social_caption") or generate_social_caption(st.session_state.script_data)["social_caption"]
