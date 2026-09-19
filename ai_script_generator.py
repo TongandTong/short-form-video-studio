@@ -263,15 +263,20 @@ class AIScriptGenerator:
             raise ValueError(
                 "Gemini API Key is missing! Set GEMINI_API_KEY in .env or pass it to AIScriptGenerator."
             )
-        self.endpoint = (
-            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={self.api_key}"
-        )
-        self.fallback_endpoint = (
-            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={self.api_key}"
-        )
-        self.secondary_fallback = (
-            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={self.api_key}"
-        )
+        # Multi-tiered model hierarchy:
+        # 1. Google AI Pro Flagship (Gemini 3.1 Pro / Pro Latest) - Deepest facts, research & reasoning
+        # 2. Gemini 3.7 Flash & 3.6 Flash - State-of-the-art fast intelligence
+        # 3. Gemini Flash Latest - High-quota reliable fallback
+        self.endpoints = [
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key={self.api_key}",
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-latest:generateContent?key={self.api_key}",
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent?key={self.api_key}",
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={self.api_key}",
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={self.api_key}",
+        ]
+        self.endpoint = self.endpoints[0]
+        self.fallback_endpoint = self.endpoints[3]
+        self.secondary_fallback = self.endpoints[4]
 
     def generate_script(
         self,
@@ -612,13 +617,13 @@ class AIScriptGenerator:
             },
         }
 
-        for url in [self.endpoint, self.fallback_endpoint, self.secondary_fallback]:
+        for url in self.endpoints:
             try:
                 response = requests.post(
                     url,
                     headers={"Content-Type": "application/json"},
                     json=payload,
-                    timeout=35,
+                    timeout=15,
                 )
                 if response.status_code == 200:
                     data = response.json()
@@ -748,7 +753,7 @@ class AIScriptGenerator:
             },
         }
 
-        for url in [self.endpoint, self.fallback_endpoint, self.secondary_fallback]:
+        for url in self.endpoints:
             try:
                 response = requests.post(
                     url,
