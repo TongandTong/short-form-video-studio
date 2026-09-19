@@ -36,7 +36,13 @@ from config import (
     save_channel_profile,
     DEFAULT_CHANNEL_PROFILE,
 )
-from ai_script_generator import AIScriptGenerator, get_random_idea, FRAMEWORK_PRESETS
+from ai_script_generator import (
+    AIScriptGenerator,
+    get_random_idea,
+    FRAMEWORK_PRESETS,
+    DURATION_MODES,
+    CATEGORIES,
+)
 from tts_engine import TTSEngine
 from video_builder import VideoBuilder
 from pipeline import hex_to_rgb
@@ -195,13 +201,7 @@ with tab1:
 
     col_cat, col_fw_filter, col_rnd = st.columns([2, 3, 2])
     with col_cat:
-        cat_options = [
-            "ทั้งหมด (สุ่มทุกหมวด)",
-            "📱 ไอที & แกดเจ็ต",
-            "☕ เครื่องดื่ม & อาหาร",
-            "🏠 ของใช้ในบ้าน & ครัว",
-            "💄 สุขภาพ & บิวตี้",
-        ]
+        cat_options = ["ทั้งหมด (สุ่มทุกหมวด)"] + CATEGORIES
         selected_cat = st.selectbox(
             "📂 หมวดหมู่สินค้า",
             cat_options,
@@ -262,13 +262,16 @@ with tab1:
     st.markdown("#### 🎯 รูปแบบวิดีโอ & กรอบมุมมองไวรัล (Framing & Mode)")
     col_mode, col_fw = st.columns([1, 1], gap="medium")
     with col_mode:
-        selected_mode = st.radio(
-            "⏱️ รูปแบบและความยาววิดีโอ:",
-            options=["multi_round", "classic"],
-            format_func=lambda x: "🔥 โหมดเจาะลึก 3 ยก (60-90s - สลับชี้ A vs B)" if x == "multi_round" else "⚡ โหมดกระชับรวดเร็ว (30s - สรุปสั้นไว)",
-            index=0,
-            help="โหมด 3 ยก จะเปรียบเทียบสลับไปมา A ➜ B ➜ A ➜ B ➜ A ➜ B ครบทุกมิติ",
+        duration_keys = list(DURATION_MODES.keys())
+        def_idx = duration_keys.index("deep_3round") if "deep_3round" in duration_keys else 0
+        selected_mode = st.selectbox(
+            "⏱️ รูปแบบความยาว & ความลึกเนื้อหา:",
+            options=duration_keys,
+            index=def_idx,
+            format_func=lambda k: DURATION_MODES[k]["name"],
+            help="เลือกระดับความยาวและจำนวนยกตามความเหมาะสมของข้อมูลที่หาได้",
         )
+        st.caption(f"💡 {DURATION_MODES[selected_mode]['desc']}")
     with col_fw:
         fw_keys = list(FRAMEWORK_PRESETS.keys())
         cur_fw = st.session_state.get("input_framework", "persona")
@@ -335,36 +338,44 @@ with tab2:
 
     col_script, col_rewrite = st.columns([3, 2], gap="large")
 
-    is_multi = st.session_state.script_data.get("mode") == "multi_round" or "round_1_a" in st.session_state.script_data
+    is_multi = (
+        st.session_state.script_data.get("mode") in DURATION_MODES
+        or st.session_state.script_data.get("mode") == "multi_round"
+        or "round_1_a" in st.session_state.script_data
+    )
 
     with col_script:
         if is_multi:
-            st.markdown("#### 🥊 บทพากย์ 3 ยก สลับชี้ A vs B (60-90s)")
+            num_rounds = st.session_state.script_data.get("num_rounds")
+            if not num_rounds:
+                if "round_4_a" in st.session_state.script_data:
+                    num_rounds = 4
+                elif "round_3_a" in st.session_state.script_data:
+                    num_rounds = 3
+                elif "round_2_a" in st.session_state.script_data:
+                    num_rounds = 2
+                else:
+                    num_rounds = 1
+
+            mode_label = DURATION_MODES.get(st.session_state.script_data.get("mode"), {}).get("name", f"{num_rounds} ยก")
+            st.markdown(f"#### 🥊 บทพากย์ {num_rounds} ยก สลับชี้ A vs B ({mode_label})")
             s_hook = st.text_area("🎯 Hook (เปิดประเด็นชวนสงสัย)", value=st.session_state.script_data.get("hook", ""), height=65)
 
-            r1_name = st.session_state.script_data.get('round_1_title', 'คุณภาพ & กลิ่นรส')
-            st.markdown(f"##### 🥊 ยกที่ 1: {r1_name}")
-            col_r1_a, col_r1_b = st.columns(2)
-            with col_r1_a:
-                s_r1_a = st.text_area(f"🟢 A: {st.session_state.script_data.get('name_a', 'A')}", value=st.session_state.script_data.get("round_1_a", ""), height=75)
-            with col_r1_b:
-                s_r1_b = st.text_area(f"🔵 B: {st.session_state.script_data.get('name_b', 'B')}", value=st.session_state.script_data.get("round_1_b", ""), height=75)
-
-            r2_name = st.session_state.script_data.get('round_2_title', 'ความสะดวก & เวลา')
-            st.markdown(f"##### 🥊 ยกที่ 2: {r2_name}")
-            col_r2_a, col_r2_b = st.columns(2)
-            with col_r2_a:
-                s_r2_a = st.text_area(f"🟢 A: {st.session_state.script_data.get('name_a', 'A')}", value=st.session_state.script_data.get("round_2_a", ""), height=75)
-            with col_r2_b:
-                s_r2_b = st.text_area(f"🔵 B: {st.session_state.script_data.get('name_b', 'B')}", value=st.session_state.script_data.get("round_2_b", ""), height=75)
-
-            r3_name = st.session_state.script_data.get('round_3_title', 'ความคุ้มค่า & ราคา')
-            st.markdown(f"##### 🥊 ยกที่ 3: {r3_name}")
-            col_r3_a, col_r3_b = st.columns(2)
-            with col_r3_a:
-                s_r3_a = st.text_area(f"🟢 A: {st.session_state.script_data.get('name_a', 'A')}", value=st.session_state.script_data.get("round_3_a", ""), height=75)
-            with col_r3_b:
-                s_r3_b = st.text_area(f"🔵 B: {st.session_state.script_data.get('name_b', 'B')}", value=st.session_state.script_data.get("round_3_b", ""), height=75)
+            round_data = {}
+            for r in range(1, num_rounds + 1):
+                r_title_key = f"round_{r}_title"
+                r_title_val = st.session_state.script_data.get(r_title_key, f"มิติที่ {r}")
+                st.markdown(f"##### 🥊 ยกที่ {r}: {r_title_val}")
+                col_ra, col_rb = st.columns(2)
+                with col_ra:
+                    s_ra = st.text_area(f"🟢 A: {st.session_state.script_data.get('name_a', 'A')}", value=st.session_state.script_data.get(f"round_{r}_a", ""), height=75, key=f"inp_r{r}_a")
+                with col_rb:
+                    s_rb = st.text_area(f"🔵 B: {st.session_state.script_data.get('name_b', 'B')}", value=st.session_state.script_data.get(f"round_{r}_b", ""), height=75, key=f"inp_r{r}_b")
+                round_data[r] = {
+                    "title": r_title_val,
+                    "a": s_ra,
+                    "b": s_rb,
+                }
 
             s_conclusion = st.text_area("🏁 สรุปฟันธง + Affiliate CTA ปักหมุด", value=st.session_state.script_data.get("conclusion", ""), height=75)
             if st.button("🔄 ใส่บทส่งท้ายประจำเพจ", key="btn_outro_multi", help="นำประโยคปิดท้ายที่ตั้งไว้ในโปรไฟล์เพจมาต่อท้ายข้อความสรุปทันที"):
@@ -376,25 +387,25 @@ with tab2:
 
             # Sync and package
             st.session_state.script_data["hook"] = s_hook
-            st.session_state.script_data["round_1_a"] = s_r1_a
-            st.session_state.script_data["round_1_b"] = s_r1_b
-            st.session_state.script_data["round_2_a"] = s_r2_a
-            st.session_state.script_data["round_2_b"] = s_r2_b
-            st.session_state.script_data["round_3_a"] = s_r3_a
-            st.session_state.script_data["round_3_b"] = s_r3_b
+            st.session_state.script_data["num_rounds"] = num_rounds
+            for r, d in round_data.items():
+                st.session_state.script_data[f"round_{r}_a"] = d["a"]
+                st.session_state.script_data[f"round_{r}_b"] = d["b"]
             st.session_state.script_data["conclusion"] = s_conclusion
             st.session_state.script_data["affiliate_comment"] = s_comment
 
-            st.session_state.script_data["segments"] = [
-                {"id": "hook", "text": s_hook, "highlight": "none", "round_label": "🔥 เปิดประเด็น"},
-                {"id": "round_1_a", "text": s_r1_a, "highlight": "A", "round_label": f"🥊 {r1_name}"},
-                {"id": "round_1_b", "text": s_r1_b, "highlight": "B", "round_label": f"🥊 {r1_name}"},
-                {"id": "round_2_a", "text": s_r2_a, "highlight": "A", "round_label": f"🥊 {r2_name}"},
-                {"id": "round_2_b", "text": s_r2_b, "highlight": "B", "round_label": f"🥊 {r2_name}"},
-                {"id": "round_3_a", "text": s_r3_a, "highlight": "A", "round_label": f"🥊 {r3_name}"},
-                {"id": "round_3_b", "text": s_r3_b, "highlight": "B", "round_label": f"🥊 {r3_name}"},
-                {"id": "conclusion", "text": s_conclusion, "highlight": "none", "round_label": "🏁 สรุปฟันธง"},
+            # Build segments dynamically
+            new_segments = [
+                {"id": "hook", "text": s_hook, "highlight": "none", "round_label": "🔥 เปิดประเด็น"}
             ]
+            for r in range(1, num_rounds + 1):
+                r_title = round_data[r]["title"]
+                if round_data[r]["a"]:
+                    new_segments.append({"id": f"round_{r}_a", "text": round_data[r]["a"], "highlight": "A", "round_label": f"🥊 {r_title}"})
+                if round_data[r]["b"]:
+                    new_segments.append({"id": f"round_{r}_b", "text": round_data[r]["b"], "highlight": "B", "round_label": f"🥊 {r_title}"})
+            new_segments.append({"id": "conclusion", "text": s_conclusion, "highlight": "none", "round_label": "🏁 สรุปฟันธง"})
+            st.session_state.script_data["segments"] = new_segments
         else:
             st.markdown("#### ✍️ บทพากย์ 4 ท่อน (แก้ไขได้โดยตรง)")
             s_hook = st.text_area("🎯 ท่อนที่ 1: Hook (เปิดประเด็นชวนสงสัย)", value=st.session_state.script_data.get("hook", ""), height=70)
@@ -471,18 +482,39 @@ with tab3:
             help="เสียง Edge Neural ของ Microsoft ให้เสียงที่เป็นธรรมชาติที่สุด มีจังหวะหายใจและน้ำหนักคำเหมือนคนพูดจริงๆ ฟรี 100%",
         )
 
+        emotion_keys = list(TTSEngine.EMOTION_PRESETS.keys())
+        emotion_choice = st.selectbox(
+            "🎭 อารมณ์และจังหวะเสียงพากย์ (Voice Mood & Pace):",
+            options=emotion_keys,
+            format_func=lambda k: TTSEngine.EMOTION_PRESETS[k]["name"],
+            index=0,
+            help="ปรับโทนเสียง อารมณ์ และจังหวะเว้นวรรคให้เหมาะกับคลิปไวรัล",
+        )
+        st.caption(f"💡 {TTSEngine.EMOTION_PRESETS[emotion_choice]['desc']}")
+
+        preset_rate = TTSEngine.EMOTION_PRESETS[emotion_choice]["rate"]
+        preset_pitch = TTSEngine.EMOTION_PRESETS[emotion_choice]["pitch"]
+
+        rate_options = ["-10%", "-5%", "+0%", "+5%", "+10%", "+15%", "+20%"]
+        pitch_options = ["-5Hz", "-2Hz", "+0Hz", "+1Hz", "+2Hz", "+5Hz"]
+
+        def_rate_idx = rate_options.index(preset_rate) if preset_rate in rate_options else 2
+        def_pitch_idx = pitch_options.index(preset_pitch) if preset_pitch in pitch_options else 2
+
         c_rate, c_pitch = st.columns(2)
         with c_rate:
             voice_rate = st.select_slider(
                 "ความเร็วเสียง (Rate):",
-                options=["-10%", "+0%", "+5%", "+10%", "+15%"],
-                value="+0%",
+                options=rate_options,
+                value=rate_options[def_rate_idx],
+                key=f"slider_rate_{emotion_choice}",
             )
         with c_pitch:
             voice_pitch = st.select_slider(
                 "ระดับโทนเสียง (Pitch):",
-                options=["-5Hz", "+0Hz", "+5Hz"],
-                value="+0Hz",
+                options=pitch_options,
+                value=pitch_options[def_pitch_idx],
+                key=f"slider_pitch_{emotion_choice}",
             )
 
         st.markdown("#### 🎵 เสียงประกอบ (BGM & SFX)")

@@ -39,25 +39,48 @@ class SegmentTimeline:
 
 def preprocess_thai_pacing(text: str) -> str:
     """
-    Intelligently inserts subtle micro-pauses (commas / ellipses) into Thai sentences
-    so Neural TTS engines (Edge-TTS / Azure) breathe and articulate naturally.
+    Intelligently formats text for Neural TTS (Edge-TTS Niwat/Premwadee):
+    1. Inserts whitespace between Thai characters and English words or numbers
+       to prevent acoustic model confusion, slurred speech, and mispronunciation.
+    2. Inserts natural micro-pauses (commas, ellipses) around contrast connectors,
+       questions, and exclamations for human-like breathing and intonation.
+    3. Normalizes common unit abbreviations for crystal-clear spoken Thai.
     """
     if not text:
         return text
-    t = re.sub(r"\s+", " ", text.strip())
-    # Add breathing pauses after exclamation and question marks
+    t = text.strip()
+
+    # 1. Separate Thai characters and English words
+    t = re.sub(r"([ก-๙])([A-Za-z])", r"\1 \2", t)
+    t = re.sub(r"([A-Za-z])([ก-๙])", r"\1 \2", t)
+
+    # 2. Separate Thai characters and Numbers
+    t = re.sub(r"([ก-๙])([0-9])", r"\1 \2", t)
+    t = re.sub(r"([0-9])([ก-๙])", r"\1 \2", t)
+
+    # 3. Spoken Unit Normalization
+    t = re.sub(r"\bHz\b", " เฮิรตซ์", t, flags=re.IGNORECASE)
+    t = re.sub(r"\bGB\b", " กิ๊ก", t, flags=re.IGNORECASE)
+    t = re.sub(r"\bTB\b", " เทราไบต์", t, flags=re.IGNORECASE)
+    t = re.sub(r"%", " เปอร์เซ็นต์", t)
+
+    # 4. Natural breathing & rhetorical pacing
     t = re.sub(r"([!?])\s*", r"\1 ... ", t)
     t = re.sub(r"(:)\s*", r"\1, ", t)
-    # Natural breathing pause before contrast conjunctions
+
+    # Natural breathing pause before contrast conjunctions and rhetorical hooks
     connectors = [
         "ในขณะที่", "ขณะเดียวกัน", "ในทางกลับกัน", "ข้อดีก็คือ", "ข้อดีคือ",
         "ข้อเสียคือ", "จุดเด่นคือ", "ข้อจำกัดคือ", "สำหรับ", "นอกจากนี้",
-        "โดยรวมแล้ว", "สรุปก็คือ", "แต่ว่า", "แต่", "ส่วน"
+        "โดยรวมแล้ว", "สรุปก็คือ", "แต่ว่า", "แต่ทว่า", "แต่", "ส่วน",
+        "อย่าเพิ่งซื้อ", "มาดูกันเลย", "แล้วคุณล่ะ", "ฟันธงได้เลยว่า"
     ]
     for c in connectors:
         t = re.sub(rf"(?<![,...])\s+({re.escape(c)})", r", \1", t)
+
     t = re.sub(r",\s*,", ",", t)
-    return re.sub(r"\s+", " ", t).strip()
+    t = re.sub(r"\s+", " ", t)
+    return t.strip()
 
 
 class TTSEngine:
@@ -68,6 +91,33 @@ class TTSEngine:
         "edge_premwadee": {"engine": "edge", "voice": "th-TH-PremwadeeNeural", "desc": "เปรมวดี (หญิง - สดใส ชัดเจน เป็นธรรมชาติ)"},
         "gcloud_neural": {"engine": "gcloud", "voice": "th-TH-Neural2-C", "desc": "Google Cloud Neural2-C (สตูดิโอ)"},
         "gtts_thai": {"engine": "gtts", "voice": "th", "desc": "Google Translate TTS (พื้นฐาน ฟรี)"},
+    }
+
+    EMOTION_PRESETS = {
+        "viral": {
+            "name": "⚡ ตื่นเต้น ไวรัล กระฉับกระเฉง (Viral & Energetic)",
+            "rate": "+10%",
+            "pitch": "+2Hz",
+            "desc": "เพิ่มความเร็วเล็กน้อย ยกโทนเสียงสูงขึ้น กระตุ้นความสนใจ เหมาะกับ Reels/TikTok/Shorts",
+        },
+        "story": {
+            "name": "🎙️ เล่าเรื่อง นุ่มลึก น่าเชื่อถือ (Storytelling & Deep)",
+            "rate": "+0%",
+            "pitch": "-2Hz",
+            "desc": "จังหวะสุขุม นุ่มลึก มีน้ำหนักคำ เหมาะกับบทวิเคราะห์ สเปก และความจริงทางวิทย์",
+        },
+        "casual": {
+            "name": "☕ สบายๆ เป็นกันเอง ป้ายยา (Casual & Friendly)",
+            "rate": "+5%",
+            "pitch": "+1Hz",
+            "desc": "น้ำเสียงฟังสบายเหมือนเพื่อนเล่าให้ฟัง เข้าถึงง่าย ชวนคุยและปักหมุดพิกัด",
+        },
+        "fast": {
+            "name": "🚀 เข้าประเด็น ด่วนจี๋ สไตล์ TikTok (Fast Paced)",
+            "rate": "+15%",
+            "pitch": "+0Hz",
+            "desc": "เร็ว คม สั้นไว ไม่เสียเวลา เหมาะกับโหมดกระชับ 30-40 วินาที",
+        },
     }
 
     def __init__(

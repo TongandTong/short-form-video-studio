@@ -127,8 +127,36 @@ FRAMEWORK_PRESETS: Dict[str, Dict[str, str]] = {
 }
 
 
+DURATION_MODES: Dict[str, Dict[str, Any]] = {
+    "short_1round": {
+        "id": "short_1round",
+        "rounds": 1,
+        "name": "⚡ กระชับ สั้นไว (1 ยก: ~30-40s)",
+        "desc": "เปิด Hook ไว ชี้หมัดเด็ดจุดต่างของ A vs B จบด้วยสรุปฟันธง เหมาะกับคนดูรีบ",
+    },
+    "medium_2round": {
+        "id": "medium_2round",
+        "rounds": 2,
+        "name": "⚖️ ความยาวมาตรฐาน (2 ยก: ~45-60s)",
+        "desc": "ยกที่ 1 การใช้งานจริง สวนกลับด้วยยกที่ 2 ความคุ้มค่า/ราคา ความยาวกำลังดี",
+    },
+    "deep_3round": {
+        "id": "deep_3round",
+        "rounds": 3,
+        "name": "🔥 เจาะลึกมัลติราวด์ (3 ยก: ~75-90s)",
+        "desc": "เปรียบเทียบสลับไปมา 3 มิติครบครัน คุณภาพ ความสะดวก และราคา ข้อมูลลึกซึ้ง",
+    },
+    "master_4round": {
+        "id": "master_4round",
+        "rounds": 4,
+        "name": "👑 เอ็กซ์ตรีมครบมิติ (4 ยก: ~100-120s)",
+        "desc": "เจาะลึก 4 ยกสุดเข้มข้น เพิ่มมิติความทนทานและประสบการณ์ระยะยาว คอนเทนต์ระดับพรีเมียม",
+    },
+}
+
+
 class AIScriptGenerator:
-    """Generates deep, fact-based Thai comparison scripts using Gemini."""
+    """Generates deep, fact-based Thai comparison scripts using Gemini 3.6 / 3.5 Flash."""
 
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
@@ -145,10 +173,13 @@ class AIScriptGenerator:
                 "Gemini API Key is missing! Set GEMINI_API_KEY in .env or pass it to AIScriptGenerator."
             )
         self.endpoint = (
-            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={self.api_key}"
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={self.api_key}"
         )
         self.fallback_endpoint = (
-            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={self.api_key}"
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={self.api_key}"
+        )
+        self.secondary_fallback = (
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={self.api_key}"
         )
 
     def generate_script(
@@ -163,7 +194,7 @@ class AIScriptGenerator:
         affiliate_link_a: str = "",
         affiliate_link_b: str = "",
         tone: str = "engaging",
-        script_mode: str = "multi_round",  # "multi_round" (60-90s) or "classic" (30s)
+        script_mode: str = "deep_3round",
         channel_outro_cta: str = "",
         framework: str = "persona",
     ) -> Dict[str, Any]:
@@ -171,26 +202,64 @@ class AIScriptGenerator:
         Deep-researches comparison points and writes a short-form script in Thai.
         Supports:
         - 10 Viral Comparison Frameworks (Persona, Crossover, Cost vs Value, Blind Test, etc.)
-        - "multi_round" (60-90s): 3-Round back-and-forth battle comparing multiple dimensions.
-        - "classic" (30s): 4-part concise summary.
+        - 4 Duration & Depth Modes: short_1round, medium_2round, deep_3round, master_4round.
         """
         fw = FRAMEWORK_PRESETS.get(framework, FRAMEWORK_PRESETS["persona"])
         outro_prompt_hint = f"\n- ข้อความส่งท้ายประจำเพจที่ต้องสอดแทรกไว้ใน conclusion: '{channel_outro_cta}'" if channel_outro_cta else ""
+
+        # Map script_mode to standardized depth
+        if script_mode in ("classic", "short_1round"):
+            active_mode = "short_1round"
+            num_rounds = 1
+        elif script_mode == "medium_2round":
+            active_mode = "medium_2round"
+            num_rounds = 2
+        elif script_mode in ("multi_round", "deep_3round"):
+            active_mode = "deep_3round"
+            num_rounds = 3
+        elif script_mode == "master_4round":
+            active_mode = "master_4round"
+            num_rounds = 4
+        else:
+            active_mode = "deep_3round"
+            num_rounds = 3
+
+        round_focus_map = {
+            1: fw.get("r1_focus", "คุณภาพ & การใช้งานจริง"),
+            2: fw.get("r2_focus", "ความสะดวก & ความคุ้มค่า"),
+            3: fw.get("r3_focus", "ความคุ้มค่า & ราคาต่อการใช้งาน"),
+            4: "ความทนทาน & ประสบการณ์ระยะยาว (Durability & Long-term Value)",
+        }
 
         framework_directive = f"""
 กรอบการเล่าเรื่องเชิงกลยุทธ์ (Content Framework):
 - หมวดหมู่: {fw['name']}
 - แนวคิดหลัก: {fw['desc']}
 - ทิศทาง Hook: {fw['hook_guide']}
-- โฟกัสยกที่ 1: {fw['r1_focus']}
-- โฟกัสยกที่ 2: {fw['r2_focus']}
-- โฟกัสยกที่ 3: {fw['r3_focus']}
+- โฟกัสยกที่ 1: {round_focus_map[1]}
+- โฟกัสยกที่ 2: {round_focus_map[2]}
+- โฟกัสยกที่ 3: {round_focus_map[3]}
+- โฟกัสยกที่ 4: {round_focus_map[4]}
 - ทิศทางสรุปฟันธง: {fw['conclusion_guide']}
 """
 
-        if script_mode == "multi_round":
-            prompt = f"""
-คุณเป็น Senior Short-Form Video Producer มืออาชีพ เชี่ยวชาญการทำคลิปเปรียบเทียบมัลติราวด์ (Deep Battle: A vs B) สไตล์ Reels/TikTok/Shorts ความยาวประมาณ 60-90 วินาที ที่คนดูเกาะติดหน้าจอจนจบ
+        round_prompts = []
+        json_fields = []
+        for r in range(1, num_rounds + 1):
+            f_title = round_focus_map.get(r, f"มิติที่ {r}")
+            round_prompts.append(
+                f"{r}. ยกที่ {r} ({f_title}):\n"
+                f"   - round_{r}_title: ตั้งชื่อยกที่ {r} สั้นๆ (ให้สอดคล้องกับ {f_title})\n"
+                f"   - round_{r}_a: จุดเด่นด้านนี้ของ {name_a} (1-2 ประโยคกระชับ ชัดเจน มีน้ำหนัก)\n"
+                f"   - round_{r}_b: สวนกลับด้วยจุดต่างด้านนี้ของ {name_b} (1-2 ประโยคกระชับ)"
+            )
+            json_fields.append(f'  "round_{r}_title": "{f_title}",\n  "round_{r}_a": "...",\n  "round_{r}_b": "..."')
+
+        rounds_instruction_str = "\n".join(round_prompts)
+        json_rounds_str = ",\n".join(json_fields)
+
+        prompt = f"""
+คุณเป็น Senior Short-Form Video Producer มืออาชีพ เชี่ยวชาญการทำคลิปเปรียบเทียบแบบสลับชี้ A vs B สไตล์ Reels/TikTok/Shorts ความยาวจำนวน {num_rounds} ยก ที่คนดูเกาะติดหน้าจอจนจบ
 
 โจทย์เปรียบเทียบ:
 - หัวข้อ: {topic}
@@ -198,26 +267,15 @@ class AIScriptGenerator:
 - ไอเทม B: {name_b} (ข้อมูล/สเปก: {details_b or 'ทั่วไป'})
 - กลุ่มเป้าหมายคนดู: {target_audience or 'บุคคลทั่วไป / ผู้บริโภคที่กำลังตัดสินใจซื้อ'}
 - จุดเน้นพิเศษ: {key_angles or 'เปรียบเทียบรอบด้านทั้งประสิทธิภาพ ความสะดวก และราคา'}
-- โทนอารมณ์: {tone} (น่าสนใจ มีน้ำหนักคำ ชวนฟัง กระชับ ไม่เวิ่นเว้อ)
+- โทนอารมณ์: {tone} (น่าสนใจ มีน้ำหนักคำ ชวนฟัง กระชับ มีพลัง ไม่เวิ่นเว้อ)
 {framework_directive}
 
 ภารกิจของคุณ:
-ร่างบทพากย์วิดีโอเปรียบเทียบสลับไปมา 3 ยก (3 Rounds Battle) สลับชี้ A ➜ B ➜ A ➜ B ➜ A ➜ B ตามกรอบ Framework ข้างต้น:
-1. hook: ประโยคเปิดคลิป 1 ประโยค ยิงคำถามคมๆ หรือประเด็นชวนสะดุ้งตามแนวทาง Framework ให้อยู่ดูต่อ
-2. ยกที่ 1 ({fw['r1_focus']}):
-   - round_1_title: ตั้งชื่อยกที่ 1 สั้นๆ (ให้สอดคล้องกับ {fw['r1_focus']})
-   - round_1_a: จุดเด่นด้านนี้ของ {name_a} (1-2 ประโยคกระชับ)
-   - round_1_b: สวนกลับด้วยจุดต่างด้านนี้ของ {name_b} (1-2 ประโยคกระชับ)
-3. ยกที่ 2 ({fw['r2_focus']}):
-   - round_2_title: ตั้งชื่อยกที่ 2 สั้นๆ (ให้สอดคล้องกับ {fw['r2_focus']})
-   - round_2_a: ข้อมูล/การเปรียบเทียบด้านนี้ของ {name_a} (1-2 ประโยคกระชับ)
-   - round_2_b: สวนกลับด้วยจุดต่างด้านนี้ของ {name_b} (1-2 ประโยคกระชับ)
-4. ยกที่ 3 ({fw['r3_focus']}):
-   - round_3_title: ตั้งชื่อยกที่ 3 สั้นๆ (ให้สอดคล้องกับ {fw['r3_focus']})
-   - round_3_a: ข้อมูล/ความคุ้มค่าด้านนี้ของ {name_a} (1-2 ประโยคกระชับ)
-   - round_3_b: สวนกลับด้วยข้อมูล/ความคุ้มค่าของ {name_b} (1-2 ประโยคกระชับ)
-5. conclusion: สรุปฟันธงตามแนวทาง {fw['conclusion_guide']} พร้อม CTA สไตล์ Affiliate เนียนๆ ชวนคนดูโหวต และบอกว่าพิกัดของแท้อยู่ในคอมเมนต์แรก{outro_prompt_hint}
-6. affiliate_comment: ข้อความสำหรับปักหมุดคอมเมนต์แรก รวบรวมพิกัด {name_a} และ {name_b} พร้อมอีโมจิ
+ร่างบทพากย์วิดีโอเปรียบเทียบสลับไปมาจำนวน {num_rounds} ยก สลับชี้ A ➜ B ตามกรอบ Framework ข้างต้น:
+- hook: ประโยคเปิดคลิป 1 ประโยค ยิงคำถามคมๆ หรือประเด็นชวนสะดุ้งตามแนวทาง Framework ให้อยู่ดูต่อ
+{rounds_instruction_str}
+- conclusion: สรุปฟันธงตามแนวทาง {fw['conclusion_guide']} พร้อม CTA สไตล์ Affiliate เนียนๆ ชวนคนดูโหวต และบอกว่าพิกัดของแท้อยู่ในคอมเมนต์แรก{outro_prompt_hint}
+- affiliate_comment: ข้อความสำหรับปักหมุดคอมเมนต์แรก รวบรวมพิกัด {name_a} และ {name_b} พร้อมอีโมจิ
 
 สำคัญมาก:
 - ห้ามใส่เครื่องหมาย Enter จริงในค่า JSON string เด็ดขาด ให้ใช้ \\n เท่านั้น
@@ -227,61 +285,17 @@ class AIScriptGenerator:
   "topic": "{topic}",
   "name_a": "{name_a}",
   "name_b": "{name_b}",
-  "mode": "multi_round",
-  "research_summary": "สรุปข้อมูลเจาะลึก 3 ยกสั้นๆ ตามกรอบ {fw['name']}...",
+  "mode": "{active_mode}",
+  "num_rounds": {num_rounds},
+  "research_summary": "สรุปข้อมูลเจาะลึก {num_rounds} ยกสั้นๆ ตามกรอบ {fw['name']}...",
   "hook": "ประโยคเปิดคลิปตามกรอบ...",
-  "round_1_title": "{fw['r1_focus']}",
-  "round_1_a": "...",
-  "round_1_b": "...",
-  "round_2_title": "{fw['r2_focus']}",
-  "round_2_a": "...",
-  "round_2_b": "...",
-  "round_3_title": "{fw['r3_focus']}",
-  "round_3_a": "...",
-  "round_3_b": "...",
+{json_rounds_str},
   "conclusion": "ประโยคสรุปฟันธงและ CTA...",
   "affiliate_comment": "📍 พิกัดของแท้ราคาโปร:\\n👉 {name_a}: [ลิงก์ A]\\n👉 {name_b}: [ลิงก์ B]\\n(โหวตกันในคอมเมนต์ได้เลยครับ)"
 }}
 """
-        else:
-            prompt = f"""
-คุณเป็น Senior Short-Form Video Producer และ Product Analyst มืออาชีพ เชี่ยวชาญการทำคลิปแนวตั้ง 9:16 (Reels/TikTok/Shorts) สไตล์ "Side-by-Side Comparison: A vs B" ที่คนดูจนจบและกดคลิกดูสินค้า
-
-โจทย์เปรียบเทียบ:
-- หัวข้อ: {topic}
-- ไอเทม A: {name_a} (ข้อมูลเบื้องต้น: {details_a or 'ทั่วไป'})
-- ไอเทม B: {name_b} (ข้อมูลเบื้องต้น: {details_b or 'ทั่วไป'})
-- กลุ่มเป้าหมายคนดู: {target_audience or 'บุคคลทั่วไป / ผู้บริโภคที่กำลังตัดสินใจซื้อ'}
-- จุดที่อยากเน้นเปรียบเทียบ: {key_angles or 'ความคุ้มค่า สเปกการใช้งานจริง และความสะดวก'}
-- โทนอารมณ์: {tone} (น่าสนใจ มีน้ำหนักคำ ชวนฟัง กระชับ ไม่เวิ่นเว้อ)
-{framework_directive}
-
-ภารกิจของคุณ:
-1. ทำ Deep Comparative Research วิเคราะห์เจาะลึกตามกรอบ {fw['name']}
-2. เขียนบทพากย์วิดีโอ 4 ท่อน (สั้น กระชับ สำหรับอ่านพากย์ 20-30 วินาที):
-   - hook: ประโยคเปิดคลิป 1 ประโยค ยิงคำถามหรือประเด็นตรงจุดตามกรอบ {fw['name']} ชวนสงสัยให้อยู่ดูต่อ
-   - item_a: เจาะจุดเด่นของ {name_a} ให้เห็นภาพชัดเจนตามกรอบ (1-2 ประโยคกระชับ)
-   - item_b: เจาะจุดเด่นของ {name_b} ให้เห็นความต่างตามกรอบ (1-2 ประโยคกระชับ)
-   - conclusion: สรุปฟันธงตามแนวทาง {fw['conclusion_guide']} พร้อมประโยค Call-To-Action (CTA) สไตล์ Affiliate แบบเนียนๆ ชวนคนดูโหวต และบอกว่าพิกัดของแท้อยู่ในคอมเมนต์แรกแล้ว{outro_prompt_hint}
-3. affiliate_comment: ข้อความสำหรับปักหมุดคอมเมนต์แรกใต้คลิป รวบรวมพิกัด {name_a} และ {name_b} จัดวางสวยงามพร้อมอีโมจิ
-
-สำคัญ: ห้ามใส่ Enter จริงในค่า JSON string เด็ดขาด ให้ใช้ \\n เท่านั้น ตอบเป็น JSON block:
-
-{{
-  "topic": "{topic}",
-  "name_a": "{name_a}",
-  "name_b": "{name_b}",
-  "mode": "classic",
-  "research_summary": "สรุปข้อมูลเจาะลึก 4 มิติสั้นๆ ตามกรอบ {fw['name']}...",
-  "hook": "ประโยคเปิดคลิป...",
-  "item_a": "ประโยคอธิบายไอเทม A...",
-  "item_b": "ประโยคอธิบายไอเทม B...",
-  "conclusion": "ประโยคสรุปฟันธงและ CTA เนียนๆ...",
-  "affiliate_comment": "📍 พิกัดของแท้ราคาโปร:\\n👉 {name_a}: [ลิงก์ A]\\n👉 {name_b}: [ลิงก์ B]\\n(โหวตกันในคอมเมนต์ได้เลยครับ)"
-}}
-"""
         raw_res = self._call_gemini(prompt, affiliate_link_a, affiliate_link_b, topic, name_a, name_b)
-        return self._package_script_data(raw_res, script_mode, name_a, name_b, framework)
+        return self._package_script_data(raw_res, active_mode, name_a, name_b, framework)
 
     def _package_script_data(
         self,
@@ -296,29 +310,55 @@ class AIScriptGenerator:
         data["framework"] = framework
         data["framework_name"] = fw["name"]
 
-        if mode == "multi_round" and "round_1_a" in data:
-            r1 = data.get("round_1_title", fw.get("r1_focus", "คุณภาพ & ฟิลลิ่ง"))
-            r2 = data.get("round_2_title", fw.get("r2_focus", "ความสะดวก & เวลา"))
-            r3 = data.get("round_3_title", fw.get("r3_focus", "ความคุ้มค่า & ราคา"))
-            data["mode"] = "multi_round"
-            data["segments"] = [
-                {"id": "hook", "text": data.get("hook", ""), "highlight": "none", "round_label": "🔥 เปิดประเด็น"},
-                {"id": "round_1_a", "text": data.get("round_1_a", ""), "highlight": "A", "round_label": f"🥊 {r1}"},
-                {"id": "round_1_b", "text": data.get("round_1_b", ""), "highlight": "B", "round_label": f"🥊 {r1}"},
-                {"id": "round_2_a", "text": data.get("round_2_a", ""), "highlight": "A", "round_label": f"🥊 {r2}"},
-                {"id": "round_2_b", "text": data.get("round_2_b", ""), "highlight": "B", "round_label": f"🥊 {r2}"},
-                {"id": "round_3_a", "text": data.get("round_3_a", ""), "highlight": "A", "round_label": f"🥊 {r3}"},
-                {"id": "round_3_b", "text": data.get("round_3_b", ""), "highlight": "B", "round_label": f"🥊 {r3}"},
-                {"id": "conclusion", "text": data.get("conclusion", ""), "highlight": "none", "round_label": "🏁 สรุปฟันธง"},
-            ]
+        # Determine num_rounds
+        if mode in ("classic", "short_1round"):
+            num_rounds = 1
+            active_mode = "short_1round"
+        elif mode == "medium_2round":
+            num_rounds = 2
+            active_mode = "medium_2round"
+        elif mode in ("multi_round", "deep_3round"):
+            num_rounds = 3
+            active_mode = "deep_3round"
+        elif mode == "master_4round":
+            num_rounds = 4
+            active_mode = "master_4round"
         else:
-            data["mode"] = "classic"
-            data["segments"] = [
-                {"id": "hook", "text": data.get("hook", ""), "highlight": "none", "round_label": "🔥 เปิดประเด็น"},
-                {"id": "item_a", "text": data.get("item_a", ""), "highlight": "A", "round_label": f"📦 {name_a}"},
-                {"id": "item_b", "text": data.get("item_b", ""), "highlight": "B", "round_label": f"📦 {name_b}"},
-                {"id": "conclusion", "text": data.get("conclusion", ""), "highlight": "none", "round_label": "🏁 สรุปฟันธง"},
-            ]
+            if "round_4_a" in data:
+                num_rounds = 4
+                active_mode = "master_4round"
+            elif "round_3_a" in data:
+                num_rounds = 3
+                active_mode = "deep_3round"
+            elif "round_2_a" in data:
+                num_rounds = 2
+                active_mode = "medium_2round"
+            else:
+                num_rounds = 1
+                active_mode = "short_1round"
+
+        data["mode"] = active_mode
+        data["num_rounds"] = num_rounds
+
+        segments = [
+            {"id": "hook", "text": data.get("hook", ""), "highlight": "none", "round_label": "🔥 เปิดประเด็น"}
+        ]
+
+        for r in range(1, num_rounds + 1):
+            r_title = data.get(f"round_{r}_title") or f"ยกที่ {r}"
+            r_a = data.get(f"round_{r}_a") or (data.get("item_a", "") if r == 1 else "")
+            r_b = data.get(f"round_{r}_b") or (data.get("item_b", "") if r == 1 else "")
+            data[f"round_{r}_a"] = r_a
+            data[f"round_{r}_b"] = r_b
+            data[f"round_{r}_title"] = r_title
+
+            if r_a:
+                segments.append({"id": f"round_{r}_a", "text": r_a, "highlight": "A", "round_label": f"🥊 {r_title}"})
+            if r_b:
+                segments.append({"id": f"round_{r}_b", "text": r_b, "highlight": "B", "round_label": f"🥊 {r_title}"})
+
+        segments.append({"id": "conclusion", "text": data.get("conclusion", ""), "highlight": "none", "round_label": "🏁 สรุปฟันธง"})
+        data["segments"] = segments
         return data
 
     def rewrite_script(
@@ -329,98 +369,59 @@ class AIScriptGenerator:
     ) -> Dict[str, Any]:
         """
         Rewrites or polishes an existing script according to user's feedback.
-        Preserves multi-round or classic structure accordingly.
+        Dynamically preserves the number of rounds in current_script.
         """
-        is_multi = current_script.get("mode") == "multi_round" or "round_1_a" in current_script
         topic = current_script.get("topic", "")
         name_a = current_script.get("name_a", "")
         name_b = current_script.get("name_b", "")
+        mode = current_script.get("mode", "deep_3round")
+        num_rounds = current_script.get("num_rounds", 3)
+        fw = current_script.get("framework", "persona")
 
-        if is_multi:
-            prompt = f"""
-คุณเป็น Senior Video Script Doctor มีบทเปรียบเทียบแบบมัลติราวด์ (3 ยก สลับไปมา) ดังนี้:
+        round_snippets = []
+        json_fields = []
+        for r in range(1, num_rounds + 1):
+            rt = current_script.get(f"round_{r}_title", f"ยกที่ {r}")
+            ra = current_script.get(f"round_{r}_a", "")
+            rb = current_script.get(f"round_{r}_b", "")
+            round_snippets.append(f"- ยกที่ {r} ({rt}):\n  - A: {ra}\n  - B: {rb}")
+            json_fields.append(f'  "round_{r}_title": "{rt}",\n  "round_{r}_a": "...",\n  "round_{r}_b": "..."')
+
+        rounds_text = "\n".join(round_snippets)
+        json_rounds_str = ",\n".join(json_fields)
+
+        prompt = f"""
+คุณเป็น Senior Video Script Doctor มีบทเปรียบเทียบเดิม ({num_rounds} ยก) ดังนี้:
 หัวข้อ: {topic}
 สินค้า A: {name_a}
 สินค้า B: {name_b}
 
 บทเดิม:
 - Hook: {current_script.get('hook', '')}
-- ยกที่ 1 ({current_script.get('round_1_title', 'คุณภาพ')}):
-  - A: {current_script.get('round_1_a', '')}
-  - B: {current_script.get('round_1_b', '')}
-- ยกที่ 2 ({current_script.get('round_2_title', 'ความสะดวก')}):
-  - A: {current_script.get('round_2_a', '')}
-  - B: {current_script.get('round_2_b', '')}
-- ยกที่ 3 ({current_script.get('round_3_title', 'ความคุ้มค่า')}):
-  - A: {current_script.get('round_3_a', '')}
-  - B: {current_script.get('round_3_b', '')}
+{rounds_text}
 - สรุป: {current_script.get('conclusion', '')}
-
-คำสั่งปรับแก้จากผู้ใช้ (Instruction):
-"{instruction}"
-โทน: {tone}
-
-โปรดรีไรท์บทใหม่ทั้ง 3 ยกให้คมขึ้น น่าฟังขึ้น ไหลลื่น ตอบโจทย์คำสั่งผู้ใช้
-สำคัญ: ห้ามใส่ Enter จริงใน JSON string ให้ใช้ \\n เท่านั้น ตอบเฉพาะ JSON block รูปแบบเดิม:
-{{
-  "topic": "{topic}",
-  "name_a": "{name_a}",
-  "name_b": "{name_b}",
-  "mode": "multi_round",
-  "research_summary": "{current_script.get('research_summary', 'ปรับปรุงตามคำสั่ง')}",
-  "hook": "...",
-  "round_1_title": "{current_script.get('round_1_title', 'คุณภาพ & ฟิลลิ่ง')}",
-  "round_1_a": "...",
-  "round_1_b": "...",
-  "round_2_title": "{current_script.get('round_2_title', 'ความสะดวก & เวลา')}",
-  "round_2_a": "...",
-  "round_2_b": "...",
-  "round_3_title": "{current_script.get('round_3_title', 'ความคุ้มค่า & ราคา')}",
-  "round_3_a": "...",
-  "round_3_b": "...",
-  "conclusion": "...",
-  "affiliate_comment": "{current_script.get('affiliate_comment', '')}"
-}}
-"""
-            raw_res = self._call_gemini(prompt, "", "", topic, name_a, name_b)
-            fw = current_script.get("framework", "persona")
-            return self._package_script_data(raw_res, "multi_round", name_a, name_b, framework=fw)
-        else:
-            prompt = f"""
-คุณเป็น Senior Video Script Doctor มีบทเปรียบเทียบเดิมดังนี้:
-หัวข้อ: {topic}
-สินค้า A: {name_a}
-สินค้า B: {name_b}
-
-บทเดิม:
-- Hook: {current_script.get('hook', '')}
-- Item A: {current_script.get('item_a', '')}
-- Item B: {current_script.get('item_b', '')}
-- Conclusion: {current_script.get('conclusion', '')}
 
 คำสั่งปรับแก้จากผู้ใช้ (Instruction):
 "{instruction}"
 โทนที่ต้องการ: {tone}
 
-โปรดรีไรท์บทใหม่ทั้ง 4 ท่อนให้ตรงตามคำสั่ง ปรับคำให้คมขึ้น น่าฟังขึ้น และจบด้วย CTA เนียนๆ เช่นเดิม
-สำคัญ: ห้ามมี Enter จริงใน JSON string ให้ใช้ \n เท่านั้น ตอบเฉพาะ JSON:
-
+โปรดรีไรท์บทใหม่ทั้ง {num_rounds} ยกให้คมขึ้น น่าฟังขึ้น ไหลลื่น ตอบโจทย์คำสั่งผู้ใช้
+สำคัญ: ห้ามใส่ Enter จริงใน JSON string ให้ใช้ \\n เท่านั้น ตอบเฉพาะ JSON block รูปแบบเดิม:
 {{
   "topic": "{topic}",
   "name_a": "{name_a}",
   "name_b": "{name_b}",
-  "mode": "classic",
-  "research_summary": "{current_script.get('research_summary', 'ปรับปรุงบทตามคำสั่งผู้ใช้')}",
+  "mode": "{mode}",
+  "num_rounds": {num_rounds},
+  "research_summary": "{current_script.get('research_summary', 'ปรับปรุงตามคำสั่ง')}",
   "hook": "...",
-  "item_a": "...",
-  "item_b": "...",
+{json_rounds_str},
   "conclusion": "...",
   "affiliate_comment": "{current_script.get('affiliate_comment', '')}"
 }}
 """
-            raw_res = self._call_gemini(prompt, "", "", topic, name_a, name_b)
-            fw = current_script.get("framework", "persona")
-            return self._package_script_data(raw_res, "classic", name_a, name_b, framework=fw)
+        raw_res = self._call_gemini(prompt, "", "", topic, name_a, name_b)
+        return self._package_script_data(raw_res, mode, name_a, name_b, framework=fw)
 
     def _call_gemini(
         self,
@@ -431,19 +432,19 @@ class AIScriptGenerator:
         name_a: str,
         name_b: str,
     ) -> Dict[str, Any]:
-        """Helper to call Gemini REST API and parse response."""
+        """Helper to call Gemini REST API and parse response with multi-tier fallback."""
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {
                 "temperature": 0.7,
                 "topP": 0.95,
-                "maxOutputTokens": 2048,
+                "maxOutputTokens": 2500,
                 "responseMimeType": "application/json",
                 "thinkingConfig": {"thinkingBudget": 0},
             },
         }
 
-        for url in [self.endpoint, self.fallback_endpoint]:
+        for url in [self.endpoint, self.fallback_endpoint, self.secondary_fallback]:
             try:
                 response = requests.post(
                     url,
@@ -516,6 +517,9 @@ class AIScriptGenerator:
             "round_3_title",
             "round_3_a",
             "round_3_b",
+            "round_4_title",
+            "round_4_a",
+            "round_4_b",
             "item_a",
             "item_b",
             "conclusion",
@@ -535,7 +539,7 @@ class AIScriptGenerator:
         return json.loads(sanitized)
 
 
-# Curated High-Retention Trending Comparison Library across 10 Viral Frameworks
+# Curated High-Retention Trending Comparison Library across 8 Categories & 10 Frameworks
 TRENDING_COMPARISON_TEMPLATES = [
     # 👤 Persona-based
     {
@@ -609,7 +613,7 @@ TRENDING_COMPARISON_TEMPLATES = [
     },
     {
         "framework": "cost_value",
-        "category": "📱 ไอที & แกดเจ็ต",
+        "category": "🚗 ยานยนต์ & การเดินทาง",
         "topic": "รถยนต์ไฟฟ้า (EV) VS รถยนต์น้ำมัน (คำนวณ 5 ปี)",
         "name_a": "รถยนต์ไฟฟ้า (EV)",
         "name_b": "รถยนต์น้ำมัน (ICE)",
@@ -619,6 +623,79 @@ TRENDING_COMPARISON_TEMPLATES = [
         "key_angles": "ส่วนต่างค่าพลังงาน 5 ปีเทียบกับค่าเบี้ยประกันและราคาขายต่อ",
         "affiliate_link_a": "https://shopee.co.th/ev_charger",
         "affiliate_link_b": "https://shopee.co.th/car_accessories",
+    },
+
+    # 🚗 ยานยนต์ & การเดินทาง (New Category)
+    {
+        "framework": "persona",
+        "category": "🚗 ยานยนต์ & การเดินทาง",
+        "topic": "ยางรถยนต์นุ่มเงียบ (Comfort) VS ยางรถยนต์สปอร์ตหนึบ (Sport)",
+        "name_a": "ยางสายนุ่มเงียบ (Comfort)",
+        "name_b": "ยางสายสปอร์ตหนึบ (Sport Performance)",
+        "details_a": "ร่องยางละเอียด ซับแรงสะเทือนดีเยี่ยม เสียงในห้องโดยสารเงียบ เหมาะขับในเมืองทางเรียบ",
+        "details_b": "แก้มยางแน่น รีดน้ำไว เข้าโค้งคม เบรกสั้น มั่นใจในความเร็วสูงและถนนเปียก",
+        "target_audience": "คนมีรถยนต์ที่กำลังจะเปลี่ยนยางชุดใหม่ตามระยะ",
+        "key_angles": "ความนุ่มนวลสบายหู เทียบกับความปลอดภัยและสมรรถนะการควบคุม",
+        "affiliate_link_a": "https://shopee.co.th/comfort_tires",
+        "affiliate_link_b": "https://shopee.co.th/sport_tires",
+    },
+
+    # 💼 การเงิน & ไลฟ์สไตล์ (New Category)
+    {
+        "framework": "cost_value",
+        "category": "💼 การเงิน & ไลฟ์สไตล์",
+        "topic": "รูดผ่อน 0% 10 เดือน VS จ่ายเงินสดเต็มจำนวน",
+        "name_a": "รูดผ่อน 0% 10 เดือน",
+        "name_b": "จ่ายสดเต็มจำนวน",
+        "details_a": "เงินก้อนยังอยู่ในบัญชีดอกเบี้ยสูง/กองทุน ได้แต้มสะสมและแคชแบ็กบัตรเครดิต",
+        "details_b": "จบหนี้ทันที ไม่สร้างภาระผูกพัน ไม่เสี่ยงต่อการใช้จ่ายเกินตัว สบายใจไร้กังวล",
+        "target_audience": "วัยทำงาน และคนที่กำลังวางแผนซื้อของชิ้นใหญ่หลักหมื่น",
+        "key_angles": "ผลตอบแทนจากการหมุนเงิน เทียบกับวินัยทางการเงินและความสบายใจ",
+        "affiliate_link_a": "https://shopee.co.th/credit_card_deal",
+        "affiliate_link_b": "https://shopee.co.th/savings_app",
+    },
+    {
+        "framework": "scenario_budget",
+        "category": "💼 การเงิน & ไลฟ์สไตล์",
+        "topic": "คอนโดติดรถไฟฟ้า VS บ้านเดี่ยวชานเมือง (งบ 3-4 ล้าน)",
+        "name_a": "คอนโดติดแนวรถไฟฟ้า",
+        "name_b": "บ้านเดี่ยว/ทาวน์โฮมชานเมือง",
+        "details_a": "ประหยัดเวลาเดินทางวันละ 2 ชั่วโมง ใกล้แหล่งงาน ปล่อยเช่าง่าย คุมค่าเดินทางได้",
+        "details_b": "ได้พื้นที่ใช้สอย 3-4 เท่า มีสวน มีที่จอดรถส่วนตัว เลี้ยงสัตว์ได้ เหมาะกับครอบครัว",
+        "target_audience": "คนทำงานรุ่นใหม่และคู่รักที่กำลังเริ่มต้นซื้ออสังหาริมทรัพย์ชิ้นแรก",
+        "key_angles": "ต้นทุนเวลาและค่าเดินทาง เทียบกับพื้นที่ใช้สอยและความสุขของครอบครัว",
+        "affiliate_link_a": "https://shopee.co.th/condo_decor",
+        "affiliate_link_b": "https://shopee.co.th/home_garden",
+    },
+
+    # 🎮 เกมมิ่ง & สตรีมมิ่ง (New Category)
+    {
+        "framework": "price_tier",
+        "category": "🎮 เกมมิ่ง & สตรีมมิ่ง",
+        "topic": "จอคอม IPS 180Hz VS จอเกมมิ่ง OLED 240Hz",
+        "name_a": "จอ IPS 180Hz (หลักพัน)",
+        "name_b": "จอ OLED 240Hz (หลักหมื่น)",
+        "details_a": "ราคาจับต้องได้ง่าย สีสันตรง ไม่ต้องกังวลเรื่องจอเบิร์นอิน ตอบสนองลื่นไหลเพียงพอ",
+        "details_b": "Contrast อนันต์ สีดำสนิท Response Time 0.03ms ไร้โกสต์ ภาพสวยสมจริงระดับเทพ",
+        "target_audience": "เกมเมอร์ สายอีสปอร์ต และคนที่กำลังจัดโต๊ะคอมใหม่",
+        "key_angles": "ความคุ้มค่าของจอราคาประหยัด เทียบกับมิติภาพและรีเฟรชเรทระดับสุดยอด",
+        "affiliate_link_a": "https://shopee.co.th/ips_monitor",
+        "affiliate_link_b": "https://shopee.co.th/oled_monitor",
+    },
+
+    # 🐾 สัตว์เลี้ยง & ของใช้หมาแมว (New Category)
+    {
+        "framework": "myth_vs_reality",
+        "category": "🐾 สัตว์เลี้ยง & ของใช้หมาแมว",
+        "topic": "อาหารแมวเกรด Holistic VS อาหารแมวตลาดทั่วไป",
+        "name_a": "อาหารเกรด Holistic Grain-Free",
+        "name_b": "อาหารแมวเกรด Commercial ทั่วไป",
+        "details_a": "เนื้อสัตว์แท้ไม่มีเศษกระดูก โซเดียมต่ำ ลดความเสี่ยงโรคไตระยะยาว ขนแน่นเงางาม",
+        "details_b": "ราคาประหยัด หาซื้อง่าย กลิ่นหอมกระตุ้นความอยากอาหารของน้องแมวได้ดี",
+        "target_audience": "ทาสแมว และคนที่อยากดูแลสุขภาพสัตว์เลี้ยงระยะยาว",
+        "key_angles": "ค่ายาค่ารักษาโรคไตในอนาคต เทียบกับส่วนต่างราคาค่าอาหารต่อเดือน",
+        "affiliate_link_a": "https://shopee.co.th/holistic_cat_food",
+        "affiliate_link_b": "https://shopee.co.th/daily_cat_food",
     },
 
     # 🙈 Blind Test / Experiment
@@ -726,6 +803,8 @@ TRENDING_COMPARISON_TEMPLATES = [
         "affiliate_link_b": "https://shopee.co.th/oven_deal",
     },
 ]
+
+CATEGORIES = list(dict.fromkeys(item["category"] for item in TRENDING_COMPARISON_TEMPLATES if "category" in item))
 
 
 def get_random_idea(
