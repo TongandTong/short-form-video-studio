@@ -245,8 +245,22 @@ class VideoBuilder:
 
         for i, line in enumerate(lines):
             y = start_y + (i * line_height)
-            draw.text((w // 2 + 1, y + 1), line, font=font, fill=(180, 180, 180), anchor="mm")
-            draw.text((w // 2, y), line, font=font, fill=COLOR_TEXT_DARK, anchor="mm")
+            words = line.split(" ")
+            line_bbox = font.getbbox(line)
+            line_w = line_bbox[2] - line_bbox[0]
+            curr_x = (w - line_w) // 2
+
+            for word in words:
+                w_bbox = font.getbbox(word + " ")
+                w_width = w_bbox[2] - w_bbox[0]
+                is_num_or_stat = bool(re.search(r"(\d+|Hz|GB|%|บาท|ล้าน|แสน|ปี|เท่า)", word))
+                word_color = (20, 140, 20) if is_num_or_stat else COLOR_TEXT_DARK
+
+                # Drop shadow
+                draw.text((curr_x + 1, y + 1), word, font=font, fill=(210, 210, 210, 200), anchor="la")
+                # Main text
+                draw.text((curr_x, y), word, font=font, fill=word_color, anchor="la")
+                curr_x += w_width
 
         return card
 
@@ -616,5 +630,22 @@ class VideoBuilder:
         video.close()
         audio_clip.close()
 
+        # Free memory buffers immediately
+        import gc
+        gc.collect()
+        self._cleanup_old_temp_files()
+
         print(f"[VideoBuilder] Video exported successfully: {output_video_path}")
         return output_video_path
+
+    def _cleanup_old_temp_files(self, max_age_hours: int = 2):
+        """Removes temporary audio/image artifacts older than max_age_hours to prevent disk bloat."""
+        import time
+        now = time.time()
+        cutoff = now - (max_age_hours * 3600)
+        for p in TEMP_DIR.glob("*"):
+            try:
+                if p.is_file() and p.stat().st_mtime < cutoff:
+                    p.unlink()
+            except Exception:
+                pass

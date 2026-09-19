@@ -42,10 +42,13 @@ from ai_script_generator import (
     FRAMEWORK_PRESETS,
     DURATION_MODES,
     CATEGORIES,
+    generate_social_caption,
 )
 from tts_engine import TTSEngine
 from video_builder import VideoBuilder
 from pipeline import hex_to_rgb
+from image_fetcher import auto_fetch_or_create_image
+from content_history import load_history, add_history_entry, delete_history_entry
 
 # Header
 st.markdown(
@@ -113,6 +116,29 @@ with st.sidebar:
             save_channel_profile(prof)
             st.session_state.channel_profile = prof
             st.toast("✅ บันทึกโปรไฟล์เพจและลายน้ำเรียบร้อยแล้ว!")
+
+    st.divider()
+    st.markdown("### 📚 คลังประวัติคลิปที่สร้าง")
+    history_items = load_history()
+    with st.expander(f"🎬 ประวัติคลิปย้อนหลัง ({len(history_items)} คลิป)", expanded=False):
+        if not history_items:
+            st.caption("ยังไม่มีประวัติการสร้างคลิปในระบบ")
+        else:
+            for item in history_items[:8]:
+                st.markdown(f"**📌 {item.get('topic', 'ไม่มีหัวข้อ')}**")
+                st.caption(f"⏱️ {item.get('date_str', '')} | {item.get('duration_seconds', 0)} วินาที")
+                v_p = item.get("video_path")
+                if v_p and Path(v_p).exists():
+                    with open(v_p, "rb") as vf:
+                        st.download_button(
+                            "⬇️ โหลดวิดีโอ MP4",
+                            data=vf,
+                            file_name=Path(v_p).name,
+                            mime="video/mp4",
+                            key=f"dl_hist_{item.get('id')}",
+                            use_container_width=True,
+                        )
+                st.divider()
 
     st.divider()
     st.markdown("### 🛠️ เครื่องมือในระบบ")
@@ -287,28 +313,127 @@ with tab1:
         st.session_state.input_framework = selected_fw
         st.info(f"💡 **แนวทาง:** {FRAMEWORK_PRESETS[selected_fw]['desc']}")
 
-    if st.button("🚀 สั่งให้ Gemini ทำ Deep Research & ร่างบทใหม่ทันที", type="primary", use_container_width=True):
-        with st.spinner("🤖 Gemini กำลังทำ Deep Research วิเคราะห์สเปก จุดแข็ง จุดด้อย และร่างบทตาม Framework..."):
-            try:
-                gen = AIScriptGenerator()
-                new_data = gen.generate_script(
-                    topic=in_topic,
-                    name_a=in_name_a,
-                    name_b=in_name_b,
-                    details_a=in_details_a,
-                    details_b=in_details_b,
-                    target_audience=in_target,
-                    key_angles=in_angles,
-                    affiliate_link_a=aff_a,
-                    affiliate_link_b=aff_b,
-                    script_mode=selected_mode,
-                    channel_outro_cta=st.session_state.channel_profile.get("default_outro_cta", ""),
-                    framework=selected_fw,
-                )
-                st.session_state.script_data = new_data
-                st.success("✅ ทำการวิเคราะห์และสร้างบทเรียบร้อยแล้ว! คลิกไปที่แท็บ '2. ตรวจบท & สั่งรีไรท์' ได้เลยครับ")
-            except Exception as e:
-                st.error(f"เกิดข้อผิดพลาดในการเรียก AI: {e}")
+    auto_fetch_enabled = st.checkbox("📸 ค้นหา/สร้างรูปภาพสินค้า A & B อัตโนมัติ (ไม่ต้องเสียเวลาหาเซฟรูปเอง)", value=True)
+
+    c_btn1, c_btn2 = st.columns([1, 1], gap="medium")
+    with c_btn1:
+        if st.button("🚀 สั่ง Gemini ร่างบท (เข้าสู่ห้องตรวจบท)", type="secondary", use_container_width=True):
+            with st.spinner("🤖 Gemini กำลังทำ Deep Research วิเคราะห์สเปก จุดแข็ง จุดด้อย และร่างบทตาม Framework..."):
+                try:
+                    gen = AIScriptGenerator()
+                    new_data = gen.generate_script(
+                        topic=in_topic,
+                        name_a=in_name_a,
+                        name_b=in_name_b,
+                        details_a=in_details_a,
+                        details_b=in_details_b,
+                        target_audience=in_target,
+                        key_angles=in_angles,
+                        affiliate_link_a=aff_a,
+                        affiliate_link_b=aff_b,
+                        script_mode=selected_mode,
+                        channel_outro_cta=st.session_state.channel_profile.get("default_outro_cta", ""),
+                        framework=selected_fw,
+                    )
+                    st.session_state.script_data = new_data
+                    st.success("✅ ทำการวิเคราะห์และสร้างบทเรียบร้อยแล้ว! คลิกไปที่แท็บ '2. ตรวจบท & สั่งรีไรท์' ได้เลยครับ")
+                except Exception as e:
+                    st.error(f"เกิดข้อผิดพลาดในการเรียก AI: {e}")
+
+    with c_btn2:
+        if st.button("⚡ 1-Click Viral Auto-Pilot (คลิกเดียวจบครบวงจร)", type="primary", use_container_width=True):
+            status_box = st.status("⚡ กำลังรันโหมด Auto-Pilot สร้างคลิปครบวงจร...", expanded=True)
+            with status_box:
+                try:
+                    # 1. AI Research & Script
+                    st.write("🤖 1/4: Gemini กำลังทำ Deep Research & เขียนบทตาม Framework...")
+                    gen = AIScriptGenerator()
+                    new_data = gen.generate_script(
+                        topic=in_topic,
+                        name_a=in_name_a,
+                        name_b=in_name_b,
+                        details_a=in_details_a,
+                        details_b=in_details_b,
+                        target_audience=in_target,
+                        key_angles=in_angles,
+                        affiliate_link_a=aff_a,
+                        affiliate_link_b=aff_b,
+                        script_mode=selected_mode,
+                        channel_outro_cta=st.session_state.channel_profile.get("default_outro_cta", ""),
+                        framework=selected_fw,
+                    )
+                    st.session_state.script_data = new_data
+
+                    # 2. Auto-fetch or generate images
+                    st.write(f"📸 2/4: กำลังค้นหารูปภาพอัตโนมัติสำหรับ '{in_name_a}' และ '{in_name_b}'...")
+                    t_now = int(time.time())
+                    img_a_path = ASSETS_DIR / "images" / f"auto_a_{t_now}.png"
+                    img_b_path = ASSETS_DIR / "images" / f"auto_b_{t_now}.png"
+                    auto_fetch_or_create_image(in_name_a, img_a_path, is_item_b=False, allow_web_search=auto_fetch_enabled)
+                    auto_fetch_or_create_image(in_name_b, img_b_path, is_item_b=True, allow_web_search=auto_fetch_enabled)
+
+                    # 3. Synthesize Voice
+                    st.write("🎙️ 3/4: สังเคราะห์เสียงพากย์ Edge Neural + มิกซ์ Lo-Fi BGM & SFX...")
+                    tts = TTSEngine(voice_key="edge_niwat", speech_rate="+10%", speech_pitch="+2Hz")
+                    output_mp4 = OUTPUT_DIR / f"shorts_autopilot_{t_now}.mp4"
+                    master_audio_path = output_mp4.parent / f"{output_mp4.stem}_audio.mp3"
+                    timeline, audio_file, total_duration = tts.build_timeline(
+                        script_data=st.session_state.script_data,
+                        output_master_audio=master_audio_path,
+                        include_bgm=True,
+                        bgm_volume=0.12,
+                        include_sfx=True,
+                    )
+
+                    # 4. Render Video
+                    st.write(f"🎬 4/4: กำลังเรนเดอร์วิดีโอ 1080x1920 (ความยาว {total_duration:.1f} วินาที)...")
+                    builder = VideoBuilder(
+                        bg_color=hex_to_rgb("#F5F2EB"),
+                        highlight_color=hex_to_rgb("#32CD32"),
+                        animation_style="pointer_and_border",
+                    )
+                    prof = st.session_state.channel_profile
+                    wm_text = prof.get("watermark_text", "@WhyItWorks")
+                    wm_opac = float(prof.get("watermark_opacity", 0.75))
+                    saved_logo = prof.get("logo_path", "")
+                    wm_logo = Path(saved_logo) if saved_logo and Path(saved_logo).exists() else None
+
+                    final_video = builder.build_video(
+                        image_a_path=img_a_path,
+                        image_b_path=img_b_path,
+                        character_path=IMAGES_DIR / "character_host.png",
+                        topic=new_data.get("topic"),
+                        name_a=new_data.get("name_a"),
+                        name_b=new_data.get("name_b"),
+                        timeline=timeline,
+                        master_audio_path=audio_file,
+                        output_video_path=output_mp4,
+                        watermark_logo_path=wm_logo,
+                        watermark_text=wm_text,
+                        watermark_opacity=wm_opac,
+                    )
+
+                    cover_path = output_mp4.parent / f"{output_mp4.stem}_cover.jpg"
+                    add_history_entry(
+                        topic=new_data.get("topic"),
+                        name_a=new_data.get("name_a"),
+                        name_b=new_data.get("name_b"),
+                        video_path=str(final_video),
+                        cover_path=str(cover_path) if cover_path.exists() else None,
+                        social_caption=new_data.get("social_caption", ""),
+                        hashtags=new_data.get("hashtags", ""),
+                        affiliate_comment=new_data.get("affiliate_comment", ""),
+                        framework=selected_fw,
+                        duration_mode=selected_mode,
+                        duration_seconds=total_duration,
+                    )
+
+                    st.session_state.rendered_video_path = str(final_video)
+                    status_box.update(label=f"🎉 Auto-Pilot สำเร็จ! สร้างคลิปเสร็จสมบูรณ์ใน {total_duration:.1f} วินาที", state="complete")
+                    st.success("✅ คลิปวิดีโอถูกสร้างเรียบร้อยแล้ว! เลื่อนไปดูหรือกดที่แท็บ '4. เรนเดอร์ & พรีวิวคลิป' ได้เลยครับ")
+                except Exception as e:
+                    status_box.update(label=f"เกิดข้อผิดพลาด: {e}", state="error")
+                    st.error(f"เกิดข้อผิดพลาด: {e}")
 
 # -------------------------------------------------------------
 # TAB 2: SCRIPT STUDIO & REWRITER
@@ -631,15 +756,22 @@ with tab4:
             with open(path_custom_bg, "wb") as f:
                 f.write(up_bg.getbuffer())
 
+        t_now = int(time.time())
         if up_a:
-            path_a = ASSETS_DIR / "images" / f"up_a_{int(time.time())}.png"
+            path_a = ASSETS_DIR / "images" / f"up_a_{t_now}.png"
             with open(path_a, "wb") as f:
                 f.write(up_a.getbuffer())
+        else:
+            name_a_val = st.session_state.script_data.get("name_a", "A")
+            path_a = auto_fetch_or_create_image(name_a_val, ASSETS_DIR / "images" / f"auto_a_{t_now}.png", is_item_b=False)
 
         if up_b:
-            path_b = ASSETS_DIR / "images" / f"up_b_{int(time.time())}.png"
+            path_b = ASSETS_DIR / "images" / f"up_b_{t_now}.png"
             with open(path_b, "wb") as f:
                 f.write(up_b.getbuffer())
+        else:
+            name_b_val = st.session_state.script_data.get("name_b", "B")
+            path_b = auto_fetch_or_create_image(name_b_val, ASSETS_DIR / "images" / f"auto_b_{t_now}.png", is_item_b=True)
 
         if char_mode == "single_upload" and up_char:
             path_char = ASSETS_DIR / "images" / f"up_char_{int(time.time())}.png"
@@ -731,6 +863,22 @@ with tab4:
             progress_box.update(label=f"✅ เรนเดอร์วิดีโอ 1080x1920 สำเร็จสมบูรณ์ใน {elapsed:.1f} วินาที!", state="complete")
             st.session_state.rendered_video_path = str(final_video)
 
+            # Record in content history
+            c_path = output_mp4.parent / f"{output_mp4.stem}_cover.jpg"
+            add_history_entry(
+                topic=st.session_state.script_data.get("topic", ""),
+                name_a=st.session_state.script_data.get("name_a", "A"),
+                name_b=st.session_state.script_data.get("name_b", "B"),
+                video_path=str(final_video),
+                cover_path=str(c_path) if c_path.exists() else None,
+                social_caption=st.session_state.script_data.get("social_caption", ""),
+                hashtags=st.session_state.script_data.get("hashtags", ""),
+                affiliate_comment=st.session_state.script_data.get("affiliate_comment", ""),
+                framework=st.session_state.script_data.get("framework", "persona"),
+                duration_mode=st.session_state.script_data.get("mode", "deep_3round"),
+                duration_seconds=total_duration,
+            )
+
     # Display Results if available
     if st.session_state.rendered_video_path and Path(st.session_state.rendered_video_path).exists():
         v_path = Path(st.session_state.rendered_video_path)
@@ -762,5 +910,9 @@ with tab4:
                         use_container_width=True,
                     )
 
-            st.markdown("#### 📋 ข้อความสำหรับปักหมุดคอมเมนต์แรก (Auto-Pin Comment):")
+            st.markdown("#### 📱 แคปชั่น & แฮชแท็กสำหรับโพสต์ลงโซเชียล (Copy ได้ทันที):")
+            social_cap = st.session_state.script_data.get("social_caption") or generate_social_caption(st.session_state.script_data)["social_caption"]
+            st.code(social_cap, language="text")
+
+            st.markdown("#### 📌 ข้อความสำหรับปักหมุดคอมเมนต์แรก (Auto-Pin Comment):")
             st.code(st.session_state.script_data.get("affiliate_comment", ""), language="text")

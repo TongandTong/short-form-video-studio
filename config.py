@@ -20,6 +20,8 @@ if str(BASE_DIR) not in sys.path:
 ASSETS_DIR = BASE_DIR / "assets"
 IMAGES_DIR = ASSETS_DIR / "images"
 FONTS_DIR = ASSETS_DIR / "fonts"
+FONT_BOLD = FONTS_DIR / "Kanit-Bold.ttf"
+FONT_REGULAR = FONTS_DIR / "Sarabun-Bold.ttf"
 SCRIPTS_DIR = ASSETS_DIR / "scripts"
 AUDIO_DIR = ASSETS_DIR / "audio"
 OUTPUT_DIR = BASE_DIR / "output"

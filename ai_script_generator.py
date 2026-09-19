@@ -185,6 +185,61 @@ DURATION_MODES: Dict[str, Dict[str, Any]] = {
 }
 
 
+def generate_social_caption(data: Dict[str, Any]) -> Dict[str, str]:
+    """Generates an engaging, high-CTR social media caption and trending hashtags."""
+    topic = data.get("topic", "")
+    name_a = data.get("name_a", "A")
+    name_b = data.get("name_b", "B")
+    hook = data.get("hook", "")
+    fw = data.get("framework", "persona")
+    is_pairing = fw == "perfect_pairing"
+
+    clean_a = re.sub(r"[^\w\u0E00-\u0E7F]", "", name_a)
+    clean_b = re.sub(r"[^\w\u0E00-\u0E7F]", "", name_b)
+
+    if is_pairing:
+        caption_lines = [
+            f"✨ ทำไม {name_a} + {name_b} ถึงเป็นคู่แท้ที่ต้องลองสักครั้งในชีวิต! 🤝",
+            f"หลายคนอาจจะยังไม่รู้ว่าความเข้ากันทางเคมีและรสชาติมันลงตัวขนาดไหน...",
+            "👇 ใครเคยลองสูตรนี้แล้วบ้าง คอมเมนต์บอกหน่อยว่าฟินจริงไหม!",
+        ]
+        tags = [
+            "#WhyItWorks",
+            "#คู่แท้",
+            "#สูตรเด็ด",
+            f"#{clean_a}" if clean_a else "",
+            f"#{clean_b}" if clean_b else "",
+            "#สาระน่ารู้",
+            "#TikTokสายความรู้",
+            "#เรื่องนี้ต้องรู้",
+        ]
+    else:
+        caption_lines = [
+            f"🥊 {topic} เลือกตัวไหนดีกว่ากันแน่? สรุปจบในคลิปเดียว!",
+            f"{hook[:90]}..." if hook else f"เทียบหมัดต่อหมัดระหว่าง {name_a} กับ {name_b} แบบเจาะลึก",
+            "💬 คุณอยู่ทีมไหน? โหวตกันในคอมเมนต์เลย! (พิกัดปักหมุดไว้ในคอมเมนต์แรกแล้วครับ)",
+        ]
+        tags = [
+            "#WhyItWorks",
+            "#เปรียบเทียบ",
+            f"#{clean_a}" if clean_a else "",
+            f"#{clean_b}" if clean_b else "",
+            "#รู้หรือไม่",
+            "#สาระน่ารู้",
+            "#ของมันต้องมี",
+            "#TikTokสายความรู้",
+            "#เทรนด์วันนี้",
+        ]
+
+    caption_text = "\n".join(caption_lines)
+    tags_clean = [t for t in tags if t and t != "#"]
+    tags_text = " ".join(tags_clean)
+    return {
+        "social_caption": f"{caption_text}\n\n{tags_text}",
+        "hashtags": tags_text,
+    }
+
+
 class AIScriptGenerator:
     """Generates deep, fact-based Thai comparison scripts using Gemini 3.6 / 3.5 Flash."""
 
@@ -404,6 +459,12 @@ class AIScriptGenerator:
 
         segments.append({"id": "conclusion", "text": data.get("conclusion", ""), "highlight": "none", "round_label": "🏁 สรุปฟันธง"})
         data["segments"] = segments
+
+        # Generate Social Caption & Hashtags
+        social_info = generate_social_caption(data)
+        data["social_caption"] = data.get("social_caption") or social_info["social_caption"]
+        data["hashtags"] = data.get("hashtags") or social_info["hashtags"]
+
         return data
 
     def rewrite_script(
