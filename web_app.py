@@ -1486,7 +1486,7 @@ with tab_queue:
                 u_aff_a = st.text_input("ลิงก์ Affiliate สินค้า A:", value="https://shopee.co.th", key="u_input_aff_a")
                 u_file_a = st.file_uploader("📁 อัปโหลดรูปสินค้า A (ถ้ามี):", type=["png", "jpg", "jpeg", "webp"], key="u_file_a")
             with col_u2:
-                u_fw = st.selectbox("กรอบการเล่าเรื่อง:", options=list(FRAMEWORK_PRESETS.keys()), format_func=lambda k: FRAMEWORK_PRESETS[k]["title"], key="u_select_fw")
+                u_fw = st.selectbox("กรอบการเล่าเรื่อง:", options=list(FRAMEWORK_PRESETS.keys()), format_func=lambda k: FRAMEWORK_PRESETS.get(k, {}).get("name", k), key="u_select_fw")
                 u_name_b = st.text_input("ชื่อสินค้า B (ฝั่งขวา):", placeholder="เช่น แปรงธรรมดา", key="u_input_name_b")
                 u_aff_b = st.text_input("ลิงก์ Affiliate สินค้า B:", value="https://shopee.co.th", key="u_input_aff_b")
                 u_file_b = st.file_uploader("📁 อัปโหลดรูปสินค้า B (ถ้ามี):", type=["png", "jpg", "jpeg", "webp"], key="u_file_b")

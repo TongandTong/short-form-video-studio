@@ -205,12 +205,23 @@ class VideoBuilder:
         return badge
 
     def _wrap_text(self, text: str, font: ImageFont.FreeTypeFont, max_width: int) -> List[str]:
-        words = text.split(" ")
+        cluster_pat = re.compile(r'[\u0E40-\u0E44]?[\u0E01-\u0E2E][\u0E30-\u0E3A\u0E47-\u0E4E]*|[A-Za-z0-9]+|[^\s\u0E00-\u0E7F]|\s+')
+        words = text.split(" ") if " " in text else [text]
+        tokens = []
+        for word in words:
+            bbox = font.getbbox(word) if hasattr(font, "getbbox") else (0, 0, len(word) * 20, 30)
+            if (bbox[2] - bbox[0]) > max_width:
+                # Break long unbroken Thai sentence into clusters
+                clusters = cluster_pat.findall(word)
+                tokens.extend(clusters)
+            else:
+                tokens.append(word)
+
         lines = []
         current_line = ""
-
-        for word in words:
-            test_line = f"{current_line} {word}".strip()
+        for token in tokens:
+            connector = " " if current_line and not current_line.endswith(" ") and not re.match(r'[\u0E00-\u0E7F]', token) else ""
+            test_line = f"{current_line}{connector}{token}".strip()
             bbox = font.getbbox(test_line)
             line_w = bbox[2] - bbox[0]
             if line_w <= max_width:
@@ -218,7 +229,7 @@ class VideoBuilder:
             else:
                 if current_line:
                     lines.append(current_line)
-                current_line = word
+                current_line = token
 
         if current_line:
             lines.append(current_line)
@@ -264,25 +275,25 @@ class VideoBuilder:
         if not text:
             return card
 
-        # Dynamic font sizing: In clean_floating mode, text is larger and punchier
-        base_size = 40 if style == "clean_floating" else 36
+        # Dynamic font sizing: In clean_floating mode, text is punchy and readable
+        base_size = 38 if style == "clean_floating" else 34
         if len(text) > 65:
-            base_size = 30 if style == "clean_floating" else 28
-        elif len(text) > 42:
-            base_size = 35 if style == "clean_floating" else 32
+            base_size = 28 if style == "clean_floating" else 26
+        elif len(text) > 40:
+            base_size = 33 if style == "clean_floating" else 30
 
         font = self._load_font(base_size, bold=True)
         max_txt_w = w - 40 if style == "clean_floating" else w - 80
         lines = self._wrap_text(text, font, max_width=max_txt_w)
 
-        if len(lines) > 2 and base_size > 28:
-            base_size = 28
+        if len(lines) > 2 and base_size > 26:
+            base_size = 26
             font = self._load_font(base_size, bold=True)
             lines = self._wrap_text(text, font, max_width=max_txt_w)
 
-        line_height = int(base_size * 1.55)
+        line_height = int(base_size * 1.65)
         total_text_h = len(lines) * line_height
-        start_y = (h - total_text_h) // 2 + text_offset_y
+        start_y = max(8, (h - total_text_h) // 2 + text_offset_y)
 
         space_w = int(font.getlength(" ")) if hasattr(font, "getlength") else 14
 
