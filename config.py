@@ -172,9 +172,13 @@ DEFAULT_CHANNEL_PROFILE = {
     "char_mouth_open": "",
     "char_gif_path": "",
     "char_pose_think": "",
+    "char_pose_think_open": "",
     "char_pose_a": "",
+    "char_pose_a_open": "",
     "char_pose_b": "",
+    "char_pose_b_open": "",
     "char_pose_neutral": "",
+    "char_pose_neutral_open": "",
     "default_image_mode": "ai_cartoon",  # "ai_cartoon" | "web_search" | "minimal_card"
     "default_art_style": "3d_pixar",    # "3d_pixar" | "2d_flat" | "ghibli" | "claymation" | "cyberpunk"
 }

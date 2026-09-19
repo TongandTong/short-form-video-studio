@@ -1466,160 +1466,163 @@ with tab_settings:
     with c_vs2:
         s_char_mode = st.radio(
             "รูปแบบตัวละครมาสคอตพิธีกร (Mascot):",
-            options=["builtin", "mouth_pair", "single_upload", "gif_animation", "multi_pose"],
-            index=["builtin", "mouth_pair", "single_upload", "gif_animation", "multi_pose"].index(prof.get("default_char_mode", "builtin")) if prof.get("default_char_mode") in ["builtin", "mouth_pair", "single_upload", "gif_animation", "multi_pose"] else 0,
+            options=["multi_pose", "builtin"],
+            index=0 if prof.get("default_char_mode", "multi_pose") == "multi_pose" else 1,
             format_func=lambda x: {
-                "builtin": "✨ มาสคอตระบบ (4 ท่าครบ + ขยับปากพูดอัตโนมัติ)",
-                "mouth_pair": "👄 สลับปาก 2 รูป (หุบปาก / อ้าปาก) — แนะนำ! วาดแค่ 2 รูป ระบบสลับชี้ซ้าย-ขวา & ขยับปากพูดให้อัตโนมัติ",
-                "single_upload": "🖼️ รูปเดี่ยวเต็มตัว (ยืนนิ่งสง่า + สลับชี้ซ้าย-ขวาให้อัตโนมัติ)",
-                "gif_animation": "🎬 ไฟล์ GIF พื้นหลังใส (เล่นวนลูปจังหวะพูดอัตโนมัติ)",
-                "multi_pose": "🎨 อัปโหลดแยก 4 ท่าทาง (คิด, ชี้ A, ชี้ B, สรุป)",
+                "multi_pose": "🎨 มาสคอตคัสตอม 8 รูป (4 ท่า x หุบปาก/อ้าปาก) — สำหรับคลิปเนียนระดับโปร",
+                "builtin": "✨ มาสคอตระบบ VSIFY Host (ตัวเริ่มต้น)",
             }[x],
             key="set_char_mode",
         )
 
-        if s_char_mode == "mouth_pair":
-            st.caption("💡 **วาดแค่ 2 รูปเท่านั้น:** รูปหุบปาก และรูปอ้าปาก (ระบบจะซิงก์ปากพูดตามเสียง และ Mirror ซ้าย-ขวาให้อัตโนมัติ ไม่ต้องวาดแยก 2 ฝั่ง)")
-            c_mp1, c_mp2 = st.columns(2)
-            with c_mp1:
-                cur_cl = prof.get("char_mouth_closed", "") or prof.get("char_single_path", "")
-                if cur_cl and Path(cur_cl).exists():
-                    st.image(cur_cl, width=110, caption="1. ท่าหุบปาก (ปัจจุบัน)")
-                up_cl = st.file_uploader("1. รูปท่ายืน/ชี้ (หุบปาก):", type=["png", "jpg", "jpeg"], key="set_up_closed")
-                if up_cl:
-                    p_cl = ASSETS_DIR / "images" / "char_mouth_closed.png"
-                    try:
-                        clean_im = remove_fake_checkerboard_bg(Image.open(up_cl))
-                        clean_im.save(p_cl, "PNG")
-                    except Exception:
-                        with open(p_cl, "wb") as f:
-                            f.write(up_cl.getbuffer())
-                    prof["char_mouth_closed"] = str(p_cl)
-                    prof["char_single_path"] = str(p_cl)
-                    st.success("✅ อัปโหลดรูปหุบปากสำเร็จ!")
+        if s_char_mode == "multi_pose":
+            st.markdown("##### 📥 อัปโหลดรูปมาสคอตเต็มตัว 8 รูป (4 ท่าทาง x หุบปาก/อ้าปาก)")
+            st.caption("💡 **วาดเห็นเต็มตัวตั้งแต่หัวจรดเท้าได้เลยครับ:** ระบบจัดวางให้เท้ายืนบนพื้นสตูดิโอ มีเงามิติที่พื้น และศีรษะอยู่ใต้ซับไตเติลพอดีเป๊ะ พร้อมตัดพื้นหลังโปร่งใสให้อัตโนมัติ")
 
-            with c_mp2:
-                cur_op = prof.get("char_mouth_open", "")
-                if cur_op and Path(cur_op).exists():
-                    st.image(cur_op, width=110, caption="2. ท่าอ้าปาก (ปัจจุบัน)")
-                up_op = st.file_uploader("2. รูปท่ายืน/ชี้ (อ้าปาก):", type=["png", "jpg", "jpeg"], key="set_up_open")
-                if up_op:
-                    p_op = ASSETS_DIR / "images" / "char_mouth_open.png"
-                    try:
-                        clean_im = remove_fake_checkerboard_bg(Image.open(up_op))
-                        clean_im.save(p_op, "PNG")
-                    except Exception:
-                        with open(p_op, "wb") as f:
-                            f.write(up_op.getbuffer())
-                    prof["char_mouth_open"] = str(p_op)
-                    st.success("✅ อัปโหลดรูปอ้าปากสำเร็จ!")
-
-        elif s_char_mode == "single_upload":
-            cur_sp = prof.get("char_single_path", "")
-            if cur_sp and Path(cur_sp).exists():
-                c_sp_im, c_sp_act = st.columns([1, 2])
-                with c_sp_im:
-                    st.image(cur_sp, width=110, caption="มาสคอตปัจจุบัน")
-                with c_sp_act:
-                    if st.button("🪄 ลบตารางหมากรุก / สีพื้นหลัง (Auto Clean)", key="clean_mascot_btn", help="คลิกเพื่อลบตารางหมากรุกหรือพื้นหลังสีทึบของรูปมาสคอตให้โปร่งใส 100% ทันที"):
+            # 1. ท่าคิด (Hook)
+            with st.expander("🤔 ท่าที่ 1: ท่าคิด (ใช้ตอนเปิดคลิป Hook)", expanded=True):
+                c_t1, c_t2 = st.columns(2)
+                with c_t1:
+                    cur_t_cl = prof.get("char_pose_think", "")
+                    if cur_t_cl and Path(cur_t_cl).exists():
+                        st.image(cur_t_cl, width=90, caption="1.1 ท่าคิด (หุบปาก)")
+                    up_t_cl = st.file_uploader("1.1 ท่าคิด — หุบปาก (PNG เต็มตัว):", type=["png", "jpg", "jpeg"], key="up_t_cl")
+                    if up_t_cl:
+                        p_t_cl = ASSETS_DIR / "images" / "char_pose_think.png"
                         try:
-                            raw_im = Image.open(cur_sp)
-                            clean_im = remove_fake_checkerboard_bg(raw_im)
-                            clean_im.save(cur_sp, "PNG")
-                            st.success("✨ ปรับพื้นหลังให้โปร่งใส 100% สำเร็จ!")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"ไม่สามารถปรับแต่งได้: {e}")
+                            clean_im = remove_fake_checkerboard_bg(Image.open(up_t_cl))
+                            clean_im.save(p_t_cl, "PNG")
+                        except Exception:
+                            with open(p_t_cl, "wb") as f:
+                                f.write(up_t_cl.getbuffer())
+                        prof["char_pose_think"] = str(p_t_cl)
+                        st.success("✅ อัปโหลดท่าคิด (หุบปาก) สำเร็จ!")
 
-            up_single = st.file_uploader("อัปโหลดรูปมาสคอตเดี่ยวเต็มตัว (PNG/JPG):", type=["png", "jpg", "jpeg"], key="set_up_single")
-            if up_single:
-                sp = ASSETS_DIR / "images" / "character_single.png"
-                try:
-                    raw_im = Image.open(up_single)
-                    clean_im = remove_fake_checkerboard_bg(raw_im)
-                    clean_im.save(sp, "PNG")
-                except Exception:
-                    with open(sp, "wb") as f:
-                        f.write(up_single.getbuffer())
-                prof["char_single_path"] = str(sp)
-                st.success("✅ อัปโหลดและปรับพื้นหลังโปร่งใสอัตโนมัติสำเร็จ!")
+                with c_t2:
+                    cur_t_op = prof.get("char_pose_think_open", "")
+                    if cur_t_op and Path(cur_t_op).exists():
+                        st.image(cur_t_op, width=90, caption="1.2 ท่าคิด (อ้าปาก)")
+                    up_t_op = st.file_uploader("1.2 ท่าคิด — อ้าปากพูด (PNG เต็มตัว):", type=["png", "jpg", "jpeg"], key="up_t_op")
+                    if up_t_op:
+                        p_t_op = ASSETS_DIR / "images" / "char_pose_think_open.png"
+                        try:
+                            clean_im = remove_fake_checkerboard_bg(Image.open(up_t_op))
+                            clean_im.save(p_t_op, "PNG")
+                        except Exception:
+                            with open(p_t_op, "wb") as f:
+                                f.write(up_t_op.getbuffer())
+                        prof["char_pose_think_open"] = str(p_t_op)
+                        st.success("✅ อัปโหลดท่าคิด (อ้าปาก) สำเร็จ!")
 
-        elif s_char_mode == "gif_animation":
-            cur_gif = prof.get("char_gif_path", "")
-            if cur_gif and Path(cur_gif).exists():
-                st.image(cur_gif, width=120, caption="GIF ปัจจุบัน")
-            up_gif = st.file_uploader("อัปโหลดไฟล์ GIF พื้นหลังใส (Transparent GIF):", type=["gif"], key="set_up_gif")
-            if up_gif:
-                gp = ASSETS_DIR / "images" / "character_anim.gif"
-                with open(gp, "wb") as f:
-                    f.write(up_gif.getbuffer())
-                prof["char_gif_path"] = str(gp)
-                st.success("✅ อัปโหลดไฟล์ GIF อนิเมชั่นสำเร็จ!")
+            # 2. ท่าชี้ A (ซ้าย)
+            with st.expander("👈 ท่าที่ 2: ท่าชี้สินค้า A (หันชี้ไปทางซ้าย)", expanded=True):
+                c_a1, c_a2 = st.columns(2)
+                with c_a1:
+                    cur_a_cl = prof.get("char_pose_a", "")
+                    if cur_a_cl and Path(cur_a_cl).exists():
+                        st.image(cur_a_cl, width=90, caption="2.1 ชี้ A (หุบปาก)")
+                    up_a_cl = st.file_uploader("2.1 ท่าชี้ A — หุบปาก (PNG เต็มตัว):", type=["png", "jpg", "jpeg"], key="up_a_cl")
+                    if up_a_cl:
+                        p_a_cl = ASSETS_DIR / "images" / "char_pose_a.png"
+                        try:
+                            clean_im = remove_fake_checkerboard_bg(Image.open(up_a_cl))
+                            clean_im.save(p_a_cl, "PNG")
+                        except Exception:
+                            with open(p_a_cl, "wb") as f:
+                                f.write(up_a_cl.getbuffer())
+                        prof["char_pose_a"] = str(p_a_cl)
+                        st.success("✅ อัปโหลดท่าชี้ A (หุบปาก) สำเร็จ!")
 
-        elif s_char_mode == "multi_pose":
-            st.caption("อัปโหลดรูปแยก 4 ท่าทาง (ระบบลบพื้นหลังตารางหมากรุกให้อัตโนมัติ):")
-            cp1, cp2 = st.columns(2)
-            with cp1:
-                cur_think = prof.get("char_pose_think", "")
-                if cur_think and Path(cur_think).exists():
-                    st.image(cur_think, width=70, caption="1. ท่าคิด")
-                up_p_think = st.file_uploader("1. ท่าคิด (Hook):", type=["png", "jpg", "jpeg"], key="set_p_think")
-                if up_p_think:
-                    pth = ASSETS_DIR / "images" / "char_pose_think.png"
-                    try:
-                        clean_im = remove_fake_checkerboard_bg(Image.open(up_p_think))
-                        clean_im.save(pth, "PNG")
-                    except Exception:
-                        with open(pth, "wb") as f:
-                            f.write(up_p_think.getbuffer())
-                    prof["char_pose_think"] = str(pth)
+                with c_a2:
+                    cur_a_op = prof.get("char_pose_a_open", "")
+                    if cur_a_op and Path(cur_a_op).exists():
+                        st.image(cur_a_op, width=90, caption="2.2 ชี้ A (อ้าปาก)")
+                    up_a_op = st.file_uploader("2.2 ท่าชี้ A — อ้าปากพูด (PNG เต็มตัว):", type=["png", "jpg", "jpeg"], key="up_a_op")
+                    if up_a_op:
+                        p_a_op = ASSETS_DIR / "images" / "char_pose_a_open.png"
+                        try:
+                            clean_im = remove_fake_checkerboard_bg(Image.open(up_a_op))
+                            clean_im.save(p_a_op, "PNG")
+                        except Exception:
+                            with open(p_a_op, "wb") as f:
+                                f.write(up_a_op.getbuffer())
+                        prof["char_pose_a_open"] = str(p_a_op)
+                        st.success("✅ อัปโหลดท่าชี้ A (อ้าปาก) สำเร็จ!")
 
-                cur_a = prof.get("char_pose_a", "")
-                if cur_a and Path(cur_a).exists():
-                    st.image(cur_a, width=70, caption="2. ท่าชี้ A")
-                up_p_a = st.file_uploader("2. ท่าชี้ A (ซ้าย):", type=["png", "jpg", "jpeg"], key="set_p_a")
-                if up_p_a:
-                    pth = ASSETS_DIR / "images" / "char_pose_a.png"
-                    try:
-                        clean_im = remove_fake_checkerboard_bg(Image.open(up_p_a))
-                        clean_im.save(pth, "PNG")
-                    except Exception:
-                        with open(pth, "wb") as f:
-                            f.write(up_p_a.getbuffer())
-                    prof["char_pose_a"] = str(pth)
+            # 3. ท่าชี้ B (ขวา)
+            with st.expander("👉 ท่าที่ 3: ท่าชี้สินค้า B (หันชี้ไปทางขวา)", expanded=True):
+                c_b1, c_b2 = st.columns(2)
+                with c_b1:
+                    cur_b_cl = prof.get("char_pose_b", "")
+                    if cur_b_cl and Path(cur_b_cl).exists():
+                        st.image(cur_b_cl, width=90, caption="3.1 ชี้ B (หุบปาก)")
+                    up_b_cl = st.file_uploader("3.1 ท่าชี้ B — หุบปาก (PNG เต็มตัว):", type=["png", "jpg", "jpeg"], key="up_b_cl")
+                    if up_b_cl:
+                        p_b_cl = ASSETS_DIR / "images" / "char_pose_b.png"
+                        try:
+                            clean_im = remove_fake_checkerboard_bg(Image.open(up_b_cl))
+                            clean_im.save(p_b_cl, "PNG")
+                        except Exception:
+                            with open(p_b_cl, "wb") as f:
+                                f.write(up_b_cl.getbuffer())
+                        prof["char_pose_b"] = str(p_b_cl)
+                        st.success("✅ อัปโหลดท่าชี้ B (หุบปาก) สำเร็จ!")
 
-            with cp2:
-                cur_b = prof.get("char_pose_b", "")
-                if cur_b and Path(cur_b).exists():
-                    st.image(cur_b, width=70, caption="3. ท่าชี้ B")
-                up_p_b = st.file_uploader("3. ท่าชี้ B (ขวา):", type=["png", "jpg", "jpeg"], key="set_p_b")
-                if up_p_b:
-                    pth = ASSETS_DIR / "images" / "char_pose_b.png"
-                    try:
-                        clean_im = remove_fake_checkerboard_bg(Image.open(up_p_b))
-                        clean_im.save(pth, "PNG")
-                    except Exception:
-                        with open(pth, "wb") as f:
-                            f.write(up_p_b.getbuffer())
-                    prof["char_pose_b"] = str(pth)
+                with c_b2:
+                    cur_b_op = prof.get("char_pose_b_open", "")
+                    if cur_b_op and Path(cur_b_op).exists():
+                        st.image(cur_b_op, width=90, caption="3.2 ชี้ B (อ้าปาก)")
+                    up_b_op = st.file_uploader("3.2 ท่าชี้ B — อ้าปากพูด (PNG เต็มตัว):", type=["png", "jpg", "jpeg"], key="up_b_op")
+                    if up_b_op:
+                        p_b_op = ASSETS_DIR / "images" / "char_pose_b_open.png"
+                        try:
+                            clean_im = remove_fake_checkerboard_bg(Image.open(up_b_op))
+                            clean_im.save(p_b_op, "PNG")
+                        except Exception:
+                            with open(p_b_op, "wb") as f:
+                                f.write(up_b_op.getbuffer())
+                        prof["char_pose_b_open"] = str(p_b_op)
+                        st.success("✅ อัปโหลดท่าชี้ B (อ้าปาก) สำเร็จ!")
 
-                cur_neu = prof.get("char_pose_neutral", "")
-                if cur_neu and Path(cur_neu).exists():
-                    st.image(cur_neu, width=70, caption="4. ท่ายิ้มสรุป")
-                up_p_neu = st.file_uploader("4. ท่ายิ้มสรุป:", type=["png", "jpg", "jpeg"], key="set_p_neu")
-                if up_p_neu:
-                    pth = ASSETS_DIR / "images" / "char_pose_neutral.png"
-                    try:
-                        clean_im = remove_fake_checkerboard_bg(Image.open(up_p_neu))
-                        clean_im.save(pth, "PNG")
-                    except Exception:
-                        with open(pth, "wb") as f:
-                            f.write(up_p_neu.getbuffer())
-                    prof["char_pose_neutral"] = str(pth)
+            # 4. ท่ายิ้มสรุป (Conclusion)
+            with st.expander("🎉 ท่าที่ 4: ท่ายิ้มสรุป (ใช้ตอนท้ายคลิป สรุปฟันธง)", expanded=True):
+                c_n1, c_n2 = st.columns(2)
+                with c_n1:
+                    cur_n_cl = prof.get("char_pose_neutral", "")
+                    if cur_n_cl and Path(cur_n_cl).exists():
+                        st.image(cur_n_cl, width=90, caption="4.1 สรุป (หุบปาก)")
+                    up_n_cl = st.file_uploader("4.1 ท่ายิ้มสรุป — หุบปาก (PNG เต็มตัว):", type=["png", "jpg", "jpeg"], key="up_n_cl")
+                    if up_n_cl:
+                        p_n_cl = ASSETS_DIR / "images" / "char_pose_neutral.png"
+                        try:
+                            clean_im = remove_fake_checkerboard_bg(Image.open(up_n_cl))
+                            clean_im.save(p_n_cl, "PNG")
+                        except Exception:
+                            with open(p_n_cl, "wb") as f:
+                                f.write(up_n_cl.getbuffer())
+                        prof["char_pose_neutral"] = str(p_n_cl)
+                        st.success("✅ อัปโหลดท่ายิ้มสรุป (หุบปาก) สำเร็จ!")
+
+                with c_n2:
+                    cur_n_op = prof.get("char_pose_neutral_open", "")
+                    if cur_n_op and Path(cur_n_op).exists():
+                        st.image(cur_n_op, width=90, caption="4.2 สรุป (อ้าปาก)")
+                    up_n_op = st.file_uploader("4.2 ท่ายิ้มสรุป — อ้าปากพูด (PNG เต็มตัว):", type=["png", "jpg", "jpeg"], key="up_n_op")
+                    if up_n_op:
+                        p_n_op = ASSETS_DIR / "images" / "char_pose_neutral_open.png"
+                        try:
+                            clean_im = remove_fake_checkerboard_bg(Image.open(up_n_op))
+                            clean_im.save(p_n_op, "PNG")
+                        except Exception:
+                            with open(p_n_op, "wb") as f:
+                                f.write(up_n_op.getbuffer())
+                        prof["char_pose_neutral_open"] = str(p_n_op)
+                        st.success("✅ อัปโหลดท่ายิ้มสรุป (อ้าปาก) สำเร็จ!")
+
         else:
             builtin_p = IMAGES_DIR / "character_host.png"
             if builtin_p.exists():
-                st.image(str(builtin_p), width=100, caption="มาสคอตระบบ VSIFY Host")
+                st.image(str(builtin_p), width=110, caption="มาสคอตระบบ VSIFY Host (พร้อม 4 ท่าครบชุด)")
 
     st.divider()
 
