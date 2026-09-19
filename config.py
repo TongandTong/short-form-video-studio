@@ -175,6 +175,8 @@ def save_channel_profile(data: dict) -> None:
 
 # Auto-delegation if Streamlit Cloud or user executes config.py as main entrypoint
 if __name__ == "__main__":
+    import sys
+    sys.modules["config"] = sys.modules[__name__]
     import runpy
     _web_app_file = BASE_DIR / "web_app.py"
     if _web_app_file.exists():
