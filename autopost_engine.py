@@ -392,13 +392,25 @@ def publish_to_all_enabled(
         except Exception as e:
             results["webhook"] = (False, f"Webhook Dispatch Error: {e}")
 
-    # Update summary
+    # Update summary and content history
     any_success = any(v[0] for v in results.values())
     if any_success:
         cfg["total_posted_count"] = cfg.get("total_posted_count", 0) + 1
         cfg["last_posted_title"] = title
         cfg["last_status"] = f"โพสต์สำเร็จ ({len(results)} แพลตฟอร์ม) - {title}"
         save_autopost_config(cfg)
+
+        # Update matching entry in content_history
+        try:
+            from content_history import load_history, update_history_post_status
+            hist = load_history()
+            succ_plats = [p for p, (s, _) in results.items() if s]
+            for h in hist:
+                if h.get("video_path") == str(video_path) or Path(h.get("video_path", "")).name == Path(video_path).name:
+                    update_history_post_status(h.get("id"), "posted_auto", succ_plats)
+                    break
+        except Exception as he:
+            print(f"[AutoPost] History status update error: {he}")
 
     return results
 

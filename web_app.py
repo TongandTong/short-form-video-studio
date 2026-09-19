@@ -48,7 +48,7 @@ from tts_engine import TTSEngine
 from video_builder import VideoBuilder
 from pipeline import hex_to_rgb
 from image_fetcher import auto_fetch_or_create_image
-from content_history import load_history, add_history_entry, delete_history_entry
+from content_history import load_history, add_history_entry, delete_history_entry, update_history_post_status
 from scheduler_daemon import (
     ensure_scheduler_running,
     load_autopilot_config,
@@ -111,13 +111,26 @@ st.markdown(
         margin-bottom: 8px;
     }
 
-    /* iOS Segmented Control Tabs */
+    /* Smooth Scrolling */
+    html {
+        scroll-behavior: smooth !important;
+    }
+
+    /* iOS Segmented Control Tabs - Sticky & Locked at Top */
     div[data-baseweb="tab-list"] {
-        background-color: #E5E5EA !important;
-        border-radius: 14px !important;
-        padding: 4px !important;
-        gap: 4px !important;
-        border: none !important;
+        position: -webkit-sticky !important;
+        position: sticky !important;
+        top: 2.85rem !important;
+        z-index: 9999 !important;
+        background: rgba(242, 242, 247, 0.94) !important;
+        backdrop-filter: blur(25px) saturate(190%) !important;
+        -webkit-backdrop-filter: blur(25px) saturate(190%) !important;
+        border-radius: 16px !important;
+        padding: 6px !important;
+        gap: 5px !important;
+        border: 1px solid rgba(0, 0, 0, 0.08) !important;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.07) !important;
+        margin-bottom: 20px !important;
     }
     div[data-baseweb="tab"] {
         border-radius: 10px !important;
@@ -128,7 +141,7 @@ st.markdown(
         transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
     }
     div[data-baseweb="tab"]:hover {
-        background-color: rgba(255, 255, 255, 0.5) !important;
+        background-color: rgba(255, 255, 255, 0.6) !important;
     }
     div[data-baseweb="tab"][aria-selected="true"] {
         background-color: #FFFFFF !important;
@@ -302,6 +315,13 @@ with st.sidebar:
         else:
             for item in history_items[:8]:
                 st.markdown(f"**📌 {item.get('topic', 'ไม่มีหัวข้อ')}**")
+                p_st = item.get("post_status", "draft")
+                if p_st == "posted_auto":
+                    st.markdown("🟢 <span style='font-size:12px; color:#34C759; font-weight:600;'>โพสต์อัตโนมัติแล้ว</span>", unsafe_allow_html=True)
+                elif p_st == "posted_manual":
+                    st.markdown("🔵 <span style='font-size:12px; color:#007AFF; font-weight:600;'>โพสต์เองแล้ว</span>", unsafe_allow_html=True)
+                else:
+                    st.markdown("🟡 <span style='font-size:12px; color:#FF9500; font-weight:600;'>ยังไม่โพสต์ (Draft)</span>", unsafe_allow_html=True)
                 st.caption(f"⏱️ {item.get('date_str', '')} | {item.get('duration_seconds', 0)} วินาที")
                 v_p = item.get("video_path")
                 if v_p and Path(v_p).exists():
@@ -1450,6 +1470,128 @@ with tab6:
                                 st.success(f"[{p_name.upper()}] ✅ {p_msg}")
                             else:
                                 st.error(f"[{p_name.upper()}] ❌ {p_msg}")
+
+    st.divider()
+
+    # Part 3: Video Post Tracker & Queue
+    st.markdown(
+        """
+        <div class="ios-card">
+            <div style="font-size: 17px; font-weight: 700; color: #1C1C1E; margin-bottom: 6px;">
+                📋 3. ตารางติดตาม & จัดการสถานะการโพสต์ (Video Post Tracker & Queue)
+            </div>
+            <div style="font-size: 13.5px; color: #636366; line-height: 1.4;">
+                ดูรายชื่อคลิปทั้งหมดที่สร้างไว้ ตรวจสอบว่าคลิปไหนยังไม่ได้โพสต์ (Draft) คลิปไหนโพสต์อัตโนมัติแล้ว หรือคลิปไหนที่คุณนำไปโพสต์ด้วยตัวเอง พร้อมปุ่มอัปเดตสถานะและสั่งโพสต์ทีละคลิป
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    all_history = load_history()
+    draft_count = sum(1 for h in all_history if h.get("post_status", "draft") == "draft")
+    auto_count = sum(1 for h in all_history if h.get("post_status") == "posted_auto")
+    manual_count = sum(1 for h in all_history if h.get("post_status") == "posted_manual")
+
+    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+    with col_m1:
+        st.metric("📦 คลิปทั้งหมด", f"{len(all_history)} คลิป")
+    with col_m2:
+        st.metric("🟡 ยังไม่โพสต์ (Draft)", f"{draft_count} คลิป")
+    with col_m3:
+        st.metric("🟢 โพสต์อัตโนมัติ", f"{auto_count} คลิป")
+    with col_m4:
+        st.metric("🔵 โพสต์เองแล้ว", f"{manual_count} คลิป")
+
+    filter_choice = st.radio(
+        "กรองตามสถานะ:",
+        options=["ทั้งหมด", "🟡 ยังไม่โพสต์ (Draft)", "🟢 โพสต์อัตโนมัติแล้ว", "🔵 โพสต์เองแล้ว"],
+        horizontal=True,
+        key="rad_filter_post_status",
+    )
+
+    filtered_list = all_history
+    if filter_choice == "🟡 ยังไม่โพสต์ (Draft)":
+        filtered_list = [h for h in all_history if h.get("post_status", "draft") == "draft"]
+    elif filter_choice == "🟢 โพสต์อัตโนมัติแล้ว":
+        filtered_list = [h for h in all_history if h.get("post_status") == "posted_auto"]
+    elif filter_choice == "🔵 โพสต์เองแล้ว":
+        filtered_list = [h for h in all_history if h.get("post_status") == "posted_manual"]
+
+    if not filtered_list:
+        st.info("ไม่มีคลิปในหมวดหมู่นี้")
+    else:
+        for idx, item in enumerate(filtered_list):
+            item_id = item.get("id", f"item_{idx}")
+            item_status = item.get("post_status", "draft")
+            status_badge = {
+                "draft": "🟡 ยังไม่โพสต์ (Draft พร้อมโพสต์)",
+                "posted_auto": f"🟢 โพสต์อัตโนมัติแล้ว ({', '.join(item.get('post_platforms', [])) or 'โซเชียล'})",
+                "posted_manual": "🔵 โพสต์เองแล้ว (Manual Posted)",
+            }.get(item_status, "🟡 ยังไม่โพสต์")
+
+            with st.expander(f"📌 {item.get('topic', 'ไม่มีชื่อ')} — {status_badge}", expanded=(idx < 2)):
+                c_info, c_action = st.columns([3, 2], gap="medium")
+                with c_info:
+                    st.caption(f"⏱️ สร้างเมื่อ: {item.get('date_str', '')} | ความยาว: {item.get('duration_seconds', 0)} วินาที | กรอบ: {item.get('framework', '')}")
+                    if item.get("posted_at"):
+                        st.caption(f"📢 โพสต์เมื่อ: {item.get('posted_at')}")
+
+                    v_path = item.get("video_path")
+                    if v_path and Path(v_path).exists():
+                        with open(v_path, "rb") as vf:
+                            st.download_button(
+                                "⬇️ ดาวน์โหลดวิดีโอ MP4",
+                                data=vf,
+                                file_name=Path(v_path).name,
+                                mime="video/mp4",
+                                key=f"dl_vid_t6_{item_id}",
+                                use_container_width=True,
+                            )
+
+                    st.markdown("**📱 แคปชั่น & แฮชแท็ก:**")
+                    st.code(f"{item.get('social_caption', '')}\n\n{item.get('hashtags', '')}", language="text")
+
+                    if item.get("affiliate_comment"):
+                        st.markdown("**📌 พิกัด Affiliate ปักหมุด:**")
+                        st.code(item.get("affiliate_comment", ""), language="text")
+
+                with c_action:
+                    st.markdown("##### 🛠️ จัดการสถานะการโพสต์")
+
+                    # Button: Publish this specific video now
+                    if st.button("🚀 สั่งโพสต์คลิปนี้ลงโซเชียลเดี๋ยวนี้", key=f"btn_pub_single_{item_id}", type="primary", use_container_width=True):
+                        v_p = item.get("video_path")
+                        if not v_p or not Path(v_p).exists():
+                            st.error("ไม่พบไฟล์วิดีโอในเครื่อง")
+                        else:
+                            c_p = item.get("cover_path")
+                            m_p = Path(v_p).parent / f"{Path(v_p).stem}_meta.json"
+                            with st.spinner(f"กำลังส่งคลิป '{item.get('topic')}' ไปยังแพลตฟอร์มที่เปิดใช้งาน..."):
+                                res = publish_to_all_enabled(
+                                    video_path=v_p,
+                                    cover_path=c_p if c_p and Path(c_p).exists() else None,
+                                    meta_path=str(m_p) if m_p.exists() else None,
+                                )
+                                if res:
+                                    st.success(f"ส่งคำสั่งโพสต์แล้ว ({len(res)} ช่องทาง)")
+                                    st.rerun()
+                                else:
+                                    st.warning("ยังไม่ได้เปิดใช้งานหรือกรอก Token ในแพลตฟอร์มใดๆ")
+
+                    # Button: Mark as Manually Posted
+                    if item_status != "posted_manual":
+                        if st.button("✅ ติ๊กเครื่องหมายว่า 'โพสต์เองแล้ว'", key=f"btn_mark_manual_{item_id}", use_container_width=True):
+                            update_history_post_status(item_id, "posted_manual")
+                            st.toast(f"บันทึกสถานะ 'โพสต์เองแล้ว' สำหรับคลิป: {item.get('topic')} เรียบร้อย!")
+                            st.rerun()
+
+                    # Button: Reset to Draft
+                    if item_status != "draft":
+                        if st.button("🔄 รีเซ็ตกลับเป็น 'ยังไม่โพสต์' (Draft)", key=f"btn_reset_draft_{item_id}", use_container_width=True):
+                            update_history_post_status(item_id, "draft")
+                            st.toast(f"รีเซ็ตคลิป: {item.get('topic')} กลับเป็น Draft แล้ว!")
+                            st.rerun()
 
     # Logs section
     st.divider()
