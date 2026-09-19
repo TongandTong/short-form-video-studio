@@ -50,7 +50,7 @@ from ai_script_generator import (
 from tts_engine import TTSEngine
 from video_builder import VideoBuilder
 from pipeline import hex_to_rgb
-from image_fetcher import auto_fetch_or_create_image
+from image_fetcher import auto_fetch_or_create_image, CARTOON_STYLES
 from content_history import load_history, add_history_entry, delete_history_entry, update_history_post_status
 from scheduler_daemon import (
     ensure_scheduler_running,
@@ -541,13 +541,37 @@ with tab_script:
                     st.session_state.script_data = new_data
                     st.session_state.script_version += 1
 
-                    st.write(f"📸 2/4: กำลังค้นหา/สร้างรูปภาพสำหรับ '{in_name_a}' และ '{in_name_b}'...")
                     t_now = int(time.time())
-                    img_a_path = ASSETS_DIR / "images" / f"auto_a_{t_now}.png"
-                    img_b_path = ASSETS_DIR / "images" / f"auto_b_{t_now}.png"
                     img_mode_def = prof.get("default_image_mode", "ai_cartoon")
-                    auto_fetch_or_create_image(in_name_a, img_a_path, is_item_b=False, allow_web_search=True, image_mode=img_mode_def)
-                    auto_fetch_or_create_image(in_name_b, img_b_path, is_item_b=True, allow_web_search=True, image_mode=img_mode_def)
+                    art_style_def = prof.get("default_art_style", "3d_pixar")
+
+                    is_multi = new_data.get("mode") == "multi_battle_3round"
+                    round_assets = None
+
+                    if is_multi:
+                        st.write(f"📸 2/4: กำลังสร้าง/ค้นหารูปภาพแบทเทิล 3 คู่ย่อย ({art_style_def})...")
+                        round_assets = {}
+                        for r in range(1, 4):
+                            r_name_a = new_data.get(f"round_{r}_name_a") or f"{in_name_a} #{r}"
+                            r_name_b = new_data.get(f"round_{r}_name_b") or f"{in_name_b} #{r}"
+                            r_path_a = ASSETS_DIR / "images" / f"auto_a_r{r}_{t_now}.png"
+                            r_path_b = ASSETS_DIR / "images" / f"auto_b_r{r}_{t_now}.png"
+                            auto_fetch_or_create_image(r_name_a, r_path_a, is_item_b=False, allow_web_search=True, image_mode=img_mode_def, art_style=art_style_def)
+                            auto_fetch_or_create_image(r_name_b, r_path_b, is_item_b=True, allow_web_search=True, image_mode=img_mode_def, art_style=art_style_def)
+                            round_assets[r] = {
+                                "name_a": r_name_a,
+                                "name_b": r_name_b,
+                                "image_a_path": r_path_a,
+                                "image_b_path": r_path_b,
+                            }
+                        img_a_path = round_assets[1]["image_a_path"]
+                        img_b_path = round_assets[1]["image_b_path"]
+                    else:
+                        st.write(f"📸 2/4: กำลังค้นหา/สร้างรูปภาพสำหรับ '{in_name_a}' และ '{in_name_b}'...")
+                        img_a_path = ASSETS_DIR / "images" / f"auto_a_{t_now}.png"
+                        img_b_path = ASSETS_DIR / "images" / f"auto_b_{t_now}.png"
+                        auto_fetch_or_create_image(in_name_a, img_a_path, is_item_b=False, allow_web_search=True, image_mode=img_mode_def, art_style=art_style_def)
+                        auto_fetch_or_create_image(in_name_b, img_b_path, is_item_b=True, allow_web_search=True, image_mode=img_mode_def, art_style=art_style_def)
 
                     st.write("🎙️ 3/4: สังเคราะห์เสียงพากย์ Edge Neural + มิกซ์ Lo-Fi BGM & SFX...")
                     v_key = prof.get("default_voice", "edge_niwat")
@@ -592,6 +616,7 @@ with tab_script:
                         watermark_logo_path=wm_logo,
                         watermark_text=wm_text,
                         watermark_opacity=wm_opac,
+                        round_assets=round_assets,
                     )
 
                     cover_path = output_mp4.parent / f"{output_mp4.stem}_cover.jpg"
@@ -809,7 +834,7 @@ with tab_render:
         st.markdown(f"**🔵 สินค้า B: {st.session_state.script_data.get('name_b', 'Item B')}**")
         up_img_b = st.file_uploader("อัปโหลดรูป B (1:1 จัตุรัส PNG/JPG):", type=["png", "jpg", "jpeg"], key="rnd_up_b")
 
-    c_fetch1, c_fetch2 = st.columns([1, 1])
+    c_fetch1, c_fetch2, c_fetch3 = st.columns([1, 1, 1])
     with c_fetch1:
         auto_fetch_chk = st.checkbox("📸 ดึง/สร้างรูปภาพอัตโนมัติ (หากไม่ได้อัปโหลดรูป)", value=True)
     with c_fetch2:
@@ -818,10 +843,18 @@ with tab_render:
             options=["ai_cartoon", "web_search", "minimal_card"],
             index=["ai_cartoon", "web_search", "minimal_card"].index(prof.get("default_image_mode", "ai_cartoon")),
             format_func=lambda x: {
-                "ai_cartoon": "✨ สร้างภาพการ์ตูน 3D AI ตามธีมเพจ (แนะนำ)",
+                "ai_cartoon": "✨ สร้างภาพการ์ตูน AI ตามธีมเพจ (แนะนำ)",
                 "web_search": "🌐 ค้นหาภาพจริงจากเว็บ/วิกิพีเดีย",
                 "minimal_card": "🔲 การ์ดข้อความกราฟิกโมเดิร์น",
             }[x],
+            label_visibility="collapsed",
+        )
+    with c_fetch3:
+        rnd_art_style = st.selectbox(
+            "ลายเส้นการ์ตูน AI:",
+            options=list(CARTOON_STYLES.keys()),
+            index=list(CARTOON_STYLES.keys()).index(prof.get("default_art_style", "3d_pixar")) if prof.get("default_art_style") in CARTOON_STYLES else 0,
+            format_func=lambda k: CARTOON_STYLES[k]["name"],
             label_visibility="collapsed",
         )
 
@@ -857,29 +890,53 @@ with tab_render:
                 img_a_path = ASSETS_DIR / "images" / f"item_a_{t_stamp}.png"
                 img_b_path = ASSETS_DIR / "images" / f"item_b_{t_stamp}.png"
 
-                if up_img_a:
-                    img_a = Image.open(up_img_a)
-                    img_a.save(img_a_path)
-                else:
-                    auto_fetch_or_create_image(
-                        st.session_state.script_data.get("name_a"),
-                        img_a_path,
-                        is_item_b=False,
-                        allow_web_search=auto_fetch_chk,
-                        image_mode=rnd_img_mode,
-                    )
+                is_multi = st.session_state.script_data.get("mode") == "multi_battle_3round"
+                round_assets = None
 
-                if up_img_b:
-                    img_b = Image.open(up_img_b)
-                    img_b.save(img_b_path)
+                if is_multi:
+                    st.write(f"🎨 กำลังสร้าง/ค้นหารูปภาพแบทเทิล 3 คู่ย่อย ({rnd_art_style})...")
+                    round_assets = {}
+                    for r in range(1, 4):
+                        r_name_a = st.session_state.script_data.get(f"round_{r}_name_a") or f"{st.session_state.script_data.get('name_a')} #{r}"
+                        r_name_b = st.session_state.script_data.get(f"round_{r}_name_b") or f"{st.session_state.script_data.get('name_b')} #{r}"
+                        r_path_a = ASSETS_DIR / "images" / f"item_a_r{r}_{t_stamp}.png"
+                        r_path_b = ASSETS_DIR / "images" / f"item_b_r{r}_{t_stamp}.png"
+                        auto_fetch_or_create_image(r_name_a, r_path_a, is_item_b=False, allow_web_search=auto_fetch_chk, image_mode=rnd_img_mode, art_style=rnd_art_style)
+                        auto_fetch_or_create_image(r_name_b, r_path_b, is_item_b=True, allow_web_search=auto_fetch_chk, image_mode=rnd_img_mode, art_style=rnd_art_style)
+                        round_assets[r] = {
+                            "name_a": r_name_a,
+                            "name_b": r_name_b,
+                            "image_a_path": r_path_a,
+                            "image_b_path": r_path_b,
+                        }
+                    img_a_path = round_assets[1]["image_a_path"]
+                    img_b_path = round_assets[1]["image_b_path"]
                 else:
-                    auto_fetch_or_create_image(
-                        st.session_state.script_data.get("name_b"),
-                        img_b_path,
-                        is_item_b=True,
-                        allow_web_search=auto_fetch_chk,
-                        image_mode=rnd_img_mode,
-                    )
+                    if up_img_a:
+                        img_a = Image.open(up_img_a)
+                        img_a.save(img_a_path)
+                    else:
+                        auto_fetch_or_create_image(
+                            st.session_state.script_data.get("name_a"),
+                            img_a_path,
+                            is_item_b=False,
+                            allow_web_search=auto_fetch_chk,
+                            image_mode=rnd_img_mode,
+                            art_style=rnd_art_style,
+                        )
+
+                    if up_img_b:
+                        img_b = Image.open(up_img_b)
+                        img_b.save(img_b_path)
+                    else:
+                        auto_fetch_or_create_image(
+                            st.session_state.script_data.get("name_b"),
+                            img_b_path,
+                            is_item_b=True,
+                            allow_web_search=auto_fetch_chk,
+                            image_mode=rnd_img_mode,
+                            art_style=rnd_art_style,
+                        )
 
                 st.write("🎙️ 1/3: สังเคราะห์เสียงพากย์ Edge Neural...")
                 tts = TTSEngine(voice_key=voice_choice, speech_rate=ov_rate, speech_pitch=ov_pitch)
@@ -922,6 +979,7 @@ with tab_render:
                     watermark_logo_path=wm_logo,
                     watermark_text=wm_text,
                     watermark_opacity=wm_opac,
+                    round_assets=round_assets,
                 )
 
                 st.write("📱 3/3: สร้างภาพปกและบันทึกลงคลัง...")
@@ -1383,11 +1441,19 @@ with tab_settings:
             options=["ai_cartoon", "web_search", "minimal_card"],
             index=["ai_cartoon", "web_search", "minimal_card"].index(prof.get("default_image_mode", "ai_cartoon")),
             format_func=lambda x: {
-                "ai_cartoon": "✨ สร้างภาพการ์ตูน 3D AI ตามธีมเพจ (แนะนำ)",
+                "ai_cartoon": "✨ สร้างภาพการ์ตูน AI ตามธีมเพจ (แนะนำ)",
                 "web_search": "🌐 ค้นหาภาพจริงจากเว็บ/วิกิพีเดีย (Wikipedia & Web)",
                 "minimal_card": "🔲 การ์ดข้อความกราฟิกโมเดิร์น (Minimal Graphic Card)",
             }[x],
             key="set_img_mode",
+        )
+        s_art_style = st.selectbox(
+            "🎨 สไตล์ลายเส้นการ์ตูน AI เริ่มต้น (Cartoon Art Style):",
+            options=list(CARTOON_STYLES.keys()),
+            index=list(CARTOON_STYLES.keys()).index(prof.get("default_art_style", "3d_pixar")) if prof.get("default_art_style") in CARTOON_STYLES else 0,
+            format_func=lambda k: CARTOON_STYLES[k]["name"],
+            key="set_art_style",
+            help="เลือกลายเส้นสำหรับภาพการ์ตูน AI เช่น 3D Pixar, 2D Flat, Studio Ghibli, Claymation หรือ Cyberpunk",
         )
         s_bg_color = st.color_picker("สีพื้นหลังเริ่มต้น (Solid Cream):", value=prof.get("default_bg_color", "#F5F2EB"), key="set_bg_color")
         s_hl_color = st.color_picker("สีกรอบไฟไฮไลต์นีออน (Active Lime):", value=prof.get("default_highlight_color", "#32CD32"), key="set_hl_color")
@@ -1562,6 +1628,7 @@ with tab_settings:
         prof["default_highlight_color"] = s_hl_color
         prof["default_char_mode"] = s_char_mode
         prof["default_image_mode"] = s_img_mode
+        prof["default_art_style"] = s_art_style
         save_channel_profile(prof)
         st.session_state.channel_profile = prof
 

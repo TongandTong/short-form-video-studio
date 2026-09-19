@@ -176,6 +176,12 @@ DURATION_MODES: Dict[str, Dict[str, Any]] = {
         "name": "🔥 เจาะลึกมัลติราวด์ (3 ยก: ~75-90s)",
         "desc": "เปรียบเทียบสลับไปมา 3 มิติครบครัน คุณภาพ ความสะดวก และราคา ข้อมูลลึกซึ้ง",
     },
+    "multi_battle_3round": {
+        "id": "multi_battle_3round",
+        "rounds": 3,
+        "name": "🎡 แบทเทิล 3 คู่ย่อยใน 1 คลิป (Carousel Battle: ~60-80s)",
+        "desc": "1 คลิปเปรียบเทียบ 3 คู่ย่อยสลับเปลี่ยนรูปและชื่อตามยก เช่น กาแฟดำ: ยก 1 ส้ม vs มะพร้าว, ยก 2 นม vs อัลมอนด์, ยก 3 โทนิค vs น้ำผึ้งมะนาว",
+    },
     "master_4round": {
         "id": "master_4round",
         "rounds": 4,
@@ -302,6 +308,9 @@ class AIScriptGenerator:
         elif script_mode in ("multi_round", "deep_3round"):
             active_mode = "deep_3round"
             num_rounds = 3
+        elif script_mode == "multi_battle_3round":
+            active_mode = "multi_battle_3round"
+            num_rounds = 3
         elif script_mode == "master_4round":
             active_mode = "master_4round"
             num_rounds = 4
@@ -329,17 +338,35 @@ class AIScriptGenerator:
 """
 
         is_pairing = fw.get("id") == "perfect_pairing"
+        is_multi_battle = active_mode == "multi_battle_3round"
         round_prompts = []
         json_fields = []
         for r in range(1, num_rounds + 1):
             f_title = round_focus_map.get(r, f"มิติที่ {r}")
-            if is_pairing:
+            if is_multi_battle:
+                round_prompts.append(
+                    f"{r}. ยกที่ {r} (คู่แบทเทิลย่อยที่ {r}):\n"
+                    f"   - round_{r}_title: หัวข้อยกที่ {r}\n"
+                    f"   - round_{r}_name_a: ชื่อไอเทม A ประจำยกนี้ (เช่น กาแฟ+ส้มยูซุ)\n"
+                    f"   - round_{r}_name_b: ชื่อไอเทม B ประจำยกนี้ (เช่น กาแฟ+น้ำมะพร้าว)\n"
+                    f"   - round_{r}_a: จุดเด่นของไอเทม A ในคู่นี้ (1-2 ประโยคกระชับ ชัดเจน)\n"
+                    f"   - round_{r}_b: สวนกลับด้วยจุดเด่นของไอเทม B ในคู่นี้ (1-2 ประโยคกระชับ)"
+                )
+                json_fields.append(
+                    f'  "round_{r}_title": "{f_title}",\n'
+                    f'  "round_{r}_name_a": "ชื่อไอเทม A ประจำยก {r}",\n'
+                    f'  "round_{r}_name_b": "ชื่อไอเทม B ประจำยก {r}",\n'
+                    f'  "round_{r}_a": "...",\n'
+                    f'  "round_{r}_b": "..."'
+                )
+            elif is_pairing:
                 round_prompts.append(
                     f"{r}. ยกที่ {r} ({f_title}):\n"
                     f"   - round_{r}_title: ตั้งชื่อยกที่ {r} สั้นๆ (ให้สอดคล้องกับ {f_title})\n"
                     f"   - round_{r}_a: บทบาท/รสสัมผัส/คุณสมบัติเด่นของ {name_a} ในมิตินี้ (1-2 ประโยคกระชับ)\n"
                     f"   - round_{r}_b: บทบาทของ {name_b} ที่เข้ามาเสริม/ตัดเลี่ยน/ทำงานร่วมกันจนลงตัว (1-2 ประโยคกระชับ)"
                 )
+                json_fields.append(f'  "round_{r}_title": "{f_title}",\n  "round_{r}_a": "...",\n  "round_{r}_b": "..."')
             else:
                 round_prompts.append(
                     f"{r}. ยกที่ {r} ({f_title}):\n"
@@ -347,7 +374,7 @@ class AIScriptGenerator:
                     f"   - round_{r}_a: ข้อมูล/จุดเด่นด้านนี้ของ {name_a} (1-2 ประโยคกระชับ ชัดเจน มีน้ำหนัก)\n"
                     f"   - round_{r}_b: สวนกลับด้วยข้อมูล/จุดต่างด้านนี้ของ {name_b} (1-2 ประโยคกระชับ)"
                 )
-            json_fields.append(f'  "round_{r}_title": "{f_title}",\n  "round_{r}_a": "...",\n  "round_{r}_b": "..."')
+                json_fields.append(f'  "round_{r}_title": "{f_title}",\n  "round_{r}_a": "...",\n  "round_{r}_b": "..."')
 
         rounds_instruction_str = "\n".join(round_prompts)
         json_rounds_str = ",\n".join(json_fields)
@@ -420,6 +447,9 @@ class AIScriptGenerator:
         elif mode in ("multi_round", "deep_3round"):
             num_rounds = 3
             active_mode = "deep_3round"
+        elif mode == "multi_battle_3round":
+            num_rounds = 3
+            active_mode = "multi_battle_3round"
         elif mode == "master_4round":
             num_rounds = 4
             active_mode = "master_4round"
@@ -444,21 +474,53 @@ class AIScriptGenerator:
             {"id": "hook", "text": data.get("hook", ""), "highlight": "none", "round_label": "🔥 เปิดประเด็น"}
         ]
 
+        rounds_data = []
         for r in range(1, num_rounds + 1):
             r_title = data.get(f"round_{r}_title") or f"ยกที่ {r}"
             r_a = data.get(f"round_{r}_a") or (data.get("item_a", "") if r == 1 else "")
             r_b = data.get(f"round_{r}_b") or (data.get("item_b", "") if r == 1 else "")
+            r_name_a = data.get(f"round_{r}_name_a") or name_a
+            r_name_b = data.get(f"round_{r}_name_b") or name_b
+
             data[f"round_{r}_a"] = r_a
             data[f"round_{r}_b"] = r_b
             data[f"round_{r}_title"] = r_title
+            data[f"round_{r}_name_a"] = r_name_a
+            data[f"round_{r}_name_b"] = r_name_b
+
+            rounds_data.append({
+                "round": r,
+                "title": r_title,
+                "name_a": r_name_a,
+                "name_b": r_name_b,
+                "text_a": r_a,
+                "text_b": r_b,
+            })
 
             if r_a:
-                segments.append({"id": f"round_{r}_a", "text": r_a, "highlight": "A", "round_label": f"🥊 {r_title}"})
+                segments.append({
+                    "id": f"round_{r}_a",
+                    "text": r_a,
+                    "highlight": "A",
+                    "round_label": f"🥊 {r_title}",
+                    "round_number": r,
+                    "name_a": r_name_a,
+                    "name_b": r_name_b,
+                })
             if r_b:
-                segments.append({"id": f"round_{r}_b", "text": r_b, "highlight": "B", "round_label": f"🥊 {r_title}"})
+                segments.append({
+                    "id": f"round_{r}_b",
+                    "text": r_b,
+                    "highlight": "B",
+                    "round_label": f"🥊 {r_title}",
+                    "round_number": r,
+                    "name_a": r_name_a,
+                    "name_b": r_name_b,
+                })
 
         segments.append({"id": "conclusion", "text": data.get("conclusion", ""), "highlight": "none", "round_label": "🏁 สรุปฟันธง"})
         data["segments"] = segments
+        data["rounds_data"] = rounds_data
 
         # Generate Social Caption & Hashtags
         social_info = generate_social_caption(data)

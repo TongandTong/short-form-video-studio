@@ -174,6 +174,7 @@ DEFAULT_CHANNEL_PROFILE = {
     "char_pose_b": "",
     "char_pose_neutral": "",
     "default_image_mode": "ai_cartoon",  # "ai_cartoon" | "web_search" | "minimal_card"
+    "default_art_style": "3d_pixar",    # "3d_pixar" | "2d_flat" | "ghibli" | "claymation" | "cyberpunk"
 }
 
 def load_channel_profile() -> dict:

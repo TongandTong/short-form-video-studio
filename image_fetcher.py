@@ -105,6 +105,30 @@ def search_wikimedia_image(query: str) -> Optional[str]:
     return None
 
 
+CARTOON_STYLES = {
+    "3d_pixar": {
+        "name": "✨ 3D Pixar / Cute 3D (อนิเมชั่น 3 มิติ สตูดิโอคลีน)",
+        "prompt": "3D cute stylized cartoon illustration of {name}, vibrant soft pastel colors, Pixar 3D animation style, clean white studio background, smooth lighting, octane render, 4k",
+    },
+    "2d_flat": {
+        "name": "🎨 2D Flat Vector (การ์ตูนเวกเตอร์ มินิมอล สีสดใส)",
+        "prompt": "Modern 2D flat vector cartoon illustration of {name}, cute kawaii icon, minimalist clean line art, bold pastel colors, white isolated background, graphic design sticker style",
+    },
+    "ghibli": {
+        "name": "🍃 Studio Ghibli (ลายเส้นอนิเมะ อบอุ่น นุ่มนวล ละมุนตา)",
+        "prompt": "Studio Ghibli style anime illustration of {name}, Hayao Miyazaki aesthetic, nostalgic soft watercolor lighting, charming detailed hand-drawn anime art, clean light background",
+    },
+    "claymation": {
+        "name": "🧸 Claymation / Stop-Motion (ดินน้ำมันปั้น 3D น่ารัก)",
+        "prompt": "Cute claymation clay sculpture illustration of {name}, plasticine stop-motion aesthetic, handmade craft texture, soft warm studio lighting, clean background, Aardman style",
+    },
+    "cyberpunk": {
+        "name": "⚡ Cyberpunk / Neon Glow (ไซเบอร์พังก์ นีออน สตรีทล้ำยุค)",
+        "prompt": "Stylized futuristic cyberpunk 3D icon of {name}, glowing neon accents, synthwave aesthetic, sleek high-tech edges, clean dark-studio isolated render",
+    },
+}
+
+
 def generate_ai_cartoon_image(
     item_name: str,
     output_path: Path,
@@ -112,24 +136,15 @@ def generate_ai_cartoon_image(
     art_style: str = "3d_pixar",
 ) -> Optional[Path]:
     """
-    Generates a charming 3D stylized cartoon illustration via free AI engine (Pollinations.ai).
-    Produces cohesive, vibrant visuals matching the VSIFY channel aesthetic.
+    Generates a charming stylized cartoon illustration via free AI engine (Pollinations.ai).
+    Supports presets: '3d_pixar', '2d_flat', 'ghibli', 'claymation', 'cyberpunk'.
     """
     clean_name = re.sub(r"\(.*?\)", "", item_name).strip()
     if not clean_name:
         return None
 
-    # Style prompts tuned for comparison video cards
-    if art_style == "3d_pixar":
-        prompt = (
-            f"3D cute stylized cartoon illustration of {clean_name}, vibrant soft colors, "
-            f"Pixar 3D animation style, clean white studio background, smooth lighting, octane render, 4k"
-        )
-    else:
-        prompt = (
-            f"Modern flat vector cartoon illustration of {clean_name}, cute kawaii icon, "
-            f"vibrant bold colors, clean isolated background, high quality"
-        )
+    style_cfg = CARTOON_STYLES.get(art_style, CARTOON_STYLES["3d_pixar"])
+    prompt = style_cfg["prompt"].format(name=clean_name)
 
     encoded_prompt = urllib.parse.quote(prompt)
     url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=512&height=512&nologo=true"
@@ -287,10 +302,11 @@ def auto_fetch_or_create_image(
     is_item_b: bool = False,
     allow_web_search: bool = True,
     image_mode: str = "ai_cartoon",  # "ai_cartoon" | "web_search" | "minimal_card"
+    art_style: str = "3d_pixar",
 ) -> Path:
     """
     Orchestrates smart image acquisition:
-    - 'ai_cartoon': Generates 3D Pixar stylized illustration via AI, with web fallback.
+    - 'ai_cartoon': Generates stylized illustration via AI (with selected art_style), with web fallback.
     - 'web_search': Searches Thai/English Wikipedia & Wikimedia Commons for real photos.
     - 'minimal_card': Instant modern minimalist typographic card.
     """
@@ -301,9 +317,9 @@ def auto_fetch_or_create_image(
             is_item_b=is_item_b,
         )
 
-    # 1. Mode: AI Cartoon Illustration (Zero-touch 3D Render)
+    # 1. Mode: AI Cartoon Illustration (Zero-touch Render with selected style)
     if image_mode == "ai_cartoon" and allow_web_search:
-        ai_res = generate_ai_cartoon_image(item_name, output_path)
+        ai_res = generate_ai_cartoon_image(item_name, output_path, art_style=art_style)
         if ai_res and ai_res.exists() and ai_res.stat().st_size > 1500:
             return ai_res
 

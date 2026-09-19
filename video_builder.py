@@ -458,6 +458,7 @@ class VideoBuilder:
         watermark_logo_path: Optional[Path] = None,
         watermark_text: Optional[str] = None,
         watermark_opacity: float = 0.75,
+        round_assets: Optional[Dict[int, Dict[str, Any]]] = None,
     ) -> Path:
         """Main video rendering pipeline with animated pointing and synchronized highlights."""
         output_video_path.parent.mkdir(parents=True, exist_ok=True)
@@ -476,17 +477,35 @@ class VideoBuilder:
         topic_img = self._render_topic_banner(topic)
         bg_base.paste(topic_img, (TOPIC_BOX["x"], TOPIC_BOX["y"]), topic_img)
 
-        # 3. Label Badges
-        badge_a = self._render_label_badge(f"A: {name_a}", COLOR_BADGE_A, LABEL_A_RECT["w"])
-        badge_b = self._render_label_badge(f"B: {name_b}", COLOR_BADGE_B, LABEL_B_RECT["w"])
-        bg_base.paste(badge_a, (LABEL_A_RECT["x"], LABEL_A_RECT["y"]), badge_a)
-        bg_base.paste(badge_b, (LABEL_B_RECT["x"], LABEL_B_RECT["y"]), badge_b)
+        # 3. Label Badges & Box Images (Single-topic vs Multi-topic Round Assets)
+        prepared_rounds: Dict[int, Dict[str, Image.Image]] = {}
+        if round_assets:
+            for r_num, r_data in round_assets.items():
+                r_name_a = r_data.get("name_a", name_a)
+                r_name_b = r_data.get("name_b", name_b)
+                r_img_a_path = r_data.get("image_a_path", image_a_path)
+                r_img_b_path = r_data.get("image_b_path", image_b_path)
 
-        # 4. Box Images A and B
-        box_a_img = self._prepare_box_image(image_a_path, BOX_A_RECT["w"], BOX_A_RECT["h"], BOX_A_RECT["radius"])
-        box_b_img = self._prepare_box_image(image_b_path, BOX_B_RECT["w"], BOX_B_RECT["h"], BOX_B_RECT["radius"])
-        bg_base.paste(box_a_img, (BOX_A_RECT["x"], BOX_A_RECT["y"]), box_a_img)
-        bg_base.paste(box_b_img, (BOX_B_RECT["x"], BOX_B_RECT["y"]), box_b_img)
+                r_badge_a = self._render_label_badge(f"A: {r_name_a}", COLOR_BADGE_A, LABEL_A_RECT["w"])
+                r_badge_b = self._render_label_badge(f"B: {r_name_b}", COLOR_BADGE_B, LABEL_B_RECT["w"])
+                r_box_a = self._prepare_box_image(r_img_a_path, BOX_A_RECT["w"], BOX_A_RECT["h"], BOX_A_RECT["radius"])
+                r_box_b = self._prepare_box_image(r_img_b_path, BOX_B_RECT["w"], BOX_B_RECT["h"], BOX_B_RECT["radius"])
+                prepared_rounds[r_num] = {
+                    "badge_a": r_badge_a,
+                    "badge_b": r_badge_b,
+                    "box_a": r_box_a,
+                    "box_b": r_box_b,
+                }
+        else:
+            badge_a = self._render_label_badge(f"A: {name_a}", COLOR_BADGE_A, LABEL_A_RECT["w"])
+            badge_b = self._render_label_badge(f"B: {name_b}", COLOR_BADGE_B, LABEL_B_RECT["w"])
+            bg_base.paste(badge_a, (LABEL_A_RECT["x"], LABEL_A_RECT["y"]), badge_a)
+            bg_base.paste(badge_b, (LABEL_B_RECT["x"], LABEL_B_RECT["y"]), badge_b)
+
+            box_a_img = self._prepare_box_image(image_a_path, BOX_A_RECT["w"], BOX_A_RECT["h"], BOX_A_RECT["radius"])
+            box_b_img = self._prepare_box_image(image_b_path, BOX_B_RECT["w"], BOX_B_RECT["h"], BOX_B_RECT["radius"])
+            bg_base.paste(box_a_img, (BOX_A_RECT["x"], BOX_A_RECT["y"]), box_a_img)
+            bg_base.paste(box_b_img, (BOX_B_RECT["x"], BOX_B_RECT["y"]), box_b_img)
 
         # 5. Pre-render Border Frames
         pad = 20
@@ -540,7 +559,25 @@ class VideoBuilder:
                     active_seg_id = seg.segment_id
                     break
 
-            # Composite Borders & Pointer
+            # If multi-round assets are configured, dynamically paste active round images & badges
+            if prepared_rounds:
+                active_round = 1
+                if active_seg_id.startswith("round_"):
+                    try:
+                        active_round = int(active_seg_id.split("_")[1])
+                    except Exception:
+                        active_round = 1
+                elif active_seg_id == "conclusion":
+                    active_round = max(prepared_rounds.keys())
+
+                r_cur = prepared_rounds.get(active_round) or prepared_rounds.get(1)
+                if r_cur:
+                    frame.paste(r_cur["badge_a"], (LABEL_A_RECT["x"], LABEL_A_RECT["y"]), r_cur["badge_a"])
+                    frame.paste(r_cur["badge_b"], (LABEL_B_RECT["x"], LABEL_B_RECT["y"]), r_cur["badge_b"])
+                    frame.paste(r_cur["box_a"], (BOX_A_RECT["x"], BOX_A_RECT["y"]), r_cur["box_a"])
+                    frame.paste(r_cur["box_b"], (BOX_B_RECT["x"], BOX_B_RECT["y"]), r_cur["box_b"])
+
+            # Composite Borders & Highlight
             bob = int(math.sin(t * 6.0) * 4)  # Bouncy animation
 
             if active_target == "A":
