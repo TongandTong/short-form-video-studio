@@ -32,6 +32,7 @@ from config import (
     SCRIPTS_DIR,
     OUTPUT_DIR,
     AUDIO_DIR,
+    TEMP_DIR,
     COLOR_BG_CREAM,
     COLOR_HIGHLIGHT_LIME,
     load_channel_profile,
@@ -899,6 +900,15 @@ with tab_render:
                 index=cur_voice_idx,
                 format_func=lambda x: TTSEngine.VOICE_PRESETS[x]["desc"],
             )
+            if st.button("🔊 ฟังตัวอย่างเสียงนี้ (Preview Voice)", key="btn_test_voice_ov"):
+                with st.spinner("กำลังสังเคราะห์ตัวอย่างเสียง..."):
+                    try:
+                        t_engine = TTSEngine(voice_key=voice_choice)
+                        sample_p = TEMP_DIR / f"sample_{voice_choice}.mp3"
+                        t_engine.synthesize_segment("สวัสดีครับ ยินดีต้อนรับสู่ช่อง เปรียบเทียบสาระน่ารู้", sample_p)
+                        st.audio(str(sample_p), format="audio/mp3")
+                    except Exception as e:
+                        st.error(f"ไม่สามารถเล่นตัวอย่างเสียงได้: {e}")
             c_rt, c_pt = st.columns(2)
             with c_rt:
                 ov_rate = st.selectbox("ความเร็วเสียง:", ["-10%", "-5%", "+0%", "+5%", "+10%", "+15%", "+20%"], index=4)
@@ -1537,11 +1547,52 @@ with tab_settings:
             st.markdown("##### 📥 อัปโหลดรูปมาสคอตเต็มตัว 8 รูป (4 ท่าทาง x หุบปาก/อ้าปาก)")
             st.caption("💡 **วาดเห็นเต็มตัวตั้งแต่หัวจรดเท้าได้เลยครับ:** ระบบจัดวางให้เท้ายืนบนพื้นสตูดิโอ มีเงามิติที่พื้น และศีรษะอยู่ใต้ซับไตเติลพอดีเป๊ะ พร้อมตัดพื้นหลังโปร่งใสให้อัตโนมัติ")
 
+            def _get_pose_img(key: str) -> str:
+                val = prof.get(key, "")
+                if val and Path(val).exists():
+                    return val
+                fallback = ASSETS_DIR / "images" / f"{key}.png"
+                if fallback.exists():
+                    return str(fallback)
+                return ""
+
+            # Quick 1-click Auto-Distributor for 1 or 2 images:
+            with st.expander("⚡ มีรูปแค่ 1 รูป หรือ 2 รูป (หุบปาก/อ้าปาก)? กระจายใส่ครบ 8 ท่าในคลิกเดียว!", expanded=False):
+                st.caption("ถ้าคุณเพิ่งสร้างรูปมาแค่ 1 รูป (รูปเดี่ยว) หรือ 2 รูป (หุบปาก/อ้าปาก) อัปโหลดตรงนี้ แล้วกดปุ่ม ระบบจะนำไปใช้กับทุกท่าทางให้อัตโนมัติทันที ไม่ต้องวาดแยก 8 รูปครับ!")
+                c_q1, c_q2 = st.columns(2)
+                with c_q1:
+                    up_q_cl = st.file_uploader("1. รูปหลัก / หุบปาก (เต็มตัว):", type=["png", "jpg", "jpeg"], key="up_quick_cl")
+                with c_q2:
+                    up_q_op = st.file_uploader("2. รูปอ้าปากพูด (ถ้ามี):", type=["png", "jpg", "jpeg"], key="up_quick_op")
+
+                if st.button("🪄 กระจายรูปนี้ใส่ครบทั้ง 8 ท่าทางทันที", use_container_width=True, type="secondary"):
+                    if up_q_cl:
+                        clean_cl = remove_fake_checkerboard_bg(Image.open(up_q_cl))
+                        clean_op = remove_fake_checkerboard_bg(Image.open(up_q_op)) if up_q_op else clean_cl
+                        for k, is_op in [
+                            ("char_pose_think", False), ("char_pose_think_open", True),
+                            ("char_pose_a", False), ("char_pose_a_open", True),
+                            ("char_pose_b", False), ("char_pose_b_open", True),
+                            ("char_pose_neutral", False), ("char_pose_neutral_open", True),
+                        ]:
+                            p = ASSETS_DIR / "images" / f"{k}.png"
+                            im = clean_op if is_op else clean_cl
+                            im.save(p, "PNG")
+                            prof[k] = str(p)
+                        prof["char_single_path"] = str(ASSETS_DIR / "images" / "char_pose_think.png")
+                        prof["default_char_mode"] = "multi_pose"
+                        save_channel_profile(prof)
+                        st.session_state.channel_profile = prof
+                        st.success("🎉 กระจายรูปใส่ครบทุกท่าเรียบร้อยแล้ว!")
+                        st.rerun()
+                    else:
+                        st.warning("กรุณาเลือกรูปหลัก (หุบปาก) ก่อนกดปุ่มครับ")
+
             # 1. ท่าคิด (Hook)
             with st.expander("🤔 ท่าที่ 1: ท่าคิด (ใช้ตอนเปิดคลิป Hook)", expanded=True):
                 c_t1, c_t2 = st.columns(2)
                 with c_t1:
-                    cur_t_cl = prof.get("char_pose_think", "")
+                    cur_t_cl = _get_pose_img("char_pose_think")
                     if cur_t_cl and Path(cur_t_cl).exists():
                         st.image(cur_t_cl, width=90, caption="1.1 ท่าคิด (หุบปาก)")
                     up_t_cl = st.file_uploader("1.1 ท่าคิด — หุบปาก (PNG เต็มตัว):", type=["png", "jpg", "jpeg"], key="up_t_cl")
@@ -1557,7 +1608,7 @@ with tab_settings:
                         st.success("✅ อัปโหลดท่าคิด (หุบปาก) สำเร็จ!")
 
                 with c_t2:
-                    cur_t_op = prof.get("char_pose_think_open", "")
+                    cur_t_op = _get_pose_img("char_pose_think_open")
                     if cur_t_op and Path(cur_t_op).exists():
                         st.image(cur_t_op, width=90, caption="1.2 ท่าคิด (อ้าปาก)")
                     up_t_op = st.file_uploader("1.2 ท่าคิด — อ้าปากพูด (PNG เต็มตัว):", type=["png", "jpg", "jpeg"], key="up_t_op")
@@ -1576,7 +1627,7 @@ with tab_settings:
             with st.expander("👈 ท่าที่ 2: ท่าชี้สินค้า A (หันชี้ไปทางซ้าย)", expanded=True):
                 c_a1, c_a2 = st.columns(2)
                 with c_a1:
-                    cur_a_cl = prof.get("char_pose_a", "")
+                    cur_a_cl = _get_pose_img("char_pose_a")
                     if cur_a_cl and Path(cur_a_cl).exists():
                         st.image(cur_a_cl, width=90, caption="2.1 ชี้ A (หุบปาก)")
                     up_a_cl = st.file_uploader("2.1 ท่าชี้ A — หุบปาก (PNG เต็มตัว):", type=["png", "jpg", "jpeg"], key="up_a_cl")
@@ -1592,7 +1643,7 @@ with tab_settings:
                         st.success("✅ อัปโหลดท่าชี้ A (หุบปาก) สำเร็จ!")
 
                 with c_a2:
-                    cur_a_op = prof.get("char_pose_a_open", "")
+                    cur_a_op = _get_pose_img("char_pose_a_open")
                     if cur_a_op and Path(cur_a_op).exists():
                         st.image(cur_a_op, width=90, caption="2.2 ชี้ A (อ้าปาก)")
                     up_a_op = st.file_uploader("2.2 ท่าชี้ A — อ้าปากพูด (PNG เต็มตัว):", type=["png", "jpg", "jpeg"], key="up_a_op")
@@ -1611,7 +1662,7 @@ with tab_settings:
             with st.expander("👉 ท่าที่ 3: ท่าชี้สินค้า B (หันชี้ไปทางขวา)", expanded=True):
                 c_b1, c_b2 = st.columns(2)
                 with c_b1:
-                    cur_b_cl = prof.get("char_pose_b", "")
+                    cur_b_cl = _get_pose_img("char_pose_b")
                     if cur_b_cl and Path(cur_b_cl).exists():
                         st.image(cur_b_cl, width=90, caption="3.1 ชี้ B (หุบปาก)")
                     up_b_cl = st.file_uploader("3.1 ท่าชี้ B — หุบปาก (PNG เต็มตัว):", type=["png", "jpg", "jpeg"], key="up_b_cl")
@@ -1627,7 +1678,7 @@ with tab_settings:
                         st.success("✅ อัปโหลดท่าชี้ B (หุบปาก) สำเร็จ!")
 
                 with c_b2:
-                    cur_b_op = prof.get("char_pose_b_open", "")
+                    cur_b_op = _get_pose_img("char_pose_b_open")
                     if cur_b_op and Path(cur_b_op).exists():
                         st.image(cur_b_op, width=90, caption="3.2 ชี้ B (อ้าปาก)")
                     up_b_op = st.file_uploader("3.2 ท่าชี้ B — อ้าปากพูด (PNG เต็มตัว):", type=["png", "jpg", "jpeg"], key="up_b_op")
@@ -1646,7 +1697,7 @@ with tab_settings:
             with st.expander("🎉 ท่าที่ 4: ท่ายิ้มสรุป (ใช้ตอนท้ายคลิป สรุปฟันธง)", expanded=True):
                 c_n1, c_n2 = st.columns(2)
                 with c_n1:
-                    cur_n_cl = prof.get("char_pose_neutral", "")
+                    cur_n_cl = _get_pose_img("char_pose_neutral")
                     if cur_n_cl and Path(cur_n_cl).exists():
                         st.image(cur_n_cl, width=90, caption="4.1 สรุป (หุบปาก)")
                     up_n_cl = st.file_uploader("4.1 ท่ายิ้มสรุป — หุบปาก (PNG เต็มตัว):", type=["png", "jpg", "jpeg"], key="up_n_cl")
@@ -1662,7 +1713,7 @@ with tab_settings:
                         st.success("✅ อัปโหลดท่ายิ้มสรุป (หุบปาก) สำเร็จ!")
 
                 with c_n2:
-                    cur_n_op = prof.get("char_pose_neutral_open", "")
+                    cur_n_op = _get_pose_img("char_pose_neutral_open")
                     if cur_n_op and Path(cur_n_op).exists():
                         st.image(cur_n_op, width=90, caption="4.2 สรุป (อ้าปาก)")
                     up_n_op = st.file_uploader("4.2 ท่ายิ้มสรุป — อ้าปากพูด (PNG เต็มตัว):", type=["png", "jpg", "jpeg"], key="up_n_op")

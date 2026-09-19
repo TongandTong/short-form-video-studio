@@ -18,12 +18,16 @@
   "default_bg_color": "#F5F2EB",
   "default_highlight_color": "#32CD32",
   "default_anim_style": "pointer_and_border",
-  "default_char_mode": "builtin",
+  "default_char_mode": "multi_pose",
   "default_subtitle_style": "clean_floating",
   "default_subtitle_anim": "typewriter",
-  "char_single_path": "",
-  "char_pose_think": "",
-  "char_pose_a": "",
-  "char_pose_b": "",
-  "char_pose_neutral": ""
+  "char_single_path": "assets/images/char_pose_think.png",
+  "char_pose_think": "assets/images/char_pose_think.png",
+  "char_pose_think_open": "assets/images/char_pose_think_open.png",
+  "char_pose_a": "assets/images/char_pose_a.png",
+  "char_pose_a_open": "assets/images/char_pose_a_open.png",
+  "char_pose_b": "assets/images/char_pose_b.png",
+  "char_pose_b_open": "assets/images/char_pose_b_open.png",
+  "char_pose_neutral": "assets/images/char_pose_neutral.png",
+  "char_pose_neutral_open": "assets/images/char_pose_neutral_open.png"
 }
