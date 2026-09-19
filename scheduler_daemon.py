@@ -354,3 +354,36 @@ def is_scheduler_alive() -> bool:
     """Checks if the background daemon thread is currently running."""
     global _daemon_thread
     return _daemon_thread is not None and _daemon_thread.is_alive()
+
+
+def run_autopilot_batch(count: int = 3, progress_callback=None) -> Tuple[int, int, list]:
+    """
+    Produces multiple videos in sequence (stockpiling clips).
+    Yields or reports progress, cleans up resources after each run.
+    Returns (success_count, fail_count, list_of_messages).
+    """
+    import gc
+    success_count = 0
+    fail_count = 0
+    results = []
+
+    for i in range(1, count + 1):
+        msg_start = f"กำลังสร้างคลิปที่ {i}/{count}..."
+        if progress_callback:
+            progress_callback(i, count, msg_start)
+        print(f"[Batch Producer] {msg_start}")
+        
+        ok, res_msg = run_autopilot_cycle(is_manual=True)
+        if ok:
+            success_count += 1
+            results.append(f"คลิปที่ {i}: สำเร็จ ({res_msg})")
+        else:
+            fail_count += 1
+            results.append(f"คลิปที่ {i}: ไม่สำเร็จ ({res_msg})")
+
+        # Memory garbage collection between heavy video renders
+        gc.collect()
+        time.sleep(2)
+
+    return success_count, fail_count, results
+

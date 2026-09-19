@@ -54,6 +54,7 @@ from scheduler_daemon import (
     load_autopilot_config,
     save_autopilot_config,
     run_autopilot_cycle,
+    run_autopilot_batch,
     is_scheduler_alive,
 )
 from gdrive_sync import (
@@ -71,6 +72,13 @@ from autopost_engine import (
     test_youtube_connection,
     test_webhook_connection,
 )
+from shopee_affiliate import (
+    load_shopee_config,
+    save_shopee_config,
+    generate_shopee_affiliate_link,
+    auto_generate_affiliate_comments,
+)
+
 
 # Start background autonomous daemon
 ensure_scheduler_running()
@@ -116,21 +124,29 @@ st.markdown(
         scroll-behavior: smooth !important;
     }
 
+    /* Prevent sticky breakage from overflow hidden */
+    [data-testid="stAppViewContainer"],
+    section[data-testid="stMain"],
+    .main {
+        overflow-x: clip !important;
+    }
+
     /* iOS Segmented Control Tabs - Sticky & Locked at Top */
-    div[data-baseweb="tab-list"] {
+    div[data-baseweb="tab-list"],
+    .stTabs [data-baseweb="tab-list"] {
         position: -webkit-sticky !important;
         position: sticky !important;
-        top: 2.85rem !important;
-        z-index: 9999 !important;
-        background: rgba(242, 242, 247, 0.94) !important;
+        top: 3.4rem !important;
+        z-index: 99999 !important;
+        background: rgba(246, 246, 248, 0.96) !important;
         backdrop-filter: blur(25px) saturate(190%) !important;
         -webkit-backdrop-filter: blur(25px) saturate(190%) !important;
         border-radius: 16px !important;
-        padding: 6px !important;
-        gap: 5px !important;
-        border: 1px solid rgba(0, 0, 0, 0.08) !important;
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.07) !important;
-        margin-bottom: 20px !important;
+        padding: 8px !important;
+        gap: 8px !important;
+        border: 1px solid rgba(0, 0, 0, 0.12) !important;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.09) !important;
+        margin-bottom: 22px !important;
     }
     div[data-baseweb="tab"] {
         border-radius: 10px !important;
@@ -401,20 +417,19 @@ if "input_aff_b" not in st.session_state:
 if "input_framework" not in st.session_state:
     st.session_state.input_framework = st.session_state.script_data.get("framework", "persona")
 
-# Tabs Navigation
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-    "1. 🔍 ป้อนข้อมูล & ค้นหาเจาะลึก",
-    "2. 📝 ตรวจบท & สั่งรีไรท์",
-    "3. 🎨 ตั้งค่าเสียง, BGM & ภาพ",
-    "4. 🎬 เรนเดอร์ & พรีวิวคลิป",
-    "5. ⏰ Auto-Pilot ผลิตอัตโนมัติ 24 ชม.",
-    "6. 🚀 ออโต้โพสต์ & Google Drive",
+# Tabs Navigation (4 Unified Super-Tabs)
+tab_studio, tab_autopilot, tab_autopost, tab_shopee = st.tabs([
+    "🎬 1. สตูดิโอสร้างคลิป (Production Studio)",
+    "⏰ 2. Auto-Pilot 24 ชม. (ผลิตคลิปอัตโนมัติ & ตุนคลิป)",
+    "🚀 3. ออโต้โพสต์ & คลังคลิป (Queue & Post Manager)",
+    "🛒 4. Shopee Auto-Affiliate (แปลงลิงก์อัตโนมัติ)",
 ])
 
 # -------------------------------------------------------------
-# TAB 1: INPUT & DEEP RESEARCH
+# TAB 1: ALL-IN-ONE PRODUCTION STUDIO
 # -------------------------------------------------------------
-with tab1:
+with tab_studio:
+    st.markdown("### 🔍 ส่วนที่ 1: ป้อนข้อมูล & AI ค้นคว้าเจาะลึก (Input & AI Research)")
     # Viral Idea Helper Banner
     num_fw = len(FRAMEWORK_PRESETS)
     st.markdown(
@@ -539,7 +554,7 @@ with tab1:
                     )
                     st.session_state.script_data = new_data
                     st.session_state.script_version += 1
-                    st.success("✅ ทำการวิเคราะห์และสร้างบทเรียบร้อยแล้ว! คลิกไปที่แท็บ '2. ตรวจบท & สั่งรีไรท์' ได้เลยครับ")
+                    st.success("✅ Gemini วิเคราะห์ข้อมูลและร่างบทเสร็จแล้ว! ตรวจทานบทและสั่งรีไรท์ได้ที่ 'ส่วนที่ 2' ด้านล่างนี้ได้ทันทีครับ 👇")
                 except Exception as e:
                     st.error(f"เกิดข้อผิดพลาดในการเรียก AI: {e}")
 
@@ -634,16 +649,16 @@ with tab1:
 
                     st.session_state.rendered_video_path = str(final_video)
                     status_box.update(label=f"🎉 Auto-Pilot สำเร็จ! สร้างคลิปเสร็จสมบูรณ์ใน {total_duration:.1f} วินาที", state="complete")
-                    st.success("✅ คลิปวิดีโอถูกสร้างเรียบร้อยแล้ว! เลื่อนไปดูหรือกดที่แท็บ '4. เรนเดอร์ & พรีวิวคลิป' ได้เลยครับ")
+                    st.success("✅ คลิปวิดีโอถูกสร้างเรียบร้อยแล้ว! เลื่อนลงไปดูวิดีโอและคัดลอกแคปชั่นที่ 'ส่วนที่ 4' ด้านล่างได้เลยครับ 👇")
                 except Exception as e:
                     status_box.update(label=f"เกิดข้อผิดพลาด: {e}", state="error")
                     st.error(f"เกิดข้อผิดพลาด: {e}")
 
-# -------------------------------------------------------------
-# TAB 2: SCRIPT STUDIO & REWRITER
-# -------------------------------------------------------------
-with tab2:
-    st.subheader("📝 Script Review & Rewrite Studio")
+    st.markdown("---")
+    # -------------------------------------------------------------
+    # PART 2: SCRIPT STUDIO & REWRITER
+    # -------------------------------------------------------------
+    st.markdown("### 📝 ส่วนที่ 2: ตรวจทานบทพูด & สั่ง AI รีไรท์ (Script Review & AI Rewriter)")
     st.caption("อ่านบทที่ AI คิดมา ตรวจสอบความถูกต้อง สั่ง AI รีไรท์เฉพาะจุด หรือแก้คำด้วยตัวเองได้อิสระ")
 
     # Framework badge
@@ -798,11 +813,12 @@ with tab2:
                 except Exception as e:
                     st.error(f"เกิดข้อผิดพลาด: {e}")
 
-# -------------------------------------------------------------
-# TAB 3: VOICE, BGM, SFX & VISUALS
-# -------------------------------------------------------------
-with tab3:
-    st.subheader("🎨 ปรับแต่งเสียงพากย์, เพลงประกอบ และงานภาพ")
+    st.markdown("---")
+    # -------------------------------------------------------------
+    # PART 3: VOICE, BGM, SFX & VISUALS
+    # -------------------------------------------------------------
+    st.markdown("### 🎨 ส่วนที่ 3: ปรับแต่งเสียงพากย์, เพลงคลอ & รูปภาพ (Audio & Visuals)")
+    st.caption("ปรับแต่งผู้บรรยาย ความเร็ว โทนเสียง อารมณ์ เพลง BGM ภาพพื้นหลัง และรูปภาพสินค้า")
 
     c_voice, c_visual = st.columns(2, gap="large")
 
@@ -931,11 +947,11 @@ with tab3:
                 up_pt_b = st.file_uploader("3. ท่ายกมือชี้ช่อง B (ทางขวา):", type=["png"], key="up_pose_b")
                 up_neutral = st.file_uploader("4. ท่ายิ้มมั่นใจ / สรุปคลิป (Conclusion):", type=["png"], key="up_pose_neutral")
 
-# -------------------------------------------------------------
-# TAB 4: RENDER & PREVIEW
-# -------------------------------------------------------------
-with tab4:
-    st.subheader("🎬 สร้างวิดีโอ 1080x1920 และรับชมตัวอย่าง")
+    st.markdown("---")
+    # -------------------------------------------------------------
+    # PART 4: RENDER & PREVIEW
+    # -------------------------------------------------------------
+    st.markdown("### 🎬 ส่วนที่ 4: สั่งเรนเดอร์คลิป 1080x1920 & รับชมตัวอย่าง (Render & Preview)")
 
     st.markdown(
         f"""
@@ -1126,10 +1142,10 @@ with tab4:
             st.code(st.session_state.script_data.get("affiliate_comment", ""), language="text")
 
 # -------------------------------------------------------------
-# TAB 5: AUTOPILOT 24/7 AUTONOMOUS SCHEDULER
+# TAB 2: AUTOPILOT 24/7 AUTONOMOUS SCHEDULER
 # -------------------------------------------------------------
-with tab5:
-    st.subheader("⏰ Auto-Pilot 24 Hours — ผลิตคลิปอัตโนมัติตามเวลา")
+with tab_autopilot:
+    st.subheader("⏰ Auto-Pilot 24 Hours — ผลิตคลิปอัตโนมัติตามเวลา & ตุนคลิป")
     st.caption("ระบบทำงานในพื้นหลังตลอด 24 ชั่วโมง สุ่มหัวข้อไวรัล ค้นภาพ สังเคราะห์เสียง Neural ตัดต่อวิดีโอ 9:16 แคปชั่น แฮชแท็ก และปักหมุด Affiliate เตรียมพร้อมนำไปโพสต์ได้ทันที")
 
     auto_cfg = load_autopilot_config()
@@ -1153,48 +1169,50 @@ with tab5:
         )
 
     with col_st2:
-        next_ts = auto_cfg.get("next_run_timestamp", 0)
-        if is_active and next_ts > 0:
-            diff_m = max(0, int((next_ts - time.time()) / 60))
-            if diff_m >= 60:
-                timer_txt = f"ในอีก {diff_m // 60} ชม. {diff_m % 60} นาที"
-            else:
-                timer_txt = f"ในอีก {diff_m} นาที"
-            scheduled_clock = time.strftime("%H:%M น.", time.localtime(next_ts))
-        else:
-            timer_txt = "—"
-            scheduled_clock = "ยังไม่ได้เปิดใช้งาน"
-
+        interval_val = auto_cfg.get("interval_hours", 3.0)
+        daily_clips = int(24 / interval_val) if interval_val > 0 else 0
         st.markdown(
             f"""
             <div class="ios-card" style="border-left: 5px solid #007AFF;">
-                <div style="font-size: 13px; color: #8E8E93; font-weight: 600;">รอบการผลิตคลิปถัดไป</div>
-                <div style="font-size: 19px; font-weight: 700; color: #007AFF; margin-top: 4px;">{timer_txt}</div>
-                <div style="font-size: 12px; color: #636366; margin-top: 5px;">เวลาประมาณ {scheduled_clock}</div>
+                <div style="font-size: 13px; color: #8E8E93; font-weight: 600;">ความถี่ในการผลิต</div>
+                <div style="font-size: 19px; font-weight: 700; color: #007AFF; margin-top: 4px;">ทุก {interval_val} ชั่วโมง</div>
+                <div style="font-size: 12px; color: #636366; margin-top: 5px;">กำลังการผลิต: ประมาณ {daily_clips} คลิป / วัน</div>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
     with col_st3:
-        total_gen = auto_cfg.get("total_generated", 0)
-        last_topic_str = auto_cfg.get("last_topic") or "ยังไม่มีคลิป"
+        next_ts = auto_cfg.get("next_run_timestamp", 0)
+        if is_active and next_ts > 0:
+            remaining_mins = max(0, int((next_ts - time.time()) / 60))
+            if remaining_mins >= 60:
+                h = remaining_mins // 60
+                m = remaining_mins % 60
+                rem_label = f"อีก {h} ชม. {m} นาที"
+            else:
+                rem_label = f"อีก {remaining_mins} นาที"
+            time_str = time.strftime("%H:%M:%S", time.localtime(next_ts))
+            sub_next = f"รอบถัดไป: {time_str} ({rem_label})"
+        else:
+            sub_next = "รอเปิดสวิตช์เริ่มระบบ"
         st.markdown(
             f"""
             <div class="ios-card" style="border-left: 5px solid #FF9500;">
-                <div style="font-size: 13px; color: #8E8E93; font-weight: 600;">ยอดผลิตสะสม</div>
-                <div style="font-size: 19px; font-weight: 700; color: #FF9500; margin-top: 4px;">{total_gen} คลิป</div>
-                <div style="font-size: 12px; color: #636366; margin-top: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">ล่าสุด: {last_topic_str}</div>
+                <div style="font-size: 13px; color: #8E8E93; font-weight: 600;">นับถอยหลังรอบถัดไป</div>
+                <div style="font-size: 19px; font-weight: 700; color: #FF9500; margin-top: 4px;">{sub_next}</div>
+                <div style="font-size: 12px; color: #636366; margin-top: 5px;">ผลิตไปแล้วทั้งหมด: {auto_cfg.get('total_generated', 0)} คลิป</div>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
-    st.markdown("#### ⚙️ ตั้งค่าความถี่ & เงื่อนไขการผลิต (Schedule Configuration)")
+    # Configuration Form
+    st.markdown("#### ⚙️ ตั้งค่าระบบการผลิตอัตโนมัติ")
     c_form1, c_form2 = st.columns(2, gap="large")
 
     with c_form1:
-        auto_toggle = st.toggle("🚀 เปิดใช้งานระบบผลิตอัตโนมัติตามเวลา (Auto-Pilot)", value=bool(auto_cfg.get("enabled", False)))
+        auto_toggle = st.toggle("เปิดระบบผลิตคลิปอัตโนมัติ 24 ชม. (Auto-Pilot Daemon)", value=bool(auto_cfg.get("enabled", False)))
 
         interval_choices = [1.0, 2.0, 3.0, 4.0, 6.0, 8.0, 12.0, 24.0]
         cur_int = float(auto_cfg.get("interval_hours", 3.0))
@@ -1246,9 +1264,9 @@ with tab5:
         def_aff_a = st.text_input("ลิงก์ Affiliate สินค้า A เริ่มต้น:", value=auto_cfg.get("default_affiliate_a", prof.get("default_affiliate_a", "https://shopee.co.th")))
         def_aff_b = st.text_input("ลิงก์ Affiliate สินค้า B เริ่มต้น:", value=auto_cfg.get("default_affiliate_b", prof.get("default_affiliate_b", "https://shopee.co.th")))
 
-    c_btn_save, c_btn_run = st.columns([1, 1], gap="medium")
+    c_btn_save, c_btn_run, c_btn_batch = st.columns([1, 1, 1], gap="small")
     with c_btn_save:
-        if st.button("💾 บันทึกการตั้งค่า Auto-Pilot", type="secondary", use_container_width=True):
+        if st.button("💾 บันทึกการตั้งค่า", type="secondary", use_container_width=True):
             auto_cfg["enabled"] = auto_toggle
             auto_cfg["interval_hours"] = float(selected_interval)
             auto_cfg["target_category"] = selected_cat
@@ -1264,7 +1282,7 @@ with tab5:
             st.rerun()
 
     with c_btn_run:
-        if st.button("⚡ ทดสอบสร้างอัตโนมัติ 1 คลิปทันที (Run 1 Clip Now)", type="primary", use_container_width=True):
+        if st.button("⚡ สร้างทดสอบ 1 คลิป", type="secondary", use_container_width=True):
             auto_cfg["interval_hours"] = float(selected_interval)
             auto_cfg["target_category"] = selected_cat
             auto_cfg["target_framework"] = selected_fw
@@ -1282,6 +1300,27 @@ with tab5:
                 else:
                     st.error(f"❌ {res_msg}")
 
+    with c_btn_batch:
+        if st.button("⚡ ผลิตชุดใหญ่ 3 คลิปตุนทันที", type="primary", use_container_width=True, help="สั่งสร้างคลิป 3 คลิปต่อเนื่องกันทันที บันทึกเก็บในคลังโดยไม่ต้องรอเวลา"):
+            auto_cfg["interval_hours"] = float(selected_interval)
+            auto_cfg["target_category"] = selected_cat
+            auto_cfg["target_framework"] = selected_fw
+            auto_cfg["target_duration_mode"] = selected_dur
+            auto_cfg["auto_search_images"] = auto_img_fetch
+            auto_cfg["default_affiliate_a"] = def_aff_a
+            auto_cfg["default_affiliate_b"] = def_aff_b
+            save_autopilot_config(auto_cfg)
+
+            status_batch = st.status("⚡ กำลังผลิตชุดใหญ่ 3 คลิปตุนไว้ในคลัง...", expanded=True)
+            with status_batch:
+                def _batch_cb(curr, total, msg):
+                    st.write(f"🎬 คลิปที่ {curr}/{total}: {msg}")
+                s_cnt, f_cnt, res_list = run_autopilot_batch(count=3, progress_callback=_batch_cb)
+                status_batch.update(label=f"🎉 ผลิตเสร็จสิ้น! สำเร็จ {s_cnt} คลิป (ผิดพลาด {f_cnt} คลิป)", state="complete" if s_cnt > 0 else "error")
+                for r in res_list:
+                    st.write(f"• {r}")
+                st.rerun()
+
     # Activity Feed / Logs
     st.divider()
     st.markdown("#### 📜 บันทึกกิจกรรมระบบอัตโนมัติ (Activity Feed & Logs)")
@@ -1292,9 +1331,9 @@ with tab5:
         st.text_area("Live Production Activity", value="\n".join(logs), height=180, disabled=True)
 
 # -------------------------------------------------------------
-# TAB 6: GOOGLE DRIVE SYNC & MULTI-PLATFORM AUTO-POST
+# TAB 3: GOOGLE DRIVE SYNC & MULTI-PLATFORM AUTO-POST
 # -------------------------------------------------------------
-with tab6:
+with tab_autopost:
     st.subheader("🚀 Cloud Sync & Multi-Platform Auto-Post — ซิงก์ Google Drive & โพสต์อัตโนมัติ")
     st.caption("เชื่อมต่อระบบเข้ากับ Google Drive และเครือข่ายโซเชียลมีเดีย (Facebook Page Reels, YouTube Shorts, TikTok Webhook) เพื่อให้ระบบนำคลิปที่สร้างเสร็จไปซิงก์และโพสต์ให้อัตโนมัติ")
 
@@ -1601,5 +1640,87 @@ with tab6:
         st.caption("ยังไม่มีประวัติการส่งโพสต์ในระบบ")
     else:
         st.text_area("Social Post Activity", value="\n".join(p_logs), height=180, disabled=True)
+
+# -------------------------------------------------------------
+# TAB 4: SHOPEE AUTO-AFFILIATE
+# -------------------------------------------------------------
+with tab_shopee:
+    st.subheader("🛒 Shopee Auto-Affiliate — ระบบแปลงลิงก์นายหน้าอัตโนมัติ")
+    st.caption("ระบบช่วยแปลงลิงก์สินค้า Shopee หรือคำค้นหา ให้กลายเป็นลิงก์ Affiliate พร้อม Tracking Tag อัตโนมัติ เพื่อนำไปใส่ในคำบรรยายและคอมเมนต์ปักหมุดทุกคลิป")
+
+    shp_cfg = load_shopee_config()
+
+    # Shopee Status Card
+    st.markdown(
+        """
+        <div class="ios-card">
+            <div style="font-size: 17px; font-weight: 700; color: #EE4D2D; margin-bottom: 6px;">
+                🟠 Shopee Open API & Universal Affiliate Link
+            </div>
+            <div style="font-size: 13.5px; color: #636366; line-height: 1.4;">
+                รองรับ 2 รูปแบบอัตโนมัติ: <b>1. โหมด Shopee Open API (GraphQL)</b> เพื่อแปลงเป็น short link แท้ (s.shopee.co.th) หรือ <b>2. โหมด Universal Affiliate Link</b> โดยใช้ Affiliate Username / Sub-ID ของคุณได้ทันทีโดยไม่ต้องขอ API พิเศษ
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    c_shp1, c_shp2 = st.columns(2, gap="large")
+    with c_shp1:
+        st.markdown("#### ⚙️ ตั้งค่าบัญชี Shopee Affiliate")
+        shp_enable = st.toggle("เปิดใช้งานระบบ Shopee Auto-Affiliate", value=bool(shp_cfg.get("enabled", True)))
+        shp_aff_id = st.text_input("Shopee Affiliate Username / Partner ID:", value=shp_cfg.get("affiliate_id", ""), placeholder="เช่น whyitworks_aff หรือ user ID ของคุณ")
+        shp_sub1 = st.text_input("Sub-ID 1 สำหรับติดตามยอด (Sub-Tracking ID):", value=shp_cfg.get("sub_ids", ["WhyItWorks"])[0] if shp_cfg.get("sub_ids") else "WhyItWorks")
+
+    with c_shp2:
+        st.markdown("#### 🔑 Shopee Affiliate Open API (สำหรับ Short Link แท้)")
+        shp_app_id = st.text_input("App ID (ถ้ามี):", value=shp_cfg.get("app_id", ""), placeholder="เช่น 18000000000")
+        shp_secret = st.text_input("Secret Key (ถ้ามี):", value=shp_cfg.get("secret", ""), type="password")
+        st.caption("💡 หากไม่มี App ID & Secret ระบบจะใช้โหมด Universal Link แท็ก Affiliate ID ให้โดยอัตโนมัติ 100%")
+
+    if st.button("💾 บันทึกการตั้งค่า Shopee Affiliate", type="secondary", use_container_width=True):
+        shp_cfg["enabled"] = shp_enable
+        shp_cfg["affiliate_id"] = shp_aff_id
+        shp_cfg["sub_ids"] = [shp_sub1]
+        shp_cfg["app_id"] = shp_app_id
+        shp_cfg["secret"] = shp_secret
+        save_shopee_config(shp_cfg)
+        st.toast("✅ บันทึกการตั้งค่า Shopee Affiliate เรียบร้อยแล้ว!")
+
+    st.divider()
+
+    # Interactive Link Converter Test Tool
+    st.markdown("#### 🧪 เครื่องมือทดสอบแปลงลิงก์ Shopee Affiliate สด")
+    st.caption("ทดสอบใส่ URL สินค้า หรือพิมพ์ชื่อสินค้า เพื่อดูตัวอย่างลิงก์ที่จะแนบลงในวิดีโอ")
+
+    col_tst1, col_tst2 = st.columns([3, 1], gap="medium")
+    with col_tst1:
+        test_url_input = st.text_input("ใส่ลิงก์สินค้า Shopee หรือพิมพ์ชื่อสินค้า:", value="https://shopee.co.th/sample-product", key="inp_shopee_test")
+    with col_tst2:
+        st.write("")
+        st.write("")
+        btn_convert = st.button("🔄 แปลงเป็นลิงก์ Affiliate ทันที", type="primary", use_container_width=True)
+
+    if btn_convert and test_url_input:
+        ok, res_aff = generate_shopee_affiliate_link(test_url_input, sub_id=shp_sub1, cfg=shp_cfg)
+        if ok:
+            st.success("✅ แปลงลิงก์สำเร็จ!")
+            st.code(res_aff, language="text")
+        else:
+            st.error(f"❌ {res_aff}")
+
+    st.divider()
+
+    # Preview Pinned Comment Generator
+    st.markdown("#### 📌 ตัวอย่างคอมเมนต์ปักหมุดที่สร้างโดยอัตโนมัติ (Item A vs Item B)")
+    sample_comm = auto_generate_affiliate_comments(
+        name_a=st.session_state.script_data.get("name_a", "สินค้า A"),
+        name_b=st.session_state.script_data.get("name_b", "สินค้า B"),
+        link_a=st.session_state.script_data.get("affiliate_comment", ""),
+        link_b="",
+        cfg=shp_cfg,
+    )
+    st.code(sample_comm, language="text")
+
 
 
