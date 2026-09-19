@@ -47,6 +47,7 @@ from ai_script_generator import (
     DURATION_MODES,
     CATEGORIES,
     generate_social_caption,
+    extract_names_from_topic,
 )
 from tts_engine import TTSEngine
 from video_builder import VideoBuilder
@@ -453,15 +454,25 @@ with tab_script:
             if len(st.session_state.seen_topics) > 30:
                 st.session_state.seen_topics.pop(0)
             st.session_state.input_topic = idea["topic"]
+            st.session_state.in_topic = idea["topic"]
             st.session_state.input_name_a = idea["name_a"]
+            st.session_state.in_name_a = idea["name_a"]
             st.session_state.input_name_b = idea["name_b"]
+            st.session_state.in_name_b = idea["name_b"]
             st.session_state.input_details_a = idea.get("details_a", "")
+            st.session_state.in_details_a = idea.get("details_a", "")
             st.session_state.input_details_b = idea.get("details_b", "")
+            st.session_state.in_details_b = idea.get("details_b", "")
             st.session_state.input_target = idea.get("target_audience", "")
+            st.session_state.in_target = idea.get("target_audience", "")
             st.session_state.input_angles = idea.get("key_angles", "")
+            st.session_state.in_angles = idea.get("key_angles", "")
             st.session_state.input_aff_a = idea.get("affiliate_a", "")
+            st.session_state.aff_a = idea.get("affiliate_a", "")
             st.session_state.input_aff_b = idea.get("affiliate_b", "")
+            st.session_state.aff_b = idea.get("affiliate_b", "")
             st.session_state.input_framework = idea.get("framework", "persona")
+            st.session_state.last_parsed_topic = idea["topic"]
             st.rerun()
 
         if st.button("🤖 ให้ AI วิเคราะห์คิดหัวข้อสดใหม่", use_container_width=True, type="primary"):
@@ -471,19 +482,65 @@ with tab_script:
                 idea = get_random_idea(category=cat_param, framework=fw_param, use_ai=True)
                 st.session_state.seen_topics.append(idea["topic"])
                 st.session_state.input_topic = idea["topic"]
+                st.session_state.in_topic = idea["topic"]
                 st.session_state.input_name_a = idea["name_a"]
+                st.session_state.in_name_a = idea["name_a"]
                 st.session_state.input_name_b = idea["name_b"]
+                st.session_state.in_name_b = idea["name_b"]
                 st.session_state.input_details_a = idea.get("details_a", "")
+                st.session_state.in_details_a = idea.get("details_a", "")
                 st.session_state.input_details_b = idea.get("details_b", "")
+                st.session_state.in_details_b = idea.get("details_b", "")
                 st.session_state.input_target = idea.get("target_audience", "")
+                st.session_state.in_target = idea.get("target_audience", "")
                 st.session_state.input_angles = idea.get("key_angles", "")
+                st.session_state.in_angles = idea.get("key_angles", "")
                 st.session_state.input_aff_a = idea.get("affiliate_a", "")
+                st.session_state.aff_a = idea.get("affiliate_a", "")
                 st.session_state.input_aff_b = idea.get("affiliate_b", "")
+                st.session_state.aff_b = idea.get("affiliate_b", "")
                 st.session_state.input_framework = idea.get("framework", "persona")
+                st.session_state.last_parsed_topic = idea["topic"]
                 st.rerun()
 
     # Input form (เรียงแถวเดียวตามลำดับการทำงาน สวยงาม เป็นระเบียบ ไม่ข้ามไปมา)
-    in_topic = st.text_input("📌 1. หัวข้อเปรียบเทียบ (Topic):", value=st.session_state.input_topic, placeholder="เช่น กาแฟดริป VS กาแฟแคปซูล")
+    cur_topic = st.session_state.get("in_topic", st.session_state.input_topic)
+    in_topic = st.text_input("📌 1. หัวข้อเปรียบเทียบ (Topic):", value=cur_topic, placeholder="เช่น กาแฟดริป VS กาแฟแคปซูล", key="in_topic")
+
+    # Auto-detect product names whenever Topic changes
+    if "last_parsed_topic" not in st.session_state:
+        st.session_state.last_parsed_topic = in_topic
+
+    if in_topic and in_topic != st.session_state.last_parsed_topic:
+        p_a, p_b = extract_names_from_topic(in_topic)
+        if p_a and p_b:
+            st.session_state.input_name_a = p_a
+            st.session_state.in_name_a = p_a
+            st.session_state.input_name_b = p_b
+            st.session_state.in_name_b = p_b
+        st.session_state.last_parsed_topic = in_topic
+
+    # Dedicated Button & Live Detection Status
+    col_tbtn, col_tinfo = st.columns([1, 1], gap="small")
+    with col_tbtn:
+        if st.button("🔄 อัปเดตแยกชื่อสินค้า A & B จากหัวข้อ", use_container_width=True, help="คลิกเพื่อแยกชื่อสินค้า A และ B จากหัวข้อมาใส่ในช่องข้อมูลด้านล่างทันที"):
+            p_a, p_b = extract_names_from_topic(in_topic)
+            if p_a and p_b:
+                st.session_state.input_name_a = p_a
+                st.session_state.in_name_a = p_a
+                st.session_state.input_name_b = p_b
+                st.session_state.in_name_b = p_b
+                st.session_state.last_parsed_topic = in_topic
+                st.toast(f"✅ อัปเดตสินค้า: A = {p_a} | B = {p_b}")
+                st.rerun()
+            else:
+                st.warning("ไม่พบคำเชื่อมเปรียบเทียบ (เช่น VS, กับ, หรือ) ในหัวข้อนี้ กรุณาระบุชื่อสินค้าในช่องด้านล่าง")
+    with col_tinfo:
+        p_a_view, p_b_view = extract_names_from_topic(in_topic)
+        if p_a_view and p_b_view:
+            st.caption(f"💡 สินค้าที่ตรวจพบ: 🟢 **{p_a_view}** VS 🔵 **{p_b_view}**")
+        else:
+            st.caption("💡 เคล็ดลับ: พิมพ์คั่นด้วย 'VS', 'กับ', หรือ 'หรือ' ระบบจะแยกชื่อสินค้าให้อัตโนมัติ")
 
     fw_options = list(FRAMEWORK_PRESETS.keys())
     cur_fw_idx = fw_options.index(st.session_state.input_framework) if st.session_state.input_framework in fw_options else 0
@@ -510,12 +567,14 @@ with tab_script:
     col_a, col_b = st.columns(2, gap="medium")
     with col_a:
         st.markdown("###### 🟢 ฝั่ง A")
-        in_name_a = st.text_input("ชื่อสินค้า/ตัวเลือก A:", value=st.session_state.input_name_a, placeholder="เช่น กาแฟดริป", key="in_name_a")
+        val_name_a = st.session_state.get("in_name_a", st.session_state.input_name_a)
+        in_name_a = st.text_input("ชื่อสินค้า/ตัวเลือก A:", value=val_name_a, placeholder="เช่น กาแฟดริป", key="in_name_a")
         in_details_a = st.text_area("จุดเด่น / สเปก / ข้อดี A:", value=st.session_state.input_details_a, height=75, placeholder="จุดเด่น สเปก หรือข้อดีของสินค้า A", key="in_details_a")
         aff_a = st.text_input("🔗 ลิงก์ Shopee สินค้า A:", value=st.session_state.input_aff_a, placeholder="ลิงก์สินค้า A เช่น https://shopee.co.th/...", key="aff_a")
     with col_b:
         st.markdown("###### 🔵 ฝั่ง B")
-        in_name_b = st.text_input("ชื่อสินค้า/ตัวเลือก B:", value=st.session_state.input_name_b, placeholder="เช่น กาแฟแคปซูล", key="in_name_b")
+        val_name_b = st.session_state.get("in_name_b", st.session_state.input_name_b)
+        in_name_b = st.text_input("ชื่อสินค้า/ตัวเลือก B:", value=val_name_b, placeholder="เช่น กาแฟแคปซูล", key="in_name_b")
         in_details_b = st.text_area("จุดเด่น / สเปก / ข้อดี B:", value=st.session_state.input_details_b, height=75, placeholder="จุดเด่น สเปก หรือข้อดีของสินค้า B", key="in_details_b")
         aff_b = st.text_input("🔗 ลิงก์ Shopee สินค้า B:", value=st.session_state.input_aff_b, placeholder="ลิงก์สินค้า B เช่น https://shopee.co.th/...", key="aff_b")
 
@@ -528,13 +587,24 @@ with tab_script:
 
     st.markdown("##### 🚀 6. สั่ง AI ผลิตบทพากย์")
     if st.button("🚀 สั่ง Gemini ร่างบททันที (พร้อมค้นหาข้อมูลเชิงลึก)", type="primary", use_container_width=True):
+        # Auto-resolve names from topic if user forgot to click update
+        eff_name_a = in_name_a
+        eff_name_b = in_name_b
+        if (eff_name_a == "กาแฟดริป" and "กาแฟ" not in in_topic) or not eff_name_a or not eff_name_b:
+            p_a, p_b = extract_names_from_topic(in_topic)
+            if p_a and p_b:
+                eff_name_a, eff_name_b = p_a, p_b
+                st.session_state.in_name_a = eff_name_a
+                st.session_state.in_name_b = eff_name_b
+                st.session_state.input_name_a = eff_name_a
+                st.session_state.input_name_b = eff_name_b
         with st.spinner("🤖 Gemini กำลังทำ Deep Research วิเคราะห์สเปก จุดแข็ง จุดด้อย และร่างบทตาม Framework..."):
             try:
                 gen = AIScriptGenerator()
                 new_data = gen.generate_script(
                     topic=in_topic,
-                    name_a=in_name_a,
-                    name_b=in_name_b,
+                    name_a=eff_name_a,
+                    name_b=eff_name_b,
                     details_a=in_details_a,
                     details_b=in_details_b,
                     target_audience=in_target,
@@ -553,6 +623,17 @@ with tab_script:
                 st.error(f"เกิดข้อผิดพลาดในการเรียก AI: {e}")
 
     if st.button("⚡ 1-Click Viral Auto-Pilot (คลิกเดียวจบครบวงจร)", type="secondary", use_container_width=True):
+        # Auto-resolve names from topic if user forgot to click update
+        eff_name_a = in_name_a
+        eff_name_b = in_name_b
+        if (eff_name_a == "กาแฟดริป" and "กาแฟ" not in in_topic) or not eff_name_a or not eff_name_b:
+            p_a, p_b = extract_names_from_topic(in_topic)
+            if p_a and p_b:
+                eff_name_a, eff_name_b = p_a, p_b
+                st.session_state.in_name_a = eff_name_a
+                st.session_state.in_name_b = eff_name_b
+                st.session_state.input_name_a = eff_name_a
+                st.session_state.input_name_b = eff_name_b
         status_box = st.status("⚡ กำลังรันโหมด Auto-Pilot สร้างคลิปครบวงจร...", expanded=True)
         with status_box:
             try:
@@ -560,8 +641,8 @@ with tab_script:
                 gen = AIScriptGenerator()
                 new_data = gen.generate_script(
                     topic=in_topic,
-                    name_a=in_name_a,
-                    name_b=in_name_b,
+                    name_a=eff_name_a,
+                    name_b=eff_name_b,
                     details_a=in_details_a,
                     details_b=in_details_b,
                     target_audience=in_target,

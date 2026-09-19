@@ -246,8 +246,23 @@ def generate_social_caption(data: Dict[str, Any]) -> Dict[str, str]:
     }
 
 
+def extract_names_from_topic(topic: str) -> tuple[str, str]:
+    """Extracts Item A and Item B from a comparison topic string."""
+    if not topic:
+        return "", ""
+    delimiters = [" VS ", " vs ", " Vs ", " v ", " V ", " กับ ", " หรือ ", " vs. ", " VS. ", " / "]
+    for d in delimiters:
+        if d in topic:
+            parts = topic.split(d, 1)
+            a = re.sub(r"^[0-9\.\s\-\:\#\*\U00010000-\U0010ffff]+", "", parts[0]).strip()
+            b = re.sub(r"^[0-9\.\s\-\:\#\*\U00010000-\U0010ffff]+", "", parts[1]).strip()
+            if a and b:
+                return a, b
+    return "", ""
+
+
 class AIScriptGenerator:
-    """Generates deep, fact-based Thai comparison scripts using Gemini 3.6 / 3.5 Flash."""
+    """Generates deep, fact-based Thai comparison scripts using Gemini."""
 
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
@@ -264,18 +279,19 @@ class AIScriptGenerator:
                 "Gemini API Key is missing! Set GEMINI_API_KEY in .env or pass it to AIScriptGenerator."
             )
         # Multi-tiered model hierarchy:
-        # 1. Google AI Pro Flagship (Gemini 3.1 Pro / Pro Latest) - Deepest facts, research & reasoning
-        # 2. Gemini 3.7 Flash & 3.6 Flash - State-of-the-art fast intelligence
-        # 3. Gemini Flash Latest - High-quota reliable fallback
+        # 1. Gemini Flash Latest & 2.5 Flash - State-of-the-art fast intelligence & reliable quota
+        # 2. Gemini 3.5 Flash & 3-Flash-Preview - Cutting edge reasoning
+        # 3. Gemini 3.1 Pro Preview - Flagship deep reasoning fallback
         self.endpoints = [
-            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key={self.api_key}",
-            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-latest:generateContent?key={self.api_key}",
-            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent?key={self.api_key}",
-            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={self.api_key}",
             f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={self.api_key}",
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={self.api_key}",
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={self.api_key}",
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key={self.api_key}",
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key={self.api_key}",
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key={self.api_key}",
         ]
         self.endpoint = self.endpoints[0]
-        self.fallback_endpoint = self.endpoints[3]
+        self.fallback_endpoint = self.endpoints[1]
         self.secondary_fallback = self.endpoints[4]
 
     def generate_script(
@@ -302,6 +318,12 @@ class AIScriptGenerator:
         """
         fw = FRAMEWORK_PRESETS.get(framework, FRAMEWORK_PRESETS["persona"])
         outro_prompt_hint = f"\n- ข้อความส่งท้ายประจำเพจที่ต้องสอดแทรกไว้ใน conclusion: '{channel_outro_cta}'" if channel_outro_cta else ""
+
+        # Safeguard: if name_a/b are empty or mismatched coffee defaults when topic is different
+        if (name_a == "กาแฟดริป" and "กาแฟ" not in topic) or not name_a or not name_b:
+            parsed_a, parsed_b = extract_names_from_topic(topic)
+            if parsed_a and parsed_b:
+                name_a, name_b = parsed_a, parsed_b
 
         # Map script_mode to standardized depth
         if script_mode in ("classic", "short_1round"):
@@ -426,7 +448,17 @@ class AIScriptGenerator:
   "affiliate_comment": "📍 พิกัดของแท้ราคาโปร:\\n👉 {name_a}: [ลิงก์ A]\\n👉 {name_b}: [ลิงก์ B]\\n(โหวตกันในคอมเมนต์ได้เลยครับ)"
 }}
 """
-        raw_res = self._call_gemini(prompt, affiliate_link_a, affiliate_link_b, topic, name_a, name_b)
+        raw_res = self._call_gemini(
+            prompt,
+            affiliate_link_a,
+            affiliate_link_b,
+            topic,
+            name_a,
+            name_b,
+            num_rounds=num_rounds,
+            round_focus_map=round_focus_map,
+            active_mode=active_mode,
+        )
         return self._package_script_data(raw_res, active_mode, name_a, name_b, framework)
 
     def _package_script_data(
@@ -523,15 +555,23 @@ class AIScriptGenerator:
                     "name_b": r_name_b,
                 })
 
-        segments.append({"id": "conclusion", "text": data.get("conclusion", ""), "highlight": "none", "round_label": "🏁 สรุปฟันธง"})
-        data["segments"] = segments
-        data["rounds_data"] = rounds_data
+        conclusion_text = data.get("conclusion", "")
+        segments.append({
+            "id": "conclusion",
+            "text": conclusion_text,
+            "highlight": "none",
+            "round_label": "🏁 สรุปฟันธง",
+        })
 
-        # Generate Social Caption & Hashtags
+        data["segments"] = segments
+        data["rounds"] = rounds_data
+        data["rounds_data"] = rounds_data
+        data.setdefault("item_a", data.get("round_1_a", ""))
+        data.setdefault("item_b", data.get("round_1_b", ""))
+
         social_info = generate_social_caption(data)
         data["social_caption"] = data.get("social_caption") or social_info["social_caption"]
         data["hashtags"] = data.get("hashtags") or social_info["hashtags"]
-
         return data
 
     def rewrite_script(
@@ -593,7 +633,16 @@ class AIScriptGenerator:
   "affiliate_comment": "{current_script.get('affiliate_comment', '')}"
 }}
 """
-        raw_res = self._call_gemini(prompt, "", "", topic, name_a, name_b)
+        raw_res = self._call_gemini(
+            prompt,
+            "",
+            "",
+            topic,
+            name_a,
+            name_b,
+            num_rounds=num_rounds,
+            active_mode=mode,
+        )
         return self._package_script_data(raw_res, mode, name_a, name_b, framework=fw)
 
     def _call_gemini(
@@ -604,6 +653,9 @@ class AIScriptGenerator:
         topic: str,
         name_a: str,
         name_b: str,
+        num_rounds: int = 3,
+        round_focus_map: Optional[Dict[int, str]] = None,
+        active_mode: str = "deep_3round",
     ) -> Dict[str, Any]:
         """Helper to call Gemini REST API and parse response with multi-tier fallback."""
         payload = {
@@ -645,11 +697,13 @@ class AIScriptGenerator:
             except Exception as e:
                 print(f"[AI] Call warning on {url}: {e}")
 
-        # Fallback template
-        return {
+        # Complete fallback template with all rounds populated
+        fb = {
             "topic": topic,
             "name_a": name_a,
             "name_b": name_b,
+            "mode": active_mode,
+            "num_rounds": num_rounds,
             "research_summary": f"เปรียบเทียบ {name_a} ด้านความยืดหยุ่นและการควบคุม กับ {name_b} ด้านความรวดเร็วและมาตรฐานสม่ำเสมอ",
             "hook": f"สองตัวนี้เลือกอะไรดี? มาดูความต่างระหว่าง {name_a} กับ {name_b} กันครับ!",
             "item_a": f"{name_a} โดดเด่นด้วยฟังก์ชันที่ครบครัน เหมาะกับคนที่ชอบความคุ้มค่าและปรับแต่งได้ตามใจ",
@@ -657,6 +711,18 @@ class AIScriptGenerator:
             "conclusion": "แล้วคุณล่ะชอบตัวไหนมากกว่ากัน? พิกัดราคาพิเศษของทั้งสองตัว ปักหมุดไว้ในคอมเมนต์เรียบร้อยแล้วครับ!",
             "affiliate_comment": f"📍 พิกัดของแท้ราคาโปร:\n👉 {name_a}: {affiliate_link_a or '[ใส่ลิงก์ A]'}\n👉 {name_b}: {affiliate_link_b or '[ใส่ลิงก์ B]'}\nโหวตกันในคอมเมนต์ได้เลยน้า!",
         }
+        rf_map = round_focus_map or {
+            1: "คุณภาพ & การใช้งานจริง",
+            2: "ความสะดวก & ความคุ้มค่า",
+            3: "ความคุ้มค่า & ราคาต่อการใช้งาน",
+            4: "ความทนทาน & ประสบการณ์ระยะยาว",
+        }
+        for r in range(1, num_rounds + 1):
+            f_title = rf_map.get(r, f"มิติที่ {r}")
+            fb[f"round_{r}_title"] = f_title
+            fb[f"round_{r}_a"] = f"{name_a} ในมิติ {f_title} ตอบโจทย์การใช้งานจริงและมีฟังก์ชันครบครัน"
+            fb[f"round_{r}_b"] = f"ส่วน {name_b} ในด้าน {f_title} เน้นความสะดวก รวดเร็ว และได้ผลลัพธ์ที่สม่ำเสมอ"
+        return fb
 
     def _clean_and_parse_json(self, text: str) -> Dict[str, Any]:
         """Strip markdown code fence if present and parse JSON with fallbacks."""
