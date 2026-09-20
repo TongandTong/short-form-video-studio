@@ -1647,45 +1647,69 @@ with tab_queue:
                 }.get(status, status)
 
                 card_label = f"#{idx+1} {p_badge}{topic_title} — {s_badge}"
-                with st.expander(card_label, expanded=(status == "ready" and idx < 2)):
+                with st.expander(card_label, expanded=(status in ["ready", "error"] and idx < 2)):
                     st.markdown(f"**มวยถูกคู่:** `{name_a}` **VS** `{name_b}`")
                     st.caption(f"🗓️ สร้างเมื่อ: {item.get('created_at', '')} | กรอบ: {item.get('framework', '')} | โหมด: {'📦 เรนเดอร์เก็บไว้' if post_mode == 'render_only' else '🚀 เรนเดอร์แล้วโพสต์เลย'}")
 
-                    st.markdown(f"##### 🟢 ข้อมูลสินค้าฝั่ง A: **{name_a}**")
-                    cur_a = item.get("image_a_path")
-                    if cur_a and Path(cur_a).exists():
-                        st.image(cur_a, width=150)
-                    else:
-                        st.warning("⚠️ ยังไม่มีรูป (จะออโต้ค้นหา)")
-                    
-                    up_a = st.file_uploader(f"เปลี่ยนรูป {name_a}:", type=["png", "jpg", "jpeg", "webp"], key=f"up_a_{item_id}")
-                    if up_a:
-                        new_p_a = save_queue_image_asset(item_id, "a", up_a.getvalue())
-                        update_planned_item(item_id, {"image_a_path": new_p_a})
-                        st.toast(f"อัปเดตรูป {name_a} แล้ว!")
-                        st.rerun()
+                    if status == "error":
+                        err_detail = item.get("error_message") or "ไม่ระบุสาเหตุ"
+                        st.error(f"❌ สาเหตุข้อผิดพลาดล่าสุด: {err_detail}")
+                        if st.button("🔄 รีเซ็ตคิวนี้กลับเป็น 'พร้อมเรนเดอร์' (Reset & Retry)", key=f"btn_retry_{item_id}", type="primary", use_container_width=True):
+                            update_planned_item(item_id, {"status": "ready", "error_message": None})
+                            st.toast("รีเซ็ตสถานะเป็นพร้อมเรนเดอร์แล้ว")
+                            st.rerun()
 
-                    new_aff_a = st.text_input("ลิงก์ Aff A:", value=item.get("affiliate_link_a", ""), key=f"aff_a_{item_id}")
-                    if new_aff_a != item.get("affiliate_link_a"):
-                        update_planned_item(item_id, {"affiliate_link_a": new_aff_a})
+                    # Two columns in the same plane for Item A and Item B
+                    col_qa, col_qb = st.columns(2, gap="medium")
+                    with col_qa:
+                        st.markdown(f"##### 🟢 ข้อมูลสินค้าฝั่ง A: **{name_a}**")
+                        cur_a = item.get("image_a_path")
+                        if cur_a and Path(cur_a).exists():
+                            st.image(cur_a, width=150)
+                        else:
+                            st.warning("⚠️ ยังไม่มีรูป (จะออโต้ค้นหา)")
 
-                    st.markdown(f"##### 🔵 ข้อมูลสินค้าฝั่ง B: **{name_b}**")
-                    cur_b = item.get("image_b_path")
-                    if cur_b and Path(cur_b).exists():
-                        st.image(cur_b, width=150)
-                    else:
-                        st.warning("⚠️ ยังไม่มีรูป (จะออโต้ค้นหา)")
-                    
-                    up_b = st.file_uploader(f"เปลี่ยนรูป {name_b}:", type=["png", "jpg", "jpeg", "webp"], key=f"up_b_{item_id}")
-                    if up_b:
-                        new_p_b = save_queue_image_asset(item_id, "b", up_b.getvalue())
-                        update_planned_item(item_id, {"image_b_path": new_p_b})
-                        st.toast(f"อัปเดตรูป {name_b} แล้ว!")
-                        st.rerun()
+                        up_a = st.file_uploader(f"เปลี่ยนรูป {name_a}:", type=["png", "jpg", "jpeg", "webp"], key=f"up_a_{item_id}")
+                        if up_a is not None:
+                            import hashlib
+                            f_bytes_a = up_a.getvalue()
+                            f_hash_a = hashlib.md5(f_bytes_a).hexdigest()
+                            hash_key_a = f"uploaded_hash_a_{item_id}"
+                            if st.session_state.get(hash_key_a) != f_hash_a:
+                                new_p_a = save_queue_image_asset(item_id, "a", f_bytes_a)
+                                update_planned_item(item_id, {"image_a_path": new_p_a})
+                                st.session_state[hash_key_a] = f_hash_a
+                                st.toast(f"✅ อัปเดตรูป {name_a} สำเร็จ!")
+                                st.rerun()
 
-                    new_aff_b = st.text_input("ลิงก์ Aff B:", value=item.get("affiliate_link_b", ""), key=f"aff_b_{item_id}")
-                    if new_aff_b != item.get("affiliate_link_b"):
-                        update_planned_item(item_id, {"affiliate_link_b": new_aff_b})
+                        new_aff_a = st.text_input("ลิงก์ Aff A:", value=item.get("affiliate_link_a", ""), key=f"aff_a_{item_id}")
+                        if new_aff_a != item.get("affiliate_link_a"):
+                            update_planned_item(item_id, {"affiliate_link_a": new_aff_a})
+
+                    with col_qb:
+                        st.markdown(f"##### 🔵 ข้อมูลสินค้าฝั่ง B: **{name_b}**")
+                        cur_b = item.get("image_b_path")
+                        if cur_b and Path(cur_b).exists():
+                            st.image(cur_b, width=150)
+                        else:
+                            st.warning("⚠️ ยังไม่มีรูป (จะออโต้ค้นหา)")
+
+                        up_b = st.file_uploader(f"เปลี่ยนรูป {name_b}:", type=["png", "jpg", "jpeg", "webp"], key=f"up_b_{item_id}")
+                        if up_b is not None:
+                            import hashlib
+                            f_bytes_b = up_b.getvalue()
+                            f_hash_b = hashlib.md5(f_bytes_b).hexdigest()
+                            hash_key_b = f"uploaded_hash_b_{item_id}"
+                            if st.session_state.get(hash_key_b) != f_hash_b:
+                                new_p_b = save_queue_image_asset(item_id, "b", f_bytes_b)
+                                update_planned_item(item_id, {"image_b_path": new_p_b})
+                                st.session_state[hash_key_b] = f_hash_b
+                                st.toast(f"✅ อัปเดตรูป {name_b} สำเร็จ!")
+                                st.rerun()
+
+                        new_aff_b = st.text_input("ลิงก์ Aff B:", value=item.get("affiliate_link_b", ""), key=f"aff_b_{item_id}")
+                        if new_aff_b != item.get("affiliate_link_b"):
+                            update_planned_item(item_id, {"affiliate_link_b": new_aff_b})
 
                     v_done = item.get("video_path")
                     if v_done and Path(v_done).exists():
@@ -1706,7 +1730,7 @@ with tab_queue:
 
                     if status != "ready":
                         if st.button("🟢 ตั้งเป็น 'พร้อมเรนเดอร์'", key=f"btn_rdy_{item_id}", use_container_width=True):
-                            update_planned_item(item_id, {"status": "ready"})
+                            update_planned_item(item_id, {"status": "ready", "error_message": None})
                             st.rerun()
                     else:
                         if st.button("⏸️ พักคิวไว้ก่อน (Draft)", key=f"btn_dft_{item_id}", use_container_width=True):
@@ -1717,9 +1741,13 @@ with tab_queue:
                         with st.spinner(f"กำลังเรนเดอร์คลิป: {topic_title}..."):
                             ok, msg = run_autopilot_cycle(is_manual=True, queue_item_id=item_id, force_post_mode=clean_item_pm)
                             if ok:
+                                st.toast(f"🎉 {msg}")
                                 st.success(f"สำเร็จ: {msg}")
                             else:
+                                st.toast(f"❌ {msg}")
                                 st.error(f"ผิดพลาด: {msg}")
+                            import time
+                            time.sleep(1)
                             st.rerun()
 
                     st.markdown("**↕️ ลำดับคิว:**")
