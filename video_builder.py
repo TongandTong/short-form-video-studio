@@ -62,12 +62,17 @@ class VideoBuilder:
         highlight_color: Tuple[int, int, int] = COLOR_HIGHLIGHT_LIME,
         font_path: Optional[str] = None,
         animation_style: str = "pointer_and_border",  # "pointer_and_border", "border_only", "scale_pulse"
+        subtitle_style: str = "clean_floating",
+        subtitle_anim: str = "typewriter",
+        **kwargs,
     ):
         self.bg_color = bg_color
         self.highlight_color = highlight_color
         self.animation_style = animation_style
         self.font_bold_path = font_path or get_font_path("bold")
         self.font_regular_path = get_regular_font_path()
+        self.subtitle_style = subtitle_style
+        self.subtitle_anim = subtitle_anim
 
     def _load_font(self, size: int, bold: bool = True) -> ImageFont.FreeTypeFont:
         f_path = self.font_bold_path if bold else self.font_regular_path
@@ -595,12 +600,14 @@ class VideoBuilder:
         watermark_text: Optional[str] = None,
         watermark_opacity: float = 0.75,
         round_assets: Optional[Dict[int, Dict[str, Any]]] = None,
-        subtitle_style: str = "clean_floating",
-        subtitle_anim: str = "typewriter",
+        subtitle_style: Optional[str] = None,
+        subtitle_anim: Optional[str] = None,
     ) -> Path:
         """Main video rendering pipeline with animated pointing and synchronized highlights."""
         output_video_path.parent.mkdir(parents=True, exist_ok=True)
-        print("[VideoBuilder] Pre-rendering visual layers...")
+        sub_style = subtitle_style or getattr(self, "subtitle_style", "clean_floating")
+        sub_anim = subtitle_anim or getattr(self, "subtitle_anim", "typewriter")
+        print(f"[VideoBuilder] Pre-rendering visual layers (subtitle_style={sub_style}, anim={sub_anim})...")
 
         # 1. Base Background
         if custom_bg_path and Path(custom_bg_path).exists():
@@ -660,21 +667,21 @@ class VideoBuilder:
             r_lbl = getattr(seg, "round_label", "")
             clusters = thai_cluster_re.findall(text)
             steps = []
-            if len(clusters) > 1 and subtitle_anim == "typewriter":
+            if len(clusters) > 1 and sub_anim == "typewriter":
                 total_c = len(clusters)
                 num_steps = max(8, min(24, total_c))
                 for s_i in range(1, num_steps + 1):
                     c_idx = max(1, int(total_c * (s_i / num_steps)))
                     partial = "".join(clusters[:c_idx])
-                    steps.append(self._render_subtitle_card(partial, r_lbl, style=subtitle_style))
+                    steps.append(self._render_subtitle_card(partial, r_lbl, style=sub_style))
             else:
-                steps = [self._render_subtitle_card(text, r_lbl, style=subtitle_style)]
+                steps = [self._render_subtitle_card(text, r_lbl, style=sub_style)]
 
             if not steps:
-                steps = [self._render_subtitle_card(text, r_lbl, style=subtitle_style)]
+                steps = [self._render_subtitle_card(text, r_lbl, style=sub_style)]
             subtitle_progressions[seg.segment_id] = steps
 
-        default_sub_card = self._render_subtitle_card(f"กำลังเปรียบเทียบ: {name_a} vs {name_b}", style=subtitle_style)
+        default_sub_card = self._render_subtitle_card(f"กำลังเปรียบเทียบ: {name_a} vs {name_b}", style=sub_style)
 
         # 7. Animated Pointing Indicator
         pointer_img = self._render_pointing_indicator("กำลังพูดถึง 👇")

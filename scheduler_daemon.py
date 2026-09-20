@@ -272,9 +272,9 @@ def run_autopilot_cycle(
         sub_style = profile.get("default_subtitle_style", "clean_floating")
         sub_anim = profile.get("default_subtitle_anim", "typewriter")
         builder = VideoBuilder(
-            bg_color=hex_to_rgb(profile.get("bg_color", "#F5F2EB")),
-            highlight_color=hex_to_rgb(profile.get("highlight_color", "#32CD32")),
-            animation_style=profile.get("default_mascot_anim", "pointer_and_border"),
+            bg_color=hex_to_rgb(profile.get("default_bg_color", profile.get("bg_color", "#F5F2EB"))),
+            highlight_color=hex_to_rgb(profile.get("default_highlight_color", profile.get("highlight_color", "#32CD32"))),
+            animation_style=profile.get("default_anim_style", profile.get("default_mascot_anim", "pointer_and_border")),
             subtitle_style=sub_style,
             subtitle_anim=sub_anim,
         )
@@ -299,6 +299,8 @@ def run_autopilot_cycle(
             watermark_logo_path=wm_logo,
             watermark_text=wm_text,
             watermark_opacity=wm_opac,
+            subtitle_style=sub_style,
+            subtitle_anim=sub_anim,
         )
 
         cover_path = output_mp4.parent / f"{output_mp4.stem}_cover.jpg"
