@@ -46,6 +46,8 @@ from ai_script_generator import (
     FRAMEWORK_PRESETS,
     DURATION_MODES,
     CATEGORIES,
+    CLIP_TYPES,
+    RELATION_TYPES,
     generate_social_caption,
     extract_names_from_topic,
 )
@@ -400,6 +402,10 @@ if "input_aff_b" not in st.session_state:
     st.session_state.input_aff_b = ""
 if "input_framework" not in st.session_state:
     st.session_state.input_framework = st.session_state.script_data.get("framework", "persona")
+if "input_clip_type" not in st.session_state:
+    st.session_state.input_clip_type = st.session_state.script_data.get("clip_type", "commerce")
+if "input_relation_type" not in st.session_state:
+    st.session_state.input_relation_type = st.session_state.script_data.get("relation_type", "compare")
 
 # -------------------------------------------------------------
 # 5 STRUCTURED TABS NAVIGATION
@@ -417,6 +423,38 @@ tab_script, tab_render, tab_autopilot, tab_queue, tab_settings = st.tabs([
 # =============================================================
 with tab_script:
     st.markdown("### 📌 ขั้นตอนที่ 1: กำหนดหัวข้อ & กรอบแนวคิด (Topic & Framework)")
+
+    col_ctype, col_rel = st.columns([1, 1], gap="medium")
+    with col_ctype:
+        c_types_keys = list(CLIP_TYPES.keys())
+        cur_ctype = st.session_state.get("input_clip_type", "commerce")
+        c_idx = c_types_keys.index(cur_ctype) if cur_ctype in c_types_keys else 0
+        selected_clip_type = st.radio(
+            "🎯 รูปแบบ / วัตถุประสงค์ของคลิป:",
+            options=c_types_keys,
+            format_func=lambda k: CLIP_TYPES[k]["name"],
+            index=c_idx,
+            horizontal=True,
+            key="selected_clip_type",
+            help="เลือกระหว่าง 'คลิปขายของ/ป้ายยา' (เน้นสินค้า & พิกัด Shopee) หรือ 'คลิปไวรัลสาระความรู้' (เน้นเปรียบเทียบข้อเท็จจริง สาระ ประวัติศาสตร์ วัฒนธรรม โดยไม่เน้นขายของ)",
+        )
+        st.session_state.input_clip_type = selected_clip_type
+    with col_rel:
+        rel_keys = list(RELATION_TYPES.keys())
+        cur_rel = st.session_state.get("input_relation_type", "compare")
+        r_idx = rel_keys.index(cur_rel) if cur_rel in rel_keys else 0
+        selected_relation = st.selectbox(
+            "📐 ฟังก์ชัน / มุมมองคู่เทียบ:",
+            options=rel_keys,
+            format_func=lambda k: RELATION_TYPES[k]["name"],
+            index=r_idx,
+            key="selected_relation",
+            help="กำหนดมุมมองการวิเคราะห์ เช่น เปรียบเทียบตรงๆ (VS), เจาะลึกความต่าง (แตกต่าง), วิเคราะห์การทำงานร่วมกัน (เข้ากัน), หรือมุมมองอิสระ",
+        )
+        st.session_state.input_relation_type = selected_relation
+
+    st.caption(f"💡 **แนวทาง:** {CLIP_TYPES[selected_clip_type]['desc']} | **มุมมอง:** {RELATION_TYPES[selected_relation]['desc']}")
+
     num_fw = len(FRAMEWORK_PRESETS)
     st.markdown(
         f"""
@@ -436,13 +474,13 @@ with tab_script:
 
         seed_kw = st.text_input(
             "💡 พิมพ์ไอเดีย/สินค้าตั้งต้น (ไม่บังคับ):",
-            placeholder="เช่น ยาดม, ชาเขียว, แปรงสีฟันไฟฟ้า, คอลลาเจน (หรือเว้นว่างไว้หากต้องการสุ่มอิสระ)",
+            placeholder="เช่น ศาสนาพุทธ, ไทย VS พม่า, แปรงสีฟันไฟฟ้า, ยาดม (หรือเว้นว่างไว้หากต้องการสุ่มอิสระ)" if selected_clip_type == "viral_knowledge" else "เช่น ยาดม, ชาเขียว, แปรงสีฟันไฟฟ้า, คอลลาเจน (หรือเว้นว่างไว้หากต้องการสุ่มอิสระ)",
             key="seed_topic_kw",
-            help="หากพิมพ์คำค้น เช่น 'ยาดม' AI จะวิเคราะห์และจับคู่เปรียบเทียบกับสินค้าตัวแทนที่น่าสนใจให้โดยอัตโนมัติ",
+            help="หากพิมพ์คำค้น AI จะวิเคราะห์และจับคู่เปรียบเทียบกับคู่ตรงข้าม/คู่ตัวแทนที่น่าสนใจให้โดยอัตโนมัติตามรูปแบบคลิปที่เลือก",
         )
 
         cat_options = ["ทั้งหมด (สุ่มทุกหมวด)"] + CATEGORIES
-        selected_cat = st.selectbox("📂 หมวดหมู่สินค้า:", cat_options, index=0)
+        selected_cat = st.selectbox("📂 หมวดหมู่สินค้า/เนื้อหา:", cat_options, index=0)
 
         fw_filter_options = [("all", f"🎯 สุ่มทุกแนวทาง ({num_fw} Frameworks)")] + [
             (k, FRAMEWORK_PRESETS[k]["name"]) for k in FRAMEWORK_PRESETS
@@ -465,6 +503,8 @@ with tab_script:
                 use_ai=False,
                 seen_topics=st.session_state.seen_topics,
                 keyword=kw_clean if kw_clean else None,
+                clip_type=selected_clip_type,
+                relation_type=selected_relation,
             )
             st.session_state.seen_topics.append(idea["topic"])
             if len(st.session_state.seen_topics) > 30:
@@ -488,6 +528,10 @@ with tab_script:
             st.session_state.input_aff_b = idea.get("affiliate_b", "") or idea.get("affiliate_link_b", "")
             st.session_state.aff_b = idea.get("affiliate_b", "") or idea.get("affiliate_link_b", "")
             st.session_state.input_framework = idea.get("framework", "persona")
+            if "clip_type" in idea:
+                st.session_state.input_clip_type = idea["clip_type"]
+            if "relation_type" in idea:
+                st.session_state.input_relation_type = idea["relation_type"]
             st.session_state.last_parsed_topic = idea["topic"]
             st.rerun()
 
@@ -502,6 +546,8 @@ with tab_script:
                     framework=fw_param,
                     use_ai=True,
                     keyword=kw_clean if kw_clean else None,
+                    clip_type=selected_clip_type,
+                    relation_type=selected_relation,
                 )
                 st.session_state.seen_topics.append(idea["topic"])
                 st.session_state.input_topic = idea["topic"]
@@ -523,12 +569,18 @@ with tab_script:
                 st.session_state.input_aff_b = idea.get("affiliate_b", "") or idea.get("affiliate_link_b", "")
                 st.session_state.aff_b = idea.get("affiliate_b", "") or idea.get("affiliate_link_b", "")
                 st.session_state.input_framework = idea.get("framework", "persona")
+                if "clip_type" in idea:
+                    st.session_state.input_clip_type = idea["clip_type"]
+                if "relation_type" in idea:
+                    st.session_state.input_relation_type = idea["relation_type"]
                 st.session_state.last_parsed_topic = idea["topic"]
                 st.rerun()
 
     # Input form (เรียงแถวเดียวตามลำดับการทำงาน สวยงาม เป็นระเบียบ ไม่ข้ามไปมา)
     cur_topic = st.session_state.get("in_topic", st.session_state.input_topic)
-    in_topic = st.text_input("📌 1. หัวข้อเปรียบเทียบ (Topic):", value=cur_topic, placeholder="เช่น กาแฟดริป VS กาแฟแคปซูล", key="in_topic")
+    is_viral = (selected_clip_type == "viral_knowledge")
+    topic_placeholder = "เช่น ศาสนาพุทธ VS ศาสนาคริสต์ หรือ ไทย VS พม่า" if is_viral else "เช่น กาแฟดริป VS กาแฟแคปซูล"
+    in_topic = st.text_input("📌 1. หัวข้อเปรียบเทียบ (Topic):", value=cur_topic, placeholder=topic_placeholder, key="in_topic")
 
     # Auto-detect product names whenever Topic changes
     if "last_parsed_topic" not in st.session_state:
@@ -546,7 +598,8 @@ with tab_script:
     # Dedicated Button & Live Detection Status
     col_tbtn, col_tinfo = st.columns([1, 1], gap="small")
     with col_tbtn:
-        if st.button("🔄 อัปเดตแยกชื่อสินค้า A & B จากหัวข้อ", use_container_width=True, help="คลิกเพื่อแยกชื่อสินค้า A และ B จากหัวข้อมาใส่ในช่องข้อมูลด้านล่างทันที"):
+        btn_update_label = "🔄 อัปเดตแยกชื่อประเด็น A & B จากหัวข้อ" if is_viral else "🔄 อัปเดตแยกชื่อสินค้า A & B จากหัวข้อ"
+        if st.button(btn_update_label, use_container_width=True, help="คลิกเพื่อแยกชื่อ A และ B จากหัวข้อมาใส่ในช่องข้อมูลด้านล่างทันที"):
             p_a, p_b = extract_names_from_topic(in_topic)
             if p_a and p_b:
                 st.session_state.input_name_a = p_a
@@ -554,16 +607,17 @@ with tab_script:
                 st.session_state.input_name_b = p_b
                 st.session_state.in_name_b = p_b
                 st.session_state.last_parsed_topic = in_topic
-                st.toast(f"✅ อัปเดตสินค้า: A = {p_a} | B = {p_b}")
+                st.toast(f"✅ อัปเดต: A = {p_a} | B = {p_b}")
                 st.rerun()
             else:
-                st.warning("ไม่พบคำเชื่อมเปรียบเทียบ (เช่น VS, กับ, หรือ) ในหัวข้อนี้ กรุณาระบุชื่อสินค้าในช่องด้านล่าง")
+                st.warning("ไม่พบคำเชื่อมเปรียบเทียบ (เช่น VS, กับ, หรือ) ในหัวข้อนี้ กรุณาระบุชื่อในช่องด้านล่าง")
     with col_tinfo:
         p_a_view, p_b_view = extract_names_from_topic(in_topic)
         if p_a_view and p_b_view:
-            st.caption(f"💡 สินค้าที่ตรวจพบ: 🟢 **{p_a_view}** VS 🔵 **{p_b_view}**")
+            status_tag = "ประเด็นที่ตรวจพบ" if is_viral else "สินค้าที่ตรวจพบ"
+            st.caption(f"💡 {status_tag}: 🟢 **{p_a_view}** VS 🔵 **{p_b_view}**")
         else:
-            st.caption("💡 เคล็ดลับ: พิมพ์คั่นด้วย 'VS', 'กับ', หรือ 'หรือ' ระบบจะแยกชื่อสินค้าให้อัตโนมัติ")
+            st.caption("💡 เคล็ดลับ: พิมพ์คั่นด้วย 'VS', 'กับ', หรือ 'หรือ' ระบบจะแยกชื่อให้อัตโนมัติ")
 
     fw_options = list(FRAMEWORK_PRESETS.keys())
     cur_fw_idx = fw_options.index(st.session_state.input_framework) if st.session_state.input_framework in fw_options else 0
@@ -586,27 +640,46 @@ with tab_script:
     )
     st.caption(f"💡 {DURATION_MODES[selected_mode]['desc']}")
 
-    st.markdown("##### 📦 4. ข้อมูลสินค้า / ตัวเลือกเปรียบเทียบ (ฝั่ง A vs ฝั่ง B)")
+    sec4_title = "##### 🔍 4. ข้อมูลประเด็น / สาระเปรียบเทียบ (ฝั่ง A vs ฝั่ง B)" if is_viral else "##### 📦 4. ข้อมูลสินค้า / ตัวเลือกเปรียบเทียบ (ฝั่ง A vs ฝั่ง B)"
+    st.markdown(sec4_title)
     col_a, col_b = st.columns(2, gap="medium")
     with col_a:
         st.markdown("###### 🟢 ฝั่ง A")
         val_name_a = st.session_state.get("in_name_a", st.session_state.input_name_a)
-        in_name_a = st.text_input("ชื่อสินค้า/ตัวเลือก A:", value=val_name_a, placeholder="เช่น กาแฟดริป", key="in_name_a")
-        in_details_a = st.text_area("จุดเด่น / สเปก / ข้อดี A:", value=st.session_state.input_details_a, height=75, placeholder="จุดเด่น สเปก หรือข้อดีของสินค้า A", key="in_details_a")
-        aff_a = st.text_input("🔗 ลิงก์ Shopee สินค้า A:", value=st.session_state.input_aff_a, placeholder="ลิงก์สินค้า A เช่น https://shopee.co.th/...", key="aff_a")
+        label_a = "ชื่อหัวข้อ/ประเด็น A:" if is_viral else "ชื่อสินค้า/ตัวเลือก A:"
+        ph_a = "เช่น ศาสนาพุทธ" if is_viral else "เช่น กาแฟดริป"
+        in_name_a = st.text_input(label_a, value=val_name_a, placeholder=ph_a, key="in_name_a")
+
+        det_label_a = "จุดเด่น / สาระสำคัญ / ข้อมูล A:" if is_viral else "จุดเด่น / สเปก / ข้อดี A:"
+        det_ph_a = "หลักคำสอน แนวปฏิบัติ จุดเน้น หรือข้อมูลสำคัญ" if is_viral else "จุดเด่น สเปก หรือข้อดีของสินค้า A"
+        in_details_a = st.text_area(det_label_a, value=st.session_state.input_details_a, height=75, placeholder=det_ph_a, key="in_details_a")
+
+        aff_label_a = "🔗 ลิงก์อ้างอิง/ข้อมูลเพิ่มเติม A (ไม่บังคับ):" if is_viral else "🔗 ลิงก์ Shopee สินค้า A:"
+        aff_ph_a = "ลิงก์บทความ หรือเว้นว่างไว้" if is_viral else "ลิงก์สินค้า A เช่น https://shopee.co.th/..."
+        aff_a = st.text_input(aff_label_a, value=st.session_state.input_aff_a, placeholder=aff_ph_a, key="aff_a")
     with col_b:
         st.markdown("###### 🔵 ฝั่ง B")
         val_name_b = st.session_state.get("in_name_b", st.session_state.input_name_b)
-        in_name_b = st.text_input("ชื่อสินค้า/ตัวเลือก B:", value=val_name_b, placeholder="เช่น กาแฟแคปซูล", key="in_name_b")
-        in_details_b = st.text_area("จุดเด่น / สเปก / ข้อดี B:", value=st.session_state.input_details_b, height=75, placeholder="จุดเด่น สเปก หรือข้อดีของสินค้า B", key="in_details_b")
-        aff_b = st.text_input("🔗 ลิงก์ Shopee สินค้า B:", value=st.session_state.input_aff_b, placeholder="ลิงก์สินค้า B เช่น https://shopee.co.th/...", key="aff_b")
+        label_b = "ชื่อหัวข้อ/ประเด็น B:" if is_viral else "ชื่อสินค้า/ตัวเลือก B:"
+        ph_b = "เช่น ศาสนาคริสต์" if is_viral else "เช่น กาแฟแคปซูล"
+        in_name_b = st.text_input(label_b, value=val_name_b, placeholder=ph_b, key="in_name_b")
+
+        det_label_b = "จุดเด่น / สาระสำคัญ / ข้อมูล B:" if is_viral else "จุดเด่น / สเปก / ข้อดี B:"
+        det_ph_b = "หลักคำสอน แนวปฏิบัติ จุดเน้น หรือข้อมูลสำคัญ" if is_viral else "จุดเด่น สเปก หรือข้อดีของสินค้า B"
+        in_details_b = st.text_area(det_label_b, value=st.session_state.input_details_b, height=75, placeholder=det_ph_b, key="in_details_b")
+
+        aff_label_b = "🔗 ลิงก์อ้างอิง/ข้อมูลเพิ่มเติม B (ไม่บังคับ):" if is_viral else "🔗 ลิงก์ Shopee สินค้า B:"
+        aff_ph_b = "ลิงก์บทความ หรือเว้นว่างไว้" if is_viral else "ลิงก์สินค้า B เช่น https://shopee.co.th/..."
+        aff_b = st.text_input(aff_label_b, value=st.session_state.input_aff_b, placeholder=aff_ph_b, key="aff_b")
 
     st.markdown("##### 🎯 5. กลุ่มเป้าหมาย & มุมมองที่เน้น")
     col_tgt, col_ang = st.columns(2, gap="medium")
     with col_tgt:
-        in_target = st.text_input("กลุ่มเป้าหมาย (เช่น สายประหยัด, คอกาแฟ):", value=st.session_state.input_target, placeholder="ระบุกลุ่มคนที่สนใจคลิปนี้", key="in_target")
+        tgt_ph = "เช่น ผู้สนใจปรัชญาและประวัติศาสตร์, คนทั่วไป" if is_viral else "ระบุกลุ่มคนที่สนใจคลิปนี้"
+        in_target = st.text_input("กลุ่มเป้าหมาย (เช่น สายประหยัด, คอกาแฟ):", value=st.session_state.input_target, placeholder=tgt_ph, key="in_target")
     with col_ang:
-        in_angles = st.text_input("มุมมองที่ต้องการเน้น (เช่น ความคุ้มค่า, พกพาสะดวก):", value=st.session_state.input_angles, placeholder="ระบุมุมมองเปรียบเทียบที่ต้องการเน้น", key="in_angles")
+        ang_ph = "เช่น จุดกำเนิด, คำสอนเรื่องชีวิตหลังความตาย" if is_viral else "ระบุมุมมองเปรียบเทียบที่ต้องการเน้น"
+        in_angles = st.text_input("มุมมองที่ต้องการเน้น (เช่น ความคุ้มค่า, พกพาสะดวก):", value=st.session_state.input_angles, placeholder=ang_ph, key="in_angles")
 
     st.markdown("##### 🚀 6. สั่ง AI ผลิตบทพากย์")
     if st.button("🚀 สั่ง Gemini ร่างบททันที (พร้อมค้นหาข้อมูลเชิงลึก)", type="primary", use_container_width=True):
@@ -621,7 +694,7 @@ with tab_script:
                 st.session_state.in_name_b = eff_name_b
                 st.session_state.input_name_a = eff_name_a
                 st.session_state.input_name_b = eff_name_b
-        with st.spinner("🤖 Gemini กำลังทำ Deep Research วิเคราะห์สเปก จุดแข็ง จุดด้อย และร่างบทตาม Framework..."):
+        with st.spinner("🤖 Gemini กำลังทำ Deep Research วิเคราะห์ข้อมูล จุดเน้น และร่างบทตาม Framework..."):
             try:
                 gen = AIScriptGenerator()
                 new_data = gen.generate_script(
@@ -637,6 +710,8 @@ with tab_script:
                     script_mode=selected_mode,
                     channel_outro_cta=prof.get("default_outro_cta", ""),
                     framework=selected_fw,
+                    clip_type=selected_clip_type,
+                    relation_type=selected_relation,
                 )
                 st.session_state.script_data = new_data
                 st.session_state.script_version += 1
@@ -675,6 +750,8 @@ with tab_script:
                     script_mode=selected_mode,
                     channel_outro_cta=prof.get("default_outro_cta", ""),
                     framework=selected_fw,
+                    clip_type=selected_clip_type,
+                    relation_type=selected_relation,
                 )
                 st.session_state.script_data = new_data
                 st.session_state.script_version += 1
@@ -1295,7 +1372,9 @@ with tab_render:
         social_cap = st.session_state.script_data.get("social_caption") or generate_social_caption(st.session_state.script_data)["social_caption"]
         st.code(social_cap, language="text")
 
-        st.markdown("#### 📌 ข้อความสำหรับปักหมุดคอมเมนต์แรก (Shopee Affiliate):")
+        is_viral_cur = st.session_state.script_data.get("clip_type") == "viral_knowledge"
+        comment_header = "#### 💬 ข้อความสำหรับปักหมุดชวนคุยคอมเมนต์แรก (Discussion Prompt):" if is_viral_cur else "#### 📌 ข้อความสำหรับปักหมุดคอมเมนต์แรก (Shopee Affiliate):"
+        st.markdown(comment_header)
         st.code(st.session_state.script_data.get("affiliate_comment", ""), language="text")
 
         if st.button("🚀 สั่งโพสต์คลิปนี้ลงโซเชียลเดี๋ยวนี้", type="secondary", use_container_width=True):
@@ -1536,6 +1615,8 @@ with tab_queue:
                 gen = AIScriptGenerator()
                 for _ in range(3):
                     idea = get_random_idea()
+                    idea_ctype = idea.get("clip_type", "commerce")
+                    idea_rel = idea.get("relation_type", "compare")
                     s_data = gen.generate_script(
                         topic=idea["topic"],
                         name_a=idea["name_a"],
@@ -1543,6 +1624,8 @@ with tab_queue:
                         details_a=idea.get("details_a", ""),
                         details_b=idea.get("details_b", ""),
                         framework=idea.get("framework", "persona"),
+                        clip_type=idea_ctype,
+                        relation_type=idea_rel,
                     )
                     add_to_planned_queue(
                         topic=idea["topic"],
@@ -1554,6 +1637,8 @@ with tab_queue:
                         post_mode="render_only",
                         jump_to_top=False,
                         framework=idea.get("framework", "persona"),
+                        clip_type=idea_ctype,
+                        relation_type=idea_rel,
                     )
                 st.toast("เพิ่ม 3 หัวข้อไวรัลเข้าคิวเรียบร้อย!")
                 st.rerun()
@@ -1562,16 +1647,23 @@ with tab_queue:
         with st.expander("⚡ เพิ่มหัวข้อด่วน / ข่าวดังแทรกคิว (Quick Add / Jump Queue)", expanded=False):
             st.caption("เจอประเด็นร้อนหรือข่าวดัง? กรอกหัวข้อ รูป และลิงก์ แล้วติ๊ก 'แทรกเป็นคิวแรก' ได้ทันที โดยคิวเดิมไม่หายและยังอยู่ครบ!")
             u_topic = st.text_input("หัวข้อด่วน / ประเด็นเปรียบเทียบ:", placeholder="เช่น แปรงสีฟันไฟฟ้า vs แปรงธรรมดา", key="u_input_topic")
+
+            u_col_ct, u_col_rel = st.columns(2)
+            with u_col_ct:
+                u_ctype = st.radio("รูปแบบคลิป:", options=list(CLIP_TYPES.keys()), format_func=lambda k: CLIP_TYPES[k]["name"], horizontal=True, key="u_select_ctype")
+            with u_col_rel:
+                u_rel = st.selectbox("ฟังก์ชันคู่เทียบ:", options=list(RELATION_TYPES.keys()), format_func=lambda k: RELATION_TYPES[k]["name"], key="u_select_rel")
+
             u_fw = st.selectbox("กรอบการเล่าเรื่อง:", options=list(FRAMEWORK_PRESETS.keys()), format_func=lambda k: FRAMEWORK_PRESETS.get(k, {}).get("name", k), key="u_select_fw")
 
             st.markdown("##### 🟢 ข้อมูลสินค้าฝั่ง A")
-            u_name_a = st.text_input("ชื่อสินค้า A (ฝั่งซ้าย):", placeholder="เช่น แปรงสีฟันไฟฟ้า", key="u_input_name_a")
-            u_aff_a = st.text_input("ลิงก์ Affiliate สินค้า A:", value="https://shopee.co.th", key="u_input_aff_a")
+            u_name_a = st.text_input("ชื่อสินค้า/ประเด็น A (ฝั่งซ้าย):", placeholder="เช่น แปรงสีฟันไฟฟ้า", key="u_input_name_a")
+            u_aff_a = st.text_input("ลิงก์ Affiliate/อ้างอิง A:", value="https://shopee.co.th", key="u_input_aff_a")
             u_file_a = st.file_uploader("📁 อัปโหลดรูปสินค้า A (ถ้ามี):", type=["png", "jpg", "jpeg", "webp"], key="u_file_a")
 
             st.markdown("##### 🔵 ข้อมูลสินค้าฝั่ง B")
-            u_name_b = st.text_input("ชื่อสินค้า B (ฝั่งขวา):", placeholder="เช่น แปรงธรรมดา", key="u_input_name_b")
-            u_aff_b = st.text_input("ลิงก์ Affiliate สินค้า B:", value="https://shopee.co.th", key="u_input_aff_b")
+            u_name_b = st.text_input("ชื่อสินค้า/ประเด็น B (ฝั่งขวา):", placeholder="เช่น แปรงธรรมดา", key="u_input_name_b")
+            u_aff_b = st.text_input("ลิงก์ Affiliate/อ้างอิง B:", value="https://shopee.co.th", key="u_input_aff_b")
             u_file_b = st.file_uploader("📁 อัปโหลดรูปสินค้า B (ถ้ามี):", type=["png", "jpg", "jpeg", "webp"], key="u_file_b")
 
             st.markdown("##### ⚙️ โหมดการทำงานเมื่อถึงคิว")
@@ -1581,7 +1673,7 @@ with tab_queue:
 
             if st.button("🚀 สร้างบทและเพิ่มเข้าคิวทันที", type="primary", use_container_width=True, key="btn_add_urgent_queue"):
                 if not u_topic.strip() or not u_name_a.strip() or not u_name_b.strip():
-                    st.error("กรุณากรอกหัวข้อ และชื่อสินค้า A และ B ให้ครบถ้วน")
+                    st.error("กรุณากรอกหัวข้อ และชื่อฝั่ง A และ B ให้ครบถ้วน")
                 else:
                     with st.spinner("🤖 AI กำลังสร้างบทสำหรับหัวข้อด่วนนี้..."):
                         t_stamp = int(time.time())
@@ -1605,6 +1697,8 @@ with tab_queue:
                             framework=u_fw,
                             affiliate_link_a=u_aff_a,
                             affiliate_link_b=u_aff_b,
+                            clip_type=u_ctype,
+                            relation_type=u_rel,
                         )
                         add_to_planned_queue(
                             topic=u_topic,
@@ -1618,6 +1712,8 @@ with tab_queue:
                             post_mode=clean_u_pm,
                             jump_to_top=u_jump,
                             framework=u_fw,
+                            clip_type=u_ctype,
+                            relation_type=u_rel,
                         )
                         st.success(f"✅ เพิ่มหัวข้อ '{u_topic}' เข้าคิวเรียบร้อย!")
                         st.rerun()

@@ -23,6 +23,47 @@ if sys.stdout and hasattr(sys.stdout, "reconfigure"):
 load_dotenv()
 
 
+CLIP_TYPES: Dict[str, Dict[str, str]] = {
+    "commerce": {
+        "id": "commerce",
+        "name": "🛍️ คลิปขายของ / ป้ายยา Affiliate (Commerce)",
+        "desc": "ค้นหาสินค้าจริง สเปก ราคา ความคุ้มค่า และปักหมุดลิงก์สั่งซื้อ Shopee",
+    },
+    "viral_knowledge": {
+        "id": "viral_knowledge",
+        "name": "🔥 คลิปไวรัลสาระความรู้ / ข้อมูลทั่วไป (Viral & Knowledge)",
+        "desc": "ไม่เน้นขายของ เปรียบเทียบข้อมูล สาระ ประวัติศาสตร์ วัฒนธรรม สถิติ ข้อเท็จจริง หรือมิติต่างๆ",
+    },
+}
+
+RELATION_TYPES: Dict[str, Dict[str, str]] = {
+    "compare": {
+        "id": "compare",
+        "name": "⚖️ เปรียบเทียบ (VS / Direct Comparison)",
+        "desc": "เทียบหมัดต่อหมัด ด้านต่อด้าน ชี้จุดเด่นของแต่ละฝั่ง",
+        "prompt_focus": "เปรียบเทียบหมัดต่อหมัด ด้านต่อด้าน ชี้จุดเด่น ข้อได้เปรียบ และความเหมาะสมของแต่ละฝั่ง",
+    },
+    "contrast": {
+        "id": "contrast",
+        "name": "🔍 แตกต่าง (Contrast / Key Differences)",
+        "desc": "เจาะลึกจุดต่างสำคัญ หรือสิ่งที่คนส่วนใหญ่มักเข้าใจผิด",
+        "prompt_focus": "เจาะลึกความแตกต่างที่ชัดเจน ข้อเท็จจริงที่คนมักสับสน เข้าใจผิด หรือจุดต่างเชิงลึก",
+    },
+    "synergy": {
+        "id": "synergy",
+        "name": "🤝 เข้ากัน / คู่กัน (Synergy / Pairing)",
+        "desc": "สองสิ่งนี้ทำงานร่วมกันอย่างไร ทำไมอยู่คู่กันแล้วลงตัวหรือเสริมพลังกัน",
+        "prompt_focus": "วิเคราะห์การทำงานร่วมกัน การอยู่คู่กัน กินคู่กัน หรือผสานจุดเด่นที่เสริมพลังซึ่งกันและกันอย่างลงตัว",
+    },
+    "custom": {
+        "id": "custom",
+        "name": "🌐 อื่นๆ / มุมมองอิสระ (Custom / Free Exploration)",
+        "desc": "ความเหมือน, วิวัฒนาการ, บทวิเคราะห์อิสระ หรือข้อเท็จจริงน่ารู้",
+        "prompt_focus": "วิเคราะห์ในมุมมองเชิงลึก ความเหมือน ข้อเท็จจริงทางประวัติศาสตร์หรือสถิติที่น่าสนใจรอบด้าน",
+    },
+}
+
+
 FRAMEWORK_PRESETS: Dict[str, Dict[str, str]] = {
     "persona": {
         "id": "persona",
@@ -202,22 +243,41 @@ def generate_social_caption(data: Dict[str, Any]) -> Dict[str, str]:
 
     clean_a = re.sub(r"[^\w\u0E00-\u0E7F]", "", name_a)
     clean_b = re.sub(r"[^\w\u0E00-\u0E7F]", "", name_b)
+    clip_type = data.get("clip_type", "commerce")
+    is_viral_kn = clip_type == "viral_knowledge"
 
     if is_pairing:
         caption_lines = [
             f"✨ ทำไม {name_a} + {name_b} ถึงเป็นคู่แท้ที่ต้องลองสักครั้งในชีวิต! 🤝",
-            f"หลายคนอาจจะยังไม่รู้ว่าความเข้ากันทางเคมีและรสชาติมันลงตัวขนาดไหน...",
-            "👇 ใครเคยลองสูตรนี้แล้วบ้าง คอมเมนต์บอกหน่อยว่าฟินจริงไหม!",
+            f"หลายคนอาจจะยังไม่รู้ว่าความเข้ากันและจุดเด่นมันลงตัวขนาดไหน...",
+            "👇 ใครเคยสัมผัสหรือมีประสบการณ์กับคู่นี้แล้วบ้าง คอมเมนต์บอกหน่อยครับ!",
         ]
         tags = [
             "#WhyItWorks",
             "#คู่แท้",
-            "#สูตรเด็ด",
+            "#เข้ากันสุดๆ",
             f"#{clean_a}" if clean_a else "",
             f"#{clean_b}" if clean_b else "",
             "#สาระน่ารู้",
             "#TikTokสายความรู้",
             "#เรื่องนี้ต้องรู้",
+        ]
+    elif is_viral_kn:
+        caption_lines = [
+            f"🧠 {topic} ต่างกันอย่างไรและมีประเด็นอะไรซ่อนอยู่? สรุปจบในคลิปเดียว!",
+            f"{hook[:90]}..." if hook else f"เจาะลึกข้อมูลระหว่าง {name_a} กับ {name_b} แบบรอบด้าน",
+            "💬 คุณมีความคิดเห็นอย่างไรกับเรื่องนี้? มาร่วมแลกเปลี่ยนกันในคอมเมนต์ได้เลยครับ 👇",
+        ]
+        tags = [
+            "#WhyItWorks",
+            "#สาระน่ารู้",
+            "#ความรู้รอบตัว",
+            "#รู้หรือไม่",
+            f"#{clean_a}" if clean_a else "",
+            f"#{clean_b}" if clean_b else "",
+            "#ประเด็นร้อน",
+            "#TikTokสายความรู้",
+            "#เรื่องน่าคิด",
         ]
     else:
         caption_lines = [
@@ -308,14 +368,20 @@ class AIScriptGenerator:
         script_mode: str = "deep_3round",
         channel_outro_cta: str = "",
         framework: str = "persona",
+        clip_type: str = "commerce",
+        relation_type: str = "compare",
     ) -> Dict[str, Any]:
         """
         Deep-researches comparison points and writes a short-form script in Thai.
         Supports:
+        - 2 Clip Types: commerce (affiliate sales) and viral_knowledge (general knowledge/viral, no forced products)
+        - 4 Relation Types: compare (VS), contrast (different), synergy (pairing), custom (free)
         - 10 Viral Comparison Frameworks (Persona, Crossover, Cost vs Value, Blind Test, etc.)
         - 4 Duration & Depth Modes: short_1round, medium_2round, deep_3round, master_4round.
         """
         fw = FRAMEWORK_PRESETS.get(framework, FRAMEWORK_PRESETS["persona"])
+        rel_info = RELATION_TYPES.get(relation_type, RELATION_TYPES["compare"])
+        is_viral_knowledge = clip_type == "viral_knowledge"
         outro_prompt_hint = f"\n- ข้อความส่งท้ายประจำเพจที่ต้องสอดแทรกไว้ใน conclusion: '{channel_outro_cta}'" if channel_outro_cta else ""
 
         # Safeguard: if name_a/b are empty or mismatched coffee defaults when topic is different
@@ -363,7 +429,7 @@ class AIScriptGenerator:
 - ทิศทางสรุปฟันธง: {fw['conclusion_guide']}
 """
 
-        is_pairing = fw.get("id") == "perfect_pairing"
+        is_pairing = fw.get("id") == "perfect_pairing" or relation_type == "synergy"
         is_multi_battle = active_mode == "multi_battle_3round"
         round_prompts = []
         json_fields = []
@@ -373,8 +439,8 @@ class AIScriptGenerator:
                 round_prompts.append(
                     f"{r}. ยกที่ {r} (คู่แบทเทิลย่อยที่ {r}):\n"
                     f"   - round_{r}_title: หัวข้อยกที่ {r}\n"
-                    f"   - round_{r}_name_a: ชื่อไอเทม A ประจำยกนี้ (เช่น กาแฟ+ส้มยูซุ)\n"
-                    f"   - round_{r}_name_b: ชื่อไอเทม B ประจำยกนี้ (เช่น กาแฟ+น้ำมะพร้าว)\n"
+                    f"   - round_{r}_name_a: ชื่อไอเทม A ประจำยกนี้\n"
+                    f"   - round_{r}_name_b: ชื่อไอเทม B ประจำยกนี้\n"
                     f"   - round_{r}_a: จุดเด่นของไอเทม A ในคู่นี้ (1-2 ประโยคกระชับ ชัดเจน)\n"
                     f"   - round_{r}_b: สวนกลับด้วยจุดเด่นของไอเทม B ในคู่นี้ (1-2 ประโยคกระชับ)"
                 )
@@ -389,8 +455,8 @@ class AIScriptGenerator:
                 round_prompts.append(
                     f"{r}. ยกที่ {r} ({f_title}):\n"
                     f"   - round_{r}_title: ตั้งชื่อยกที่ {r} สั้นๆ (ให้สอดคล้องกับ {f_title})\n"
-                    f"   - round_{r}_a: บทบาท/รสสัมผัส/คุณสมบัติเด่นของ {name_a} ในมิตินี้ (1-2 ประโยคกระชับ)\n"
-                    f"   - round_{r}_b: บทบาทของ {name_b} ที่เข้ามาเสริม/ตัดเลี่ยน/ทำงานร่วมกันจนลงตัว (1-2 ประโยคกระชับ)"
+                    f"   - round_{r}_a: บทบาท/คุณสมบัติเด่นของ {name_a} ในมิตินี้ (1-2 ประโยคกระชับ)\n"
+                    f"   - round_{r}_b: บทบาทของ {name_b} ที่เข้ามาเสริม/ผสานพลังกันจนลงตัว (1-2 ประโยคกระชับ)"
                 )
                 json_fields.append(f'  "round_{r}_title": "{f_title}",\n  "round_{r}_a": "...",\n  "round_{r}_b": "..."')
             else:
@@ -405,21 +471,38 @@ class AIScriptGenerator:
         rounds_instruction_str = "\n".join(round_prompts)
         json_rounds_str = ",\n".join(json_fields)
 
-        producer_role = (
-            f"คุณเป็น Senior Short-Form Video Producer มืออาชีพ เชี่ยวชาญการทำคลิปวิเคราะห์การจับคู่ที่ลงตัว (Synergy Pairing: ทำไม A + B ถึงเข้ากันขั้นสุด) สไตล์ Reels/TikTok/Shorts ความยาวจำนวน {num_rounds} ยก ที่คนดูเกาะติดหน้าจอจนจบ"
-            if is_pairing
-            else f"คุณเป็น Senior Short-Form Video Producer มืออาชีพ เชี่ยวชาญการทำคลิปเปรียบเทียบแบบสลับชี้ A vs B สไตล์ Reels/TikTok/Shorts ความยาวจำนวน {num_rounds} ยก ที่คนดูเกาะติดหน้าจอจนจบ"
-        )
+        rel_directive = f"\n- มิติความสัมพันธ์หลัก: {rel_info['prompt_focus']}"
+
+        if is_viral_knowledge:
+            producer_role = (
+                f"คุณเป็น Senior Short-Form Video Producer มืออาชีพ เชี่ยวชาญการทำคลิปไวรัลสาระความรู้ ข้อมูลเปรียบเทียบเชิงลึก ประวัติศาสตร์ วัฒนธรรม สถิติ และข้อเท็จจริงชวนสงสัย สไตล์ Reels/TikTok/Shorts ความยาวจำนวน {num_rounds} ยก ที่ตรึงคนดูตั้งแต่ต้นจนจบ"
+            )
+            target_aud_desc = target_audience or "คนทั่วไป ผู้สนใจสาระน่ารู้ และชาวโซเชียลที่ชอบประเด็นน่าคิด"
+            key_ang_desc = key_angles or f"วิเคราะห์ข้อมูลรอบด้าน ทั้งข้อเท็จจริง ความต่าง และมุมมองน่าสนใจ ({rel_info['name']})"
+            conclusion_prompt = f"- conclusion: สรุปฟันธงประเด็นสำคัญในเชิงสาระน่าคิด และปิดท้ายด้วยคำถามเปิดกระตุ้นให้คนดูอยากคอมเมนต์แสดงความคิดเห็นและแลกเปลี่ยนมุมมองกันอย่างสร้างสรรค์ (ห้ามพูดขายของ หรือแจกพิกัด Shopee เด็ดขาด!){outro_prompt_hint}"
+            comment_prompt = f"- affiliate_comment: ข้อความชวนคนดูคอมเมนต์แลกเปลี่ยนความคิดเห็นหรือโหวตมุมมอง เช่น '💬 คุณมีความคิดเห็นอย่างไรกับเรื่องนี้? หรืออยากให้เรานำประเด็นไหนมาเปรียบเทียบกันอีก คอมเมนต์แลกเปลี่ยนกันได้เลยครับ 👇'"
+            json_comment_sample = '"affiliate_comment": "💬 คุณมีความคิดเห็นอย่างไรกับเรื่องนี้? มาร่วมแลกเปลี่ยนกันในคอมเมนต์ได้เลยครับ 👇"'
+        else:
+            producer_role = (
+                f"คุณเป็น Senior Short-Form Video Producer มืออาชีพ เชี่ยวชาญการทำคลิปวิเคราะห์การจับคู่ที่ลงตัว (Synergy Pairing: ทำไม A + B ถึงเข้ากันขั้นสุด) สไตล์ Reels/TikTok/Shorts ความยาวจำนวน {num_rounds} ยก ที่คนดูเกาะติดหน้าจอจนจบ"
+                if is_pairing
+                else f"คุณเป็น Senior Short-Form Video Producer มืออาชีพ เชี่ยวชาญการทำคลิปเปรียบเทียบแบบสลับชี้ A vs B สไตล์ Reels/TikTok/Shorts ความยาวจำนวน {num_rounds} ยก ที่คนดูเกาะติดหน้าจอจนจบ"
+            )
+            target_aud_desc = target_audience or "บุคคลทั่วไป / ผู้บริโภคที่กำลังตัดสินใจซื้อ"
+            key_ang_desc = key_angles or "เปรียบเทียบรอบด้านทั้งประสิทธิภาพ ความสะดวก และราคา"
+            conclusion_prompt = f"- conclusion: สรุปฟันธงตามแนวทาง {fw['conclusion_guide']} พร้อม CTA สไตล์ Affiliate เนียนๆ ชวนคนดูโหวต และบอกว่าพิกัดของแท้อยู่ในคอมเมนต์แรก{outro_prompt_hint}"
+            comment_prompt = f"- affiliate_comment: ข้อความสำหรับปักหมุดคอมเมนต์แรก รวบรวมพิกัด {name_a} และ {name_b} พร้อมอีโมจิ"
+            json_comment_sample = f'"affiliate_comment": "📍 พิกัดของแท้ราคาโปร:\\n👉 {name_a}: [ลิงก์ A]\\n👉 {name_b}: [ลิงก์ B]\\n(โหวตกันในคอมเมนต์ได้เลยครับ)"'
 
         prompt = f"""
 {producer_role}
 
 โจทย์เปรียบเทียบ:
 - หัวข้อ: {topic}
-- ไอเทม A: {name_a} (ข้อมูล/สเปก: {details_a or 'ทั่วไป'})
-- ไอเทม B: {name_b} (ข้อมูล/สเปก: {details_b or 'ทั่วไป'})
-- กลุ่มเป้าหมายคนดู: {target_audience or 'บุคคลทั่วไป / ผู้บริโภคที่กำลังตัดสินใจซื้อ'}
-- จุดเน้นพิเศษ: {key_angles or 'เปรียบเทียบรอบด้านทั้งประสิทธิภาพ ความสะดวก และราคา'}
+- ฝั่ง A: {name_a} (ข้อมูล/รายละเอียด: {details_a or 'ทั่วไป'})
+- ฝั่ง B: {name_b} (ข้อมูล/รายละเอียด: {details_b or 'ทั่วไป'})
+- กลุ่มเป้าหมายคนดู: {target_aud_desc}
+- จุดเน้นพิเศษ: {key_ang_desc}{rel_directive}
 - โทนอารมณ์: {tone} (น่าสนใจ มีน้ำหนักคำ ชวนฟัง กระชับ มีพลัง ไม่เวิ่นเว้อ)
 {framework_directive}
 
@@ -427,8 +510,8 @@ class AIScriptGenerator:
 ร่างบทพากย์วิดีโอเปรียบเทียบสลับไปมาจำนวน {num_rounds} ยก สลับชี้ A ➜ B ตามกรอบ Framework ข้างต้น:
 - hook: ประโยคเปิดคลิป 1 ประโยค ยิงคำถามคมๆ หรือประเด็นชวนสะดุ้งตามแนวทาง Framework ให้อยู่ดูต่อ
 {rounds_instruction_str}
-- conclusion: สรุปฟันธงตามแนวทาง {fw['conclusion_guide']} พร้อม CTA สไตล์ Affiliate เนียนๆ ชวนคนดูโหวต และบอกว่าพิกัดของแท้อยู่ในคอมเมนต์แรก{outro_prompt_hint}
-- affiliate_comment: ข้อความสำหรับปักหมุดคอมเมนต์แรก รวบรวมพิกัด {name_a} และ {name_b} พร้อมอีโมจิ
+{conclusion_prompt}
+{comment_prompt}
 
 สำคัญมาก:
 - ห้ามใส่เครื่องหมาย Enter จริงในค่า JSON string เด็ดขาด ให้ใช้ \\n เท่านั้น
@@ -444,7 +527,7 @@ class AIScriptGenerator:
   "hook": "ประโยคเปิดคลิปตามกรอบ...",
 {json_rounds_str},
   "conclusion": "ประโยคสรุปฟันธงและ CTA...",
-  "affiliate_comment": "📍 พิกัดของแท้ราคาโปร:\\n👉 {name_a}: [ลิงก์ A]\\n👉 {name_b}: [ลิงก์ B]\\n(โหวตกันในคอมเมนต์ได้เลยครับ)"
+  {json_comment_sample}
 }}
 """
         raw_res = self._call_gemini(
@@ -458,7 +541,15 @@ class AIScriptGenerator:
             round_focus_map=round_focus_map,
             active_mode=active_mode,
         )
-        return self._package_script_data(raw_res, active_mode, name_a, name_b, framework)
+        return self._package_script_data(
+            raw_res,
+            active_mode,
+            name_a,
+            name_b,
+            framework=framework,
+            clip_type=clip_type,
+            relation_type=relation_type,
+        )
 
     def _package_script_data(
         self,
@@ -467,11 +558,15 @@ class AIScriptGenerator:
         name_a: str,
         name_b: str,
         framework: str = "persona",
+        clip_type: str = "commerce",
+        relation_type: str = "compare",
     ) -> Dict[str, Any]:
         """Constructs the canonical segments timeline structure for TTS and Video engines."""
         fw = FRAMEWORK_PRESETS.get(framework, FRAMEWORK_PRESETS["persona"])
         data["framework"] = framework
         data["framework_name"] = fw["name"]
+        data["clip_type"] = clip_type
+        data["relation_type"] = relation_type
 
         # Determine num_rounds
         if mode in ("classic", "short_1round"):
@@ -781,39 +876,67 @@ class AIScriptGenerator:
         category: Optional[str] = None,
         framework: Optional[str] = None,
         keyword: Optional[str] = None,
+        clip_type: str = "commerce",
+        relation_type: str = "compare",
     ) -> Dict[str, Any]:
-        """Uses Gemini to invent a brand new, trending, highly viral comparison topic on demand, optionally seeded with a keyword."""
+        """Uses Gemini to invent a brand new, trending, highly viral comparison topic on demand, optionally seeded with a keyword, clip type, and relation angle."""
         kw_clean = (keyword or "").strip()
-        if kw_clean:
-            kw_hint = f"- บังคับ: ต้องใช้ไอเดีย/คีย์เวิร์ดตั้งต้นคือ '{kw_clean}' โดยนำไปจับคู่เปรียบเทียบกับคู่แข่ง ตัวเลือกทดแทน หรือมุมมองที่น่าสนใจ ชวนสงสัย หรือเป็นที่ถกเถียงที่สุด (เช่น ถ้าคีย์เวิร์ดคือ '{kw_clean}' ให้หาอีกสิ่งหนึ่งมาเปรียบเทียบกันอย่างสมน้ำสมเนื้อและน่าติดตาม)"
-        else:
-            kw_hint = "- คิดหัวข้อแบบเปิดกว้าง เลือกสิ่งที่เป็นกระแสและน่าสนใจที่สุดในตอนนี้"
+        rel_info = RELATION_TYPES.get(relation_type, RELATION_TYPES["compare"])
 
-        cat_hint = f"ในหมวดหมู่: {category}" if category and category != "ทั้งหมด (สุ่มทุกหมวด)" else "เลือกหมวดหมู่ที่เป็นกระแสไวรัลในไทย (ของกิน, เครื่องดื่ม, แกดเจ็ต, ของใช้, สุขภาพ, การเงิน)"
-        fw_hint = f"ใช้กรอบจิตวิทยา: {framework}" if framework and framework != "all" else "เลือกกรอบจิตวิทยาที่น่าสนใจ (เช่น persona, budget_vs_luxury, crossover, perfect_pairing, science_myth)"
+        if kw_clean:
+            kw_hint = f"- บังคับ: ต้องใช้ไอเดีย/คีย์เวิร์ดตั้งต้นคือ '{kw_clean}' โดยนำไปจับคู่เปรียบเทียบในมุมมอง '{rel_info['name']}'"
+        else:
+            kw_hint = f"- คิดหัวข้อที่เป็นกระแสไวรัล ชวนสงสัย ในมุมมอง '{rel_info['name']}'"
+
+        if clip_type == "viral_knowledge":
+            cat_hint = f"ในหมวดหมู่: {category}" if category and category != "ทั้งหมด (สุ่มทุกหมวด)" else "เลือกหมวดหมู่วิทยาศาสตร์ สังคม ประวัติศาสตร์ วัฒนธรรม ปรัชญา หรือข้อเท็จจริงทั่วไป"
+            fw_hint = f"ใช้กรอบจิตวิทยา: {framework}" if framework and framework != "all" else "เลือกกรอบจิตวิทยาที่น่าสนใจ (เช่น crossover, science_myth, persona, cost_value)"
+            type_directive = f"""
+วัตถุประสงค์คลิป: คลิปไวรัลสาระความรู้ / ข้อมูลทั่วไป (ไม่ใช่คลิปขายของ!)
+เงื่อนไขสำคัญมาก:
+- ห้ามแปลงหัวข้อเป็นสินค้า เครื่องประดับ วัตถุมงคล หรือสิ่งของมาขายบน Shopee เด็ดขาด!
+- เช่น ถ้าโจทย์คือ 'ศาสนาพุทธ VS ศาสนาคริสต์' ให้เปรียบเทียบแก่นคำสอน ประวัติศาสตร์ สัญลักษณ์ หรือวิถีปฏิบัติจริงของทั้งสองศาสนา (ห้ามแปลงเป็นขายกำไลหินหรือสร้อยคอจี้กางเขนเด็ดขาด)
+- หรือถ้าโจทย์คือ 'ไทย VS พม่า' ให้เปรียบเทียบด้านอาหาร วัฒนธรรม สถิติ ค่าครองชีพ หรือภูมิศาสตร์
+- ไอเทม A และ B ให้ใช้ชื่อแก่นแท้ของหัวข้อโดยตรง เช่น name_a: 'ศาสนาพุทธ', name_b: 'ศาสนาคริสต์'
+- มุมมองคู่เทียบ: {rel_info['prompt_focus']}
+"""
+            default_cat = "🧠 สาระความรู้ & วัฒนธรรม"
+            sample_aff = ""
+        else:
+            cat_hint = f"ในหมวดหมู่: {category}" if category and category != "ทั้งหมด (สุ่มทุกหมวด)" else "เลือกหมวดหมู่ที่เป็นกระแสไวรัลในไทย (ของกิน, เครื่องดื่ม, แกดเจ็ต, ของใช้, สุขภาพ, การเงิน)"
+            fw_hint = f"ใช้กรอบจิตวิทยา: {framework}" if framework and framework != "all" else "เลือกกรอบจิตวิทยาที่น่าสนใจ (เช่น persona, budget_vs_luxury, crossover, perfect_pairing, science_myth)"
+            type_directive = f"""
+วัตถุประสงค์คลิป: คลิปป้ายยาสินค้าเปรียบเทียบสเปกและความคุ้มค่า (Commerce)
+- ต้องเป็นของ 2 สิ่งที่คนไทยรู้จักดี เคยสงสัย หรือกำลังถกเถียงกันในชีวิตประจำวัน
+- ชื่อไอเทม A และ B ต้องชัดเจน เป็นรูปธรรม จับต้องได้ สำหรับการตัดสินใจซื้อ
+- มุมมองคู่เทียบ: {rel_info['prompt_focus']}
+"""
+            default_cat = "☕ เครื่องดื่ม & อาหาร"
+            sample_aff = "https://shopee.co.th"
 
         prompt = f"""คุณคือ Senior Viral Content Strategist ของช่องวิดีโอสั้น 'แตกต่างกันอย่างไร / Why It Works'
-โปรดคิดหัวข้อเปรียบเทียบ (VS / Pairing) ที่สดใหม่ แปลกใหม่ ชวนสงสัย และมีโอกาสเป็นไวรัลสูงมาก 1 หัวข้อ
+โปรดคิดหัวข้อเปรียบเทียบ ({rel_info['name']}) ที่สดใหม่ แปลกใหม่ ชวนสงสัย และมีโอกาสเป็นไวรัลสูงมาก 1 หัวข้อ
 เงื่อนไข:
+{type_directive}
 {kw_hint}
 - {cat_hint}
 - {fw_hint}
-- ต้องเป็นของ 2 สิ่งที่คนไทยรู้จักดี เคยสงสัย หรือกำลังถกเถียงกันในชีวิตประจำวัน
-- ชื่อไอเทม A และ B ต้องชัดเจน เป็นรูปธรรม จับต้องได้ ไม่ใช่นามธรรม
 
 ตอบกลับเป็น JSON Schema นี้เท่านั้น:
 {{
   "framework": "{framework if framework and framework != 'all' else 'persona'}",
-  "category": "{category if category and category != 'ทั้งหมด (สุ่มทุกหมวด)' else '☕ เครื่องดื่ม & อาหาร'}",
-  "topic": "ชื่อหัวข้อคลิปที่ดึงดูด น่าคลิกดู (เช่น กาแฟส้ม VS กาแฟมะพร้าว หรือ ทำไมกินสิ่งนี้คู่กันแล้วดี)",
-  "name_a": "ชื่อไอเทม A พร้อมคำขยายสั้นๆ",
-  "name_b": "ชื่อไอเทม B พร้อมคำขยายสั้นๆ",
-  "details_a": "จุดเด่น รสชาติ หรือสเปกของ A (1-2 ประโยค)",
-  "details_b": "จุดเด่น รสชาติ หรือสเปกของ B (1-2 ประโยค)",
+  "category": "{category if category and category != 'ทั้งหมด (สุ่มทุกหมวด)' else default_cat}",
+  "clip_type": "{clip_type}",
+  "relation_type": "{relation_type}",
+  "topic": "ชื่อหัวข้อคลิปที่ดึงดูด น่าคลิกดู (เช่น กาแฟส้ม VS กาแฟมะพร้าว หรือ ศาสนาพุทธ VS ศาสนาคริสต์ ต่างกันอย่างไร)",
+  "name_a": "ชื่อฝั่ง A พร้อมคำขยายสั้นๆ",
+  "name_b": "ชื่อฝั่ง B พร้อมคำขยายสั้นๆ",
+  "details_a": "จุดเด่น ข้อมูลสำคัญ หรือสเปกของ A (1-2 ประโยค)",
+  "details_b": "จุดเด่น ข้อมูลสำคัญ หรือสเปกของ B (1-2 ประโยค)",
   "target_audience": "กลุ่มคนที่สนใจประเด็นนี้",
   "key_angles": "มิติเปรียบเทียบหลักที่ทำให้คนดูต้องหยุดดูจนจบ",
-  "affiliate_link_a": "https://shopee.co.th",
-  "affiliate_link_b": "https://shopee.co.th"
+  "affiliate_link_a": "{sample_aff}",
+  "affiliate_link_b": "{sample_aff}"
 }}"""
 
         payload = {
@@ -842,6 +965,8 @@ class AIScriptGenerator:
                     if raw_text:
                         parsed = self._clean_and_parse_json(raw_text)
                         if parsed.get("topic") and parsed.get("name_a") and parsed.get("name_b"):
+                            parsed["clip_type"] = clip_type
+                            parsed["relation_type"] = relation_type
                             return parsed
             except Exception as e:
                 print(f"[AI] Fresh topic call error on {url}: {e}")
@@ -856,10 +981,37 @@ class AIScriptGenerator:
             ]
             if matching:
                 import random
-                return random.choice(matching).copy()
+                m_item = random.choice(matching).copy()
+                m_item["clip_type"] = clip_type
+                m_item["relation_type"] = relation_type
+                return m_item
+
+            if clip_type == "viral_knowledge":
+                if " vs " in kw_clean.lower() or " กับ " in kw_clean:
+                    p_a, p_b = extract_names_from_topic(kw_clean)
+                else:
+                    p_a, p_b = kw_clean, f"มุมมองคู่เทียบของ {kw_clean}"
+                return {
+                    "framework": framework if framework and framework != "all" else "crossover",
+                    "category": category if category and category != "ทั้งหมด (สุ่มทุกหมวด)" else "🧠 สาระความรู้ & วัฒนธรรม",
+                    "clip_type": "viral_knowledge",
+                    "relation_type": relation_type,
+                    "topic": f"{p_a} VS {p_b} (ต่างกันอย่างไรและมีประเด็นอะไรซ่อนอยู่)",
+                    "name_a": p_a,
+                    "name_b": p_b,
+                    "details_a": f"แนวคิด ประวัติความเป็นมา และจุดเด่นของ {p_a}",
+                    "details_b": f"แนวคิด ประวัติความเป็นมา และจุดเด่นของ {p_b}",
+                    "target_audience": "ผู้ที่สนใจสาระน่ารู้ ความแตกต่าง และข้อเท็จจริงรอบตัว",
+                    "key_angles": f"เจาะลึกมิติ {rel_info['name']} เปรียบเทียบข้อเท็จจริงเชิงลึก",
+                    "affiliate_link_a": "",
+                    "affiliate_link_b": "",
+                }
+
             return {
                 "framework": framework if framework and framework != "all" else "persona",
                 "category": category if category and category != "ทั้งหมด (สุ่มทุกหมวด)" else "💡 ไลฟ์สไตล์ & ของใช้",
+                "clip_type": "commerce",
+                "relation_type": relation_type,
                 "topic": f"{kw_clean} รุ่นยอดนิยม VS {kw_clean} ตัวท็อปพรีเมียม",
                 "name_a": f"{kw_clean} รุ่นคุ้มค่า",
                 "name_b": f"{kw_clean} รุ่นพรีเมียม",
@@ -872,7 +1024,7 @@ class AIScriptGenerator:
             }
 
         # Fallback to random template
-        return get_random_idea(category=category, framework=framework, use_ai=False)
+        return get_random_idea(category=category, framework=framework, use_ai=False, clip_type=clip_type, relation_type=relation_type)
 
 
 # Curated High-Retention Trending Comparison Library across 8 Categories & 10 Frameworks
@@ -1377,6 +1529,66 @@ TRENDING_COMPARISON_TEMPLATES = [
         "affiliate_link_a": "https://shopee.co.th/latex_mattress",
         "affiliate_link_b": "https://shopee.co.th/spring_mattress",
     },
+    {
+        "framework": "crossover",
+        "category": "🧠 สาระความรู้ & วัฒนธรรม",
+        "clip_type": "viral_knowledge",
+        "relation_type": "contrast",
+        "topic": "ศาสนาพุทธ VS ศาสนาคริสต์ (หลักคิด ความเหมือน และจุดต่างที่ลึกซึ้ง)",
+        "name_a": "ศาสนาพุทธ (Buddhism)",
+        "name_b": "ศาสนาคริสต์ (Christianity)",
+        "details_a": "เน้นอริยสัจ 4 กฎแห่งกรรม การพึ่งพาตนเอง และการดับทุกข์สู่พระนิพพาน",
+        "details_b": "เน้นความรัก ความศรัทธาต่อพระผู้เป็นเจ้า และการได้รับความรอดพ้น",
+        "target_audience": "คนสนใจปรัชญา ประวัติศาสตร์ ศาสนาเปรียบเทียบ และสาระน่ารู้",
+        "key_angles": "มุมมองต่อชีวิต ความดี-ชั่ว และเป้าหมายสูงสุดของมนุษย์",
+        "affiliate_link_a": "",
+        "affiliate_link_b": "",
+    },
+    {
+        "framework": "persona",
+        "category": "🧠 สาระความรู้ & วัฒนธรรม",
+        "clip_type": "viral_knowledge",
+        "relation_type": "compare",
+        "topic": "ประเทศไทย VS ประเทศพม่า (ส่องค่าครองชีพ วัฒนธรรม และสถิติที่น่าทึ่ง)",
+        "name_a": "ประเทศไทย (Thailand)",
+        "name_b": "ประเทศพม่า (Myanmar)",
+        "details_a": "ศูนย์กลางการท่องเที่ยว อุตสาหกรรมอาหาร และระบบสาธารณสุขระดับสากล",
+        "details_b": "อุดมด้วยทรัพยากรธรรมชาติ วัฒนธรรมพุทธโบราณ และตลาดแรงงานขนาดใหญ่",
+        "target_audience": "คนติดตามเศรษฐกิจ สังคม การท่องเที่ยว อาเซียน และประวัติศาสตร์",
+        "key_angles": "ดัชนีการพัฒนา ค่าครองชีพ สถิติเศรษฐกิจ และวิถีชีวิตผู้คน",
+        "affiliate_link_a": "",
+        "affiliate_link_b": "",
+    },
+    {
+        "framework": "persona",
+        "category": "🧠 สาระความรู้ & วัฒนธรรม",
+        "clip_type": "viral_knowledge",
+        "relation_type": "contrast",
+        "topic": "Introvert VS Extrovert (แหล่งชาร์จพลังงานที่ต่างกันสุดขั้ว)",
+        "name_a": "Introvert (มนุษย์ชาร์จพลังคนเดียว)",
+        "name_b": "Extrovert (มนุษย์ชาร์จพลังจากผู้คน)",
+        "details_a": "ฟื้นฟูพลังจากความสงบและการอยู่คนเดียว คิดลึกซึ้งก่อนพูด โฟกัสยาวนาน",
+        "details_b": "ตื่นตัวและได้พลังเมื่อพบปะผู้คน ปรับตัวเข้าสังคมไว สื่อสารคล่องแคล่ว",
+        "target_audience": "คนทำงาน วัยรุ่น คนที่อยากเข้าใจบุคลิกภาพจิตวิทยาของตนเองและคนรอบข้าง",
+        "key_angles": "การรับมือกับความเครียด สไตล์การทำงาน และวิธีฟื้นฟูพลังใจ",
+        "affiliate_link_a": "",
+        "affiliate_link_b": "",
+    },
+    {
+        "framework": "crossover",
+        "category": "🧠 สาระความรู้ & วัฒนธรรม",
+        "clip_type": "viral_knowledge",
+        "relation_type": "compare",
+        "topic": "กรุงเทพมหานคร VS โตเกียว (ผังเมือง ระบบขนส่ง และคุณภาพชีวิต)",
+        "name_a": "กรุงเทพฯ (Bangkok)",
+        "name_b": "มหานครโตเกียว (Tokyo)",
+        "details_a": "เมืองมีชีวิตชีวา 24 ชม. สตรีทฟู้ดระดับโลก ค่าครองชีพอาหารเข้าถึงง่าย",
+        "details_b": "โครงข่ายรถไฟฟ้าหนาแน่นที่สุดในโลก ผังเมืองเป็นระเบียบ สะอาด ปลอดภัย",
+        "target_audience": "คนเมือง คนรักการท่องเที่ยว ผังเมือง และไลฟ์สไตล์เมืองใหญ่",
+        "key_angles": "ความสะดวกในการเดินทาง ความเป็นระเบียบ และความสุขในการใช้ชีวิต",
+        "affiliate_link_a": "",
+        "affiliate_link_b": "",
+    },
 ]
 
 CATEGORIES = list(dict.fromkeys(item["category"] for item in TRENDING_COMPARISON_TEMPLATES if "category" in item))
@@ -1388,19 +1600,36 @@ def get_random_idea(
     use_ai: bool = False,
     seen_topics: Optional[List[str]] = None,
     keyword: Optional[str] = None,
+    clip_type: str = "commerce",
+    relation_type: str = "compare",
 ) -> Dict[str, Any]:
     """Returns a fresh high-retention comparison idea template or generates a fresh one via AI."""
     import random
 
     kw_clean = (keyword or "").strip()
-    if use_ai or (kw_clean and not any(kw_clean.lower() in item.get("topic", "").lower() for item in TRENDING_COMPARISON_TEMPLATES)):
+    if use_ai or clip_type == "viral_knowledge" or (kw_clean and not any(kw_clean.lower() in item.get("topic", "").lower() for item in TRENDING_COMPARISON_TEMPLATES)):
         try:
             gen = AIScriptGenerator()
-            return gen.generate_fresh_topic_idea(category=category, framework=framework, keyword=kw_clean)
+            return gen.generate_fresh_topic_idea(
+                category=category,
+                framework=framework,
+                keyword=kw_clean,
+                clip_type=clip_type,
+                relation_type=relation_type,
+            )
         except Exception:
             pass
 
     pool = TRENDING_COMPARISON_TEMPLATES
+    if clip_type == "viral_knowledge":
+        vk_pool = [item for item in pool if item.get("clip_type") == "viral_knowledge"]
+        if vk_pool:
+            pool = vk_pool
+    elif clip_type == "commerce":
+        comm_pool = [item for item in pool if item.get("clip_type", "commerce") == "commerce"]
+        if comm_pool:
+            pool = comm_pool
+
     if kw_clean:
         matching = [
             item for item in pool
@@ -1426,7 +1655,10 @@ def get_random_idea(
         if unseen:
             pool = unseen
 
-    return random.choice(pool).copy()
+    res = random.choice(pool).copy()
+    res["clip_type"] = clip_type
+    res["relation_type"] = relation_type
+    return res
 
 
 if __name__ == "__main__":

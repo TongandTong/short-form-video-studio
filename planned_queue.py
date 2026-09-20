@@ -86,6 +86,8 @@ def add_to_planned_queue(
     key_angles: str = "",
     framework: str = "persona",
     duration_mode: str = "standard_3round",
+    clip_type: str = "commerce",
+    relation_type: str = "compare",
 ) -> Dict[str, Any]:
     """
     Creates a new queue entry and appends or inserts at top.
@@ -109,6 +111,8 @@ def add_to_planned_queue(
         "key_angles": key_angles,
         "framework": framework,
         "duration_mode": duration_mode,
+        "clip_type": clip_type,
+        "relation_type": relation_type,
         "script_data": script_data,
         "image_a_path": saved_img_a or (image_a_path or ""),
         "image_b_path": saved_img_b or (image_b_path or ""),

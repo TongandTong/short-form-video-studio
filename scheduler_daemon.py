@@ -157,9 +157,11 @@ def run_autopilot_cycle(
             chosen_fw = curated_item.get("framework", "persona")
             dur_mode = curated_item.get("duration_mode", "standard_3round")
             post_mode = force_post_mode or curated_item.get("post_mode", "render_only")
+            clip_type = curated_item.get("clip_type", "commerce")
+            relation_type = curated_item.get("relation_type", "compare")
             script_data = curated_item.get("script_data")
 
-            _add_log(cfg, f"📋 นำคิวล่วงหน้ามาผลิต: '{topic}' ({name_a} vs {name_b}) [โหมด: {post_mode}]")
+            _add_log(cfg, f"📋 นำคิวล่วงหน้ามาผลิต: '{topic}' ({name_a} vs {name_b}) [โหมด: {post_mode} | {clip_type}]")
             save_autopilot_config(cfg)
 
             # Generate script if not pre-stored
@@ -178,6 +180,8 @@ def run_autopilot_cycle(
                     script_mode=dur_mode,
                     channel_outro_cta=outro_cta,
                     framework=chosen_fw,
+                    clip_type=clip_type,
+                    relation_type=relation_type,
                 )
 
             # Use verified curated images
@@ -216,9 +220,11 @@ def run_autopilot_cycle(
             aff_a = template.get("affiliate_link_a") or cfg.get("default_affiliate_a", "https://shopee.co.th")
             aff_b = template.get("affiliate_link_b") or cfg.get("default_affiliate_b", "https://shopee.co.th")
             chosen_fw = template.get("framework", fw if fw != "all" else "persona")
+            clip_type = template.get("clip_type", "commerce")
+            relation_type = template.get("relation_type", "compare")
             post_mode = force_post_mode or "render_and_post"
 
-            _add_log(cfg, f"🤖 AI Deep Research: '{topic}' ({name_a} vs {name_b})")
+            _add_log(cfg, f"🤖 AI Deep Research: '{topic}' ({name_a} vs {name_b}) [{clip_type}]")
             save_autopilot_config(cfg)
 
             gen = AIScriptGenerator()
@@ -235,6 +241,8 @@ def run_autopilot_cycle(
                 script_mode=dur_mode,
                 channel_outro_cta=outro_cta,
                 framework=chosen_fw,
+                clip_type=clip_type,
+                relation_type=relation_type,
             )
 
             allow_search = cfg.get("auto_search_images", True)
