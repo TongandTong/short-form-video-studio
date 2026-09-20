@@ -44,6 +44,7 @@ from config import (
     get_regular_font_path,
     OUTPUT_DIR,
     IMAGES_DIR,
+    TEMP_DIR,
     WATERMARK_SAFE_ZONES,
 )
 from tts_engine import SegmentTimeline

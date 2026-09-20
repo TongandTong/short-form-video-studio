@@ -308,17 +308,6 @@ with st.sidebar:
         st.info("💡 **แชร์ข้ามเน็ตฟรี:** `npx localtunnel --port 8501`")
 
     st.divider()
-    auto_cfg = load_autopilot_config()
-    st.markdown("### ⏰ สถานะ Auto-Pilot 24 ชม.")
-    if auto_cfg.get("enabled"):
-        next_ts = auto_cfg.get("next_run_timestamp", 0)
-        remaining_m = max(0, int((next_ts - time.time()) / 60)) if next_ts > 0 else 0
-        rem_str = f"ในอีก {remaining_m // 60} ชม. {remaining_m % 60} นาที" if remaining_m >= 60 else f"ในอีก {remaining_m} นาที"
-        st.success(f"🟢 **ทำงานอยู่** (ทุก {auto_cfg.get('interval_hours')} ชม.)\n\n⏱️ คลิปถัดไป: {rem_str}")
-    else:
-        st.info("⚪ **ปิดอยู่** (ตั้งเวลาที่แท็บ 3 ได้ตลอดเวลา)")
-
-    st.divider()
     st.markdown("### 📚 คลังประวัติคลิปที่สร้าง")
     history_items = load_history()
     with st.expander(f"🎬 ประวัติคลิปย้อนหลัง ({len(history_items)} คลิป)", expanded=False):
@@ -333,13 +322,13 @@ with st.sidebar:
                 elif p_st == "posted_manual":
                     st.markdown("🔵 <span style='font-size:12px; color:#007AFF; font-weight:600;'>โพสต์เองแล้ว</span>", unsafe_allow_html=True)
                 else:
-                    st.markdown("🟡 <span style='font-size:12px; color:#FF9500; font-weight:600;'>ยังไม่โพสต์ (Draft)</span>", unsafe_allow_html=True)
+                    st.markdown("🟡 <span style='font-size:12px; color:#FF9500; font-weight:600;'>บันทึกเก็บไว้ (Draft)</span>", unsafe_allow_html=True)
                 v_p = item.get("video_path")
                 if v_p and Path(v_p).exists():
                     st.caption(f"📁 {Path(v_p).name}")
                 st.divider()
 
-    st.info("⚙️ **อัปโหลดโลโก้, ลายน้ำ & ตั้งค่า API:** ไปที่แท็บ **5. ตั้งค่าส่วนกลาง** ด้านบน")
+    st.info("⚙️ **อัปโหลดโลโก้, ลายน้ำ & ตั้งค่า API:** ไปที่แท็บ **4. ตั้งค่าส่วนกลาง** ด้านบน")
 
 # Initialize Script Data in Session State
 if "script_data" not in st.session_state:
@@ -408,14 +397,13 @@ if "input_relation_type" not in st.session_state:
     st.session_state.input_relation_type = st.session_state.script_data.get("relation_type", "compare")
 
 # -------------------------------------------------------------
-# 5 STRUCTURED TABS NAVIGATION
+# 4 DIRECT PRODUCTION TABS (NO QUEUE OVERHEAD)
 # -------------------------------------------------------------
-tab_script, tab_render, tab_autopilot, tab_queue, tab_settings = st.tabs([
-    "📝 1. ร่างบท & รีไรท์ (Script Studio)",
-    "🎬 2. เรนเดอร์ & พรีวิวคลิป (Render Studio)",
-    "⏰ 3. Auto-Pilot 24 ชม. (ผลิตอัตโนมัติ)",
-    "🚀 4. คลังคลิป & ออโต้โพสต์ (Queue & Post Manager)",
-    "⚙️ 5. ตั้งค่าส่วนกลาง (Global Settings)",
+tab_script, tab_render, tab_history, tab_settings = st.tabs([
+    "📝 1. ร่างบท & สตูดิโอ (Script Studio)",
+    "🎬 2. เรนเดอร์ & ออโต้โพสต์/เซฟ (Render & Publish)",
+    "🚀 3. คลังคลิปสำเร็จ & ประวัติโพสต์ (Video Vault & History)",
+    "⚙️ 4. ตั้งค่าส่วนกลาง (Global Settings)",
 ])
 
 # =============================================================
@@ -720,7 +708,18 @@ with tab_script:
             except Exception as e:
                 st.error(f"เกิดข้อผิดพลาดในการเรียก AI: {e}")
 
-    if st.button("⚡ 1-Click Viral Auto-Pilot (คลิกเดียวจบครบวงจร)", type="secondary", use_container_width=True):
+    col_ap_opt, col_ap_btn = st.columns([1, 2], gap="small")
+    with col_ap_opt:
+        t1_dest_mode = st.radio(
+            "ปลายทางหลังสร้างเสร็จ:",
+            ["📦 เซฟเก็บไว้ดู / ดาวน์โหลด", "🚀 ออโต้โพสต์ลงโซเชียลทันที"],
+            index=0,
+            key="t1_dest_mode_sel",
+        )
+    with col_ap_btn:
+        btn_1click = st.button("⚡ 1-Click Viral Auto-Pilot (เรนเดอร์จบในคลิกเดียว)", type="secondary", use_container_width=True)
+
+    if btn_1click:
         # Auto-resolve names from topic if user forgot to click update
         eff_name_a = in_name_a
         eff_name_b = in_name_b
@@ -854,8 +853,23 @@ with tab_script:
                 )
 
                 st.session_state.rendered_video_path = str(final_video)
-                status_box.update(label=f"🎉 สำเร็จ! สร้างคลิปเสร็จสมบูรณ์ใน {total_duration:.1f} วินาที", state="complete")
-                st.toast("✅ สร้างคลิปเสร็จแล้ว! ไปดูที่แท็บ '2. เรนเดอร์ & พรีวิวคลิป'")
+
+                if "ออโต้โพสต์" in t1_dest_mode:
+                    st.write("🚀 5/5: กำลังส่งคลิปขึ้น Facebook / YouTube / TikTok อัตโนมัติ...")
+                    m_p = output_mp4.parent / f"{output_mp4.stem}_meta.json"
+                    res = publish_to_all_enabled(
+                        video_path=str(final_video),
+                        cover_path=str(cover_path) if cover_path.exists() else None,
+                        meta_path=str(m_p) if m_p.exists() else None,
+                    )
+                    if res:
+                        status_box.update(label=f"🎉 เรนเดอร์ & ออโต้โพสต์สำเร็จ {len(res)} ช่องทาง!", state="complete")
+                        st.toast(f"🚀 ออโต้โพสต์สำเร็จ {len(res)} แพลตฟอร์ม!")
+                    else:
+                        status_box.update(label="🎉 เรนเดอร์สำเร็จ! (ยังไม่ได้เปิดใช้งาน API โซเชียลในแท็บตั้งค่า)", state="complete")
+                else:
+                    status_box.update(label=f"🎉 เรนเดอร์และบันทึกเสร็จสมบูรณ์ใน {total_duration:.1f} วินาที", state="complete")
+                    st.toast("✅ บันทึกคลิปเสร็จแล้ว! ไปดูที่แท็บ '2. เรนเดอร์ & ออโต้โพสต์/เซฟ'")
                 st.rerun()
             except Exception as e:
                 status_box.update(label=f"เกิดข้อผิดพลาด: {e}", state="error")
@@ -1006,104 +1020,13 @@ with tab_script:
             except Exception as e:
                 st.error(f"เกิดข้อผิดพลาด: {e}")
 
-    # Planned Queue Integration for Tab 1
     st.markdown("---")
-    st.markdown("### 📥 ขั้นตอนที่ 3: ตรวจเลือกรูปสินค้า & ลิงก์ Affiliate บันทึกเข้าคิวผลิต (Pre-curated Queue)")
-    with st.expander("📦 จัดเตรียมรูปภาพและพิกัด Affiliate บันทึกเข้าคิวผลิตล่วงหน้า", expanded=True):
-        st.caption("พอใจบทแล้ว? สามารถตรวจเลือกรูปสินค้า A & B ให้ตรงเป๊ะ ใส่ลิงก์ Affiliate แล้วบันทึกเข้าคิวล่วงหน้าไว้ได้ทันที (จัดเก็บได้ไม่จำกัด สั่งเรนเดอร์ทิ้งไว้หรือปล่อยบอททยอยทำได้)")
-
-        q_topic = st.session_state.script_data.get("topic", st.session_state.get("input_topic", "หัวข้อเปรียบเทียบ"))
-        q_name_a = st.session_state.script_data.get("name_a", st.session_state.get("input_name_a", "สินค้า A"))
-        q_name_b = st.session_state.script_data.get("name_b", st.session_state.get("input_name_b", "สินค้า B"))
-
-        col_qa, col_qb = st.columns(2, gap="medium")
-        with col_qa:
-            st.markdown(f"##### 🟢 ข้อมูลและรูปภาพสินค้า A: **{q_name_a}**")
-            exist_img_a = ASSETS_DIR / "images" / "item_a.png"
-            if exist_img_a.exists():
-                st.image(str(exist_img_a), width=180, caption=f"ภาพปัจจุบัน: {q_name_a}")
-            q_file_a = st.file_uploader(f"📁 อัปโหลดรูปจริง {q_name_a} (ไม่บังคับ):", type=["png", "jpg", "jpeg", "webp"], key="t1_queue_img_a")
-            q_aff_a = st.text_input(
-                f"🔗 ลิงก์ Affiliate สินค้า A ({q_name_a}):",
-                value=st.session_state.get("input_aff_a", "") or "https://shopee.co.th",
-                key="t1_queue_aff_a",
-            )
-        with col_qb:
-            st.markdown(f"##### 🔵 ข้อมูลและรูปภาพสินค้า B: **{q_name_b}**")
-            exist_img_b = ASSETS_DIR / "images" / "item_b.png"
-            if exist_img_b.exists():
-                st.image(str(exist_img_b), width=180, caption=f"ภาพปัจจุบัน: {q_name_b}")
-            q_file_b = st.file_uploader(f"📁 อัปโหลดรูปจริง {q_name_b} (ไม่บังคับ):", type=["png", "jpg", "jpeg", "webp"], key="t1_queue_img_b")
-            q_aff_b = st.text_input(
-                f"🔗 ลิงก์ Affiliate สินค้า B ({q_name_b}):",
-                value=st.session_state.get("input_aff_b", "") or "https://shopee.co.th",
-                key="t1_queue_aff_b",
-            )
-
-        st.markdown("##### ⚙️ ตัวเลือกการผลิตเมื่อถึงคิว:")
-        q_post_mode = st.radio(
-            "โหมดการทำงานเมื่อถึงคิว:",
-            options=["📦 เรนเดอร์เก็บไว้ (Render & Save Only)", "🚀 เรนเดอร์แล้วโพสต์เลย (Render & Auto-Post)"],
-            index=0,
-            key="t1_queue_post_mode",
-        )
-        clean_post_mode = "render_only" if "เก็บไว้" in q_post_mode else "render_and_post"
-
-        q_jump_top = st.checkbox(
-            "⚡ แทรกเป็นคิวแรกสุดทันที (แซงคิวทำก่อน / Jump to Top)",
-            value=False,
-            help="ติ๊กเมื่อเป็นเรื่องด่วน กระแสไวรัล หรือข่าวดังที่ต้องการให้ระบบนำไปเรนเดอร์เป็นคลิปถัดไปทันทีโดยไม่ลบคิวเดิม",
-            key="t1_queue_jump_top",
-        )
-
-        if st.button("💾 บันทึกเข้าคิวผลิตทันที (Save to Production Queue)", type="primary", use_container_width=True, key="btn_t1_save_queue"):
-            with st.spinner("📦 กำลังจัดเก็บหัวข้อ ภาพ และลิงก์เข้าคลัง..."):
-                t_stamp = int(time.time())
-                from planned_queue import QUEUE_ASSETS_DIR
-                saved_a_path = None
-                if q_file_a is not None:
-                    saved_a_path = QUEUE_ASSETS_DIR / f"temp_upload_a_{t_stamp}.png"
-                    with open(saved_a_path, "wb") as fa:
-                        fa.write(q_file_a.getbuffer())
-                elif exist_img_a.exists():
-                    saved_a_path = exist_img_a
-
-                saved_b_path = None
-                if q_file_b is not None:
-                    saved_b_path = QUEUE_ASSETS_DIR / f"temp_upload_b_{t_stamp}.png"
-                    with open(saved_b_path, "wb") as fb:
-                        fb.write(q_file_b.getbuffer())
-                elif exist_img_b.exists():
-                    saved_b_path = exist_img_b
-
-                new_q_item = add_to_planned_queue(
-                    topic=q_topic,
-                    name_a=q_name_a,
-                    name_b=q_name_b,
-                    script_data=st.session_state.script_data,
-                    image_a_path=str(saved_a_path) if saved_a_path else None,
-                    image_b_path=str(saved_b_path) if saved_b_path else None,
-                    affiliate_link_a=q_aff_a,
-                    affiliate_link_b=q_aff_b,
-                    post_mode=clean_post_mode,
-                    jump_to_top=q_jump_top,
-                    details_a=st.session_state.get("input_details_a", ""),
-                    details_b=st.session_state.get("input_details_b", ""),
-                    target_audience=st.session_state.get("input_target", ""),
-                    key_angles=st.session_state.get("input_angles", ""),
-                    framework=st.session_state.script_data.get("framework", "persona"),
-                    duration_mode=st.session_state.script_data.get("script_mode", "standard_3round"),
-                )
-                jump_msg = "⚡ (แซงคิวขึ้นเป็นอันดับ 1 แล้ว!)" if q_jump_top else ""
-                st.success(f"🎉 บันทึกหัวข้อ '{q_topic}' เข้าคิวผลิตเรียบร้อยแล้ว! {jump_msg} คุณสามารถไปดูคิวทั้งหมดได้ที่ 'แท็บ 4. คลังคลิป & ออโต้โพสต์'")
-                st.toast(f"✅ บันทึกเข้าคิวเรียบร้อย: {q_topic}")
-
     st.markdown(
         """
         <div style="background: rgba(52, 199, 89, 0.08); border: 1px solid rgba(52, 199, 89, 0.3); border-radius: 14px; padding: 16px 20px; margin-top: 20px;">
-            <div style="font-weight: 700; font-size: 16px; color: #28a745;">🎉 ตรวจบทพูดเรียบร้อยแล้วใช่ไหม?</div>
+            <div style="font-weight: 700; font-size: 16px; color: #28a745;">🎉 ได้บทที่พอใจแล้วใช่ไหม?</div>
             <div style="font-size: 13.5px; color: #555; margin-top: 3px;">
-                คลิกที่แท็บ <b>'🎬 2. เรนเดอร์ & พรีวิวคลิป'</b> ด้านบน เพื่อใส่รูปสินค้าและกดเรนเดอร์วิดีโอ 1080x1920 ได้เลยครับ!
+                คลิกที่แท็บ <b>'🎬 2. เรนเดอร์ & ออโต้โพสต์/เซฟ'</b> ด้านบน เพื่อใส่รูปสินค้าและกดเรนเดอร์วิดีโอ 1080x1920 พร้อมเลือกว่าจะเซฟเก็บไว้หรือออโต้โพสต์ขึ้นโซเชียลได้ทันที!
             </div>
         </div>
         """,
@@ -1194,8 +1117,20 @@ with tab_render:
         ov_wm_enable = st.toggle("เปิดลายน้ำกันก๊อป", value=True)
 
     # Render Action Button
-    st.markdown("### 🎬 ขั้นตอนที่ 3: สั่งเรนเดอร์และรับชมวิดีโอ (1080x1920 Video Player)")
-    if st.button("🎥 สั่งเรนเดอร์คลิปวิดีโอ 1080x1920 (9:16)", type="primary", use_container_width=True):
+    st.markdown("### 🎬 ขั้นตอนที่ 3: สั่งเรนเดอร์และเลือกระบบปลายทาง")
+    col_act1, col_act2 = st.columns([1, 1], gap="medium")
+    with col_act1:
+        post_target_choice = st.radio(
+            "🎯 ปลายทางหลังเรนเดอร์เสร็จ:",
+            options=["📦 เซฟเก็บไว้ดู / ดาวน์โหลด (Save Only)", "🚀 ออโต้โพสต์ลงโซเชียลทันที (Auto-Post)"],
+            index=0,
+            key="post_target_choice",
+            help="เลือกว่าต้องการแค่เซฟไฟล์วิดีโอไว้ดู หรือให้อัปโหลดไปยัง Facebook Reels / YouTube Shorts / TikTok อัตโนมัติทันทีที่เรนเดอร์เสร็จ",
+        )
+    with col_act2:
+        st.caption("💡 หากเลือก **ออโต้โพสต์** ระบบจะส่งคลิป แคปชั่น แฮชแท็ก และคอมเมนต์ปักหมุดไปยังโซเชียลทุกช่องทางที่คุณเปิดใช้งานในแท็บตั้งค่าทันทีที่เรนเดอร์เสร็จ")
+
+    if st.button("🚀 สั่งเรนเดอร์คลิปวิดีโอ 1080x1920 (9:16)", type="primary", use_container_width=True):
         status_box = st.status("🎬 กำลังเรนเดอร์วิดีโอ 1080x1920 (9:16)...", expanded=True)
         with status_box:
             try:
@@ -1319,8 +1254,23 @@ with tab_render:
                 )
 
                 st.session_state.rendered_video_path = str(final_video)
-                status_box.update(label=f"🎉 เรนเดอร์สำเร็จ! ความยาวคลิป {total_duration:.1f} วินาที", state="complete")
-                st.toast("✅ สร้างวิดีโอเรียบร้อยแล้ว!")
+
+                if "ออโต้โพสต์" in post_target_choice:
+                    st.write("🚀 4/4: กำลังส่งคลิปขึ้น Facebook / YouTube / TikTok อัตโนมัติ...")
+                    m_p = output_mp4.parent / f"{output_mp4.stem}_meta.json"
+                    res = publish_to_all_enabled(
+                        video_path=str(final_video),
+                        cover_path=str(cover_path) if cover_path.exists() else None,
+                        meta_path=str(m_p) if m_p.exists() else None,
+                    )
+                    if res:
+                        status_box.update(label=f"🎉 เรนเดอร์ & ออโต้โพสต์สำเร็จ {len(res)} ช่องทาง! ความยาว {total_duration:.1f} วินาที", state="complete")
+                        st.toast(f"🚀 ออโต้โพสต์สำเร็จ {len(res)} แพลตฟอร์ม!")
+                    else:
+                        status_box.update(label=f"🎉 เรนเดอร์สำเร็จ! ความยาว {total_duration:.1f} วินาที (ยังไม่ได้เปิด API โซเชียลในแท็บตั้งค่า)", state="complete")
+                else:
+                    status_box.update(label=f"🎉 เรนเดอร์และบันทึกเสร็จสมบูรณ์! ความยาว {total_duration:.1f} วินาที", state="complete")
+                    st.toast("✅ สร้างวิดีโอเรียบร้อยแล้ว!")
             except Exception as e:
                 status_box.update(label=f"เกิดข้อผิดพลาด: {e}", state="error")
                 st.error(f"เกิดข้อผิดพลาด: {e}")
@@ -1386,543 +1336,71 @@ with tab_render:
                     meta_path=str(m_p) if m_p.exists() else None,
                 )
                 if res:
-                    st.success(f"ส่งคำสั่งโพสต์แล้ว ({len(res)} ช่องทาง) ตรวจสอบที่แท็บ '4. คลังคลิป & ออโต้โพสต์'")
+                    st.success(f"ส่งคำสั่งโพสต์แล้ว ({len(res)} ช่องทาง) ตรวจสอบที่แท็บ '3. คลังคลิปสำเร็จ & ประวัติโพสต์'")
                 else:
-                    st.warning("ยังไม่ได้เปิดใช้งานโซเชียลใดๆ (ไปตั้งค่าได้ที่แท็บ '5. ตั้งค่าส่วนกลาง')")
+                    st.warning("ยังไม่ได้เปิดใช้งานโซเชียลใดๆ (ไปตั้งค่าได้ที่แท็บ '4. ตั้งค่าส่วนกลาง')")
 
 # =============================================================
-# TAB 3: AUTOPILOT 24/7 AUTONOMOUS SCHEDULER
+# TAB 3: VIDEO VAULT & HISTORY (POST TRACKER & SOCIAL LOGS)
 # =============================================================
-with tab_autopilot:
-    st.subheader("⏰ Auto-Pilot 24 Hours — ผลิตคลิปอัตโนมัติตามเวลา & ตุนคลิป")
-    st.caption("ระบบทำงานในพื้นหลังตลอด 24 ชั่วโมง สุ่มหัวข้อไวรัล ค้นภาพ สังเคราะห์เสียง Neural ตัดต่อวิดีโอ 9:16 แคปชั่น แฮชแท็ก และปักหมุด Affiliate เตรียมพร้อมนำไปโพสต์ได้ทันที")
+with tab_history:
+    st.subheader("🚀 คลังคลิปสำเร็จ & ประวัติการโพสต์ (Video Vault & Post History)")
+    st.caption("ตรวจสอบคลิปทั้งหมดที่สร้างเสร็จแล้ว ดาวน์โหลด MP4 / ภาพปก หรือสั่งโพสต์ไปยังโซเชียลได้ทันที")
 
-    auto_cfg = load_autopilot_config()
+    all_history = load_history()
+    draft_count = sum(1 for h in all_history if h.get("post_status", "draft") == "draft")
+    auto_count = sum(1 for h in all_history if h.get("post_status") == "posted_auto")
+    manual_count = sum(1 for h in all_history if h.get("post_status") == "posted_manual")
 
-    col_st1, col_st2, col_st3 = st.columns([1, 1, 1])
-    with col_st1:
-        is_active = auto_cfg.get("enabled", False)
-        badge_color = "#34C759" if is_active else "#8E8E93"
-        badge_title = "🟢 เปิดทำงาน (Active)" if is_active else "⚪ ปิดทำงาน (Paused)"
-        st.markdown(
-            f"""
-            <div class="ios-card" style="border-left: 5px solid {badge_color};">
-                <div style="font-size: 13px; color: #8E8E93; font-weight: 600;">สถานะระบบ Auto-Pilot</div>
-                <div style="font-size: 19px; font-weight: 700; color: {badge_color}; margin-top: 4px;">{badge_title}</div>
-                <div style="font-size: 12px; color: #636366; margin-top: 5px;">Worker Daemon: {'🟢 ออนไลน์' if is_scheduler_alive() else '🟡 กำลังเตรียมพร้อม'}</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+    with col_m1:
+        st.metric("📦 คลิปทั้งหมด", f"{len(all_history)} คลิป")
+    with col_m2:
+        st.metric("🟡 บันทึกเก็บไว้ (Draft)", f"{draft_count} คลิป")
+    with col_m3:
+        st.metric("🟢 โพสต์อัตโนมัติแล้ว", f"{auto_count} คลิป")
+    with col_m4:
+        st.metric("🔵 โพสต์เองแล้ว", f"{manual_count} คลิป")
 
-    with col_st2:
-        interval_val = auto_cfg.get("interval_hours", 3.0)
-        daily_clips = int(24 / interval_val) if interval_val > 0 else 0
-        st.markdown(
-            f"""
-            <div class="ios-card" style="border-left: 5px solid #007AFF;">
-                <div style="font-size: 13px; color: #8E8E93; font-weight: 600;">ความถี่ในการผลิต</div>
-                <div style="font-size: 19px; font-weight: 700; color: #007AFF; margin-top: 4px;">ทุก {interval_val} ชั่วโมง</div>
-                <div style="font-size: 12px; color: #636366; margin-top: 5px;">กำลังการผลิต: ประมาณ {daily_clips} คลิป / วัน</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    with col_st3:
-        next_ts = auto_cfg.get("next_run_timestamp", 0)
-        if is_active and next_ts > 0:
-            remaining_mins = max(0, int((next_ts - time.time()) / 60))
-            if remaining_mins >= 60:
-                h = remaining_mins // 60
-                m = remaining_mins % 60
-                rem_label = f"อีก {h} ชม. {m} นาที"
-            else:
-                rem_label = f"อีก {remaining_mins} นาที"
-            time_str = time.strftime("%H:%M:%S", time.localtime(next_ts))
-            sub_next = f"รอบถัดไป: {time_str} ({rem_label})"
-        else:
-            sub_next = "รอเปิดสวิตช์เริ่มระบบ"
-        st.markdown(
-            f"""
-            <div class="ios-card" style="border-left: 5px solid #FF9500;">
-                <div style="font-size: 13px; color: #8E8E93; font-weight: 600;">นับถอยหลังรอบถัดไป</div>
-                <div style="font-size: 19px; font-weight: 700; color: #FF9500; margin-top: 4px;">{sub_next}</div>
-                <div style="font-size: 12px; color: #636366; margin-top: 5px;">ผลิตไปแล้วทั้งหมด: {auto_cfg.get('total_generated', 0)} คลิป</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    # Planned Queue Priority Banner
-    p_ready_cnt = sum(1 for it in load_planned_queue() if it.get("status") == "ready")
-    if p_ready_cnt > 0:
-        st.info(f"💡 **มีหัวข้อในคิวล่วงหน้าที่พร้อมรัน {p_ready_cnt} คลิป**: เมื่อถึงรอบผลิต ระบบ Auto-Pilot จะดึงหัวข้อจากคิวล่วงหน้านี้ไปผลิตก่อนตามลำดับ พร้อมใช้รูปภาพและลิงก์ Affiliate ที่คุณเลือกไว้ 100% (สามารถดูหรือจัดคิวได้ที่ 'แท็บ 4. คลังคลิป & ออโต้โพสต์')")
-
-    st.markdown("#### ⚙️ ตั้งค่าระบบการผลิตอัตโนมัติ")
-    auto_toggle = st.toggle("เปิดระบบผลิตคลิปอัตโนมัติ 24 ชม. (Auto-Pilot Daemon)", value=bool(auto_cfg.get("enabled", False)))
-
-    interval_choices = [1.0, 2.0, 3.0, 4.0, 6.0, 8.0, 12.0, 24.0]
-    cur_int = float(auto_cfg.get("interval_hours", 3.0))
-    int_idx = interval_choices.index(cur_int) if cur_int in interval_choices else 2
-    selected_interval = st.selectbox(
-        "⏱️ สร้างคลิปใหม่ทุกๆ:",
-        options=interval_choices,
-        index=int_idx,
-        format_func=lambda h: f"ทุก {int(h) if h.is_integer() else h} ชั่วโมง ({int(24/h)} คลิปต่อวัน)",
+    filter_choice = st.radio(
+        "กรองตามสถานะ:",
+        options=["ทั้งหมด", "🟡 บันทึกเก็บไว้ (Draft)", "🟢 โพสต์อัตโนมัติแล้ว", "🔵 โพสต์เองแล้ว"],
+        horizontal=True,
+        key="rad_filter_post_status",
     )
 
-    dur_list = list(DURATION_MODES.keys())
-    cur_dur = auto_cfg.get("target_duration_mode", "standard_3round")
-    dur_idx = dur_list.index(cur_dur) if cur_dur in dur_list else 1
-    selected_dur = st.selectbox("⏱️ รูปแบบความยาวคลิป:", options=dur_list, index=dur_idx, format_func=lambda k: DURATION_MODES[k]["name"])
+    filtered_list = all_history
+    if filter_choice == "🟡 บันทึกเก็บไว้ (Draft)":
+        filtered_list = [h for h in all_history if h.get("post_status", "draft") == "draft"]
+    elif filter_choice == "🟢 โพสต์อัตโนมัติแล้ว":
+        filtered_list = [h for h in all_history if h.get("post_status") == "posted_auto"]
+    elif filter_choice == "🔵 โพสต์เองแล้ว":
+        filtered_list = [h for h in all_history if h.get("post_status") == "posted_manual"]
 
-    all_cats = ["ทั้งหมด (สุ่มทุกหมวด)"] + CATEGORIES
-    cur_cat = auto_cfg.get("target_category", "ทั้งหมด (สุ่มทุกหมวด)")
-    cat_idx = all_cats.index(cur_cat) if cur_cat in all_cats else 0
-    selected_cat = st.selectbox("📂 หมวดหมู่สินค้าเป้าหมาย:", options=all_cats, index=cat_idx)
-
-    fw_list = ["all"] + list(FRAMEWORK_PRESETS.keys())
-    cur_fw = auto_cfg.get("target_framework", "all")
-    fw_idx = fw_list.index(cur_fw) if cur_fw in fw_list else 0
-    selected_fw = st.selectbox(
-        "🎯 กรอบแนวทาง Framework ไวรัล:",
-        options=fw_list,
-        index=fw_idx,
-        format_func=lambda k: f"สุ่มทุกแนวทาง ({len(FRAMEWORK_PRESETS)} Frameworks)" if k == "all" else FRAMEWORK_PRESETS[k]["name"],
-    )
-
-    auto_img_fetch = st.checkbox("📸 ค้นหาและบันทึกภาพสินค้าจากเว็บฟรีอัตโนมัติ", value=bool(auto_cfg.get("auto_search_images", True)))
-
-    st.markdown("##### 🔗 พิกัด Affiliate สำรองเริ่มต้น")
-    def_aff_a = st.text_input("ลิงก์ Affiliate สินค้า A เริ่มต้น:", value=auto_cfg.get("default_affiliate_a", prof.get("default_affiliate_a", "https://shopee.co.th")))
-    def_aff_b = st.text_input("ลิงก์ Affiliate สินค้า B เริ่มต้น:", value=auto_cfg.get("default_affiliate_b", prof.get("default_affiliate_b", "https://shopee.co.th")))
-
-    if st.button("💾 บันทึกการตั้งค่าระบบผลิตอัตโนมัติ", type="primary", use_container_width=True):
-        auto_cfg["enabled"] = auto_toggle
-        auto_cfg["interval_hours"] = float(selected_interval)
-        auto_cfg["target_category"] = selected_cat
-        auto_cfg["target_framework"] = selected_fw
-        auto_cfg["target_duration_mode"] = selected_dur
-        auto_cfg["auto_search_images"] = auto_img_fetch
-        auto_cfg["default_affiliate_a"] = def_aff_a
-        auto_cfg["default_affiliate_b"] = def_aff_b
-        if auto_toggle and auto_cfg.get("next_run_timestamp", 0) <= time.time():
-            auto_cfg["next_run_timestamp"] = int(time.time() + float(selected_interval) * 3600)
-        save_autopilot_config(auto_cfg)
-        st.toast("✅ บันทึกการตั้งค่า Auto-Pilot สำเร็จแล้ว!")
-        st.rerun()
-
-    if st.button("⚡ สร้างทดสอบ 1 คลิปเดี๋ยวนี้", type="secondary", use_container_width=True):
-        auto_cfg["interval_hours"] = float(selected_interval)
-        auto_cfg["target_category"] = selected_cat
-        auto_cfg["target_framework"] = selected_fw
-        auto_cfg["target_duration_mode"] = selected_dur
-        auto_cfg["auto_search_images"] = auto_img_fetch
-        auto_cfg["default_affiliate_a"] = def_aff_a
-        auto_cfg["default_affiliate_b"] = def_aff_b
-        save_autopilot_config(auto_cfg)
-
-        with st.spinner("🤖 กำลังรันผลิตคลิปอัตโนมัติครบวงจร..."):
-            ok, res_msg = run_autopilot_cycle(is_manual=True)
-            if ok:
-                st.success(f"🎉 {res_msg}")
-                st.rerun()
-            else:
-                st.error(f"❌ {res_msg}")
-
-    if st.button("⚡ ผลิตชุดใหญ่ 3 คลิปตุนทันที", type="secondary", use_container_width=True, help="สร้างคลิป 3 คลิปต่อเนื่องกันทันที บันทึกเก็บในคลังโดยไม่ต้องรอเวลา"):
-            auto_cfg["interval_hours"] = float(selected_interval)
-            auto_cfg["target_category"] = selected_cat
-            auto_cfg["target_framework"] = selected_fw
-            auto_cfg["target_duration_mode"] = selected_dur
-            auto_cfg["auto_search_images"] = auto_img_fetch
-            auto_cfg["default_affiliate_a"] = def_aff_a
-            auto_cfg["default_affiliate_b"] = def_aff_b
-            save_autopilot_config(auto_cfg)
-
-            status_batch = st.status("⚡ กำลังผลิตชุดใหญ่ 3 คลิปตุนไว้ในคลัง...", expanded=True)
-            with status_batch:
-                def _batch_cb(curr, total, msg):
-                    st.write(f"🎬 คลิปที่ {curr}/{total}: {msg}")
-                s_cnt, f_cnt, res_list = run_autopilot_batch(count=3, progress_callback=_batch_cb)
-                status_batch.update(label=f"🎉 ผลิตเสร็จสิ้น! สำเร็จ {s_cnt} คลิป (ผิดพลาด {f_cnt} คลิป)", state="complete" if s_cnt > 0 else "error")
-                for r in res_list:
-                    st.write(f"• {r}")
-                st.rerun()
-
-    st.divider()
-    st.markdown("#### 📜 บันทึกกิจกรรมระบบอัตโนมัติ (Activity Feed & Logs)")
-    logs = auto_cfg.get("history_log", [])
-    if not logs:
-        st.caption("ยังไม่มีบันทึกกิจกรรมในระบบ")
+    if not filtered_list:
+        st.info("💡 ยังไม่มีคลิปในหมวดหมู่นี้ — คุณสามารถสร้างและเรนเดอร์คลิปใหม่ได้จากแท็บ '1. ร่างบท & สตูดิโอ' หรือ '2. เรนเดอร์'")
     else:
-        st.text_area("Live Production Activity", value="\n".join(logs), height=180, disabled=True)
+        for idx, item in enumerate(filtered_list):
+            item_id = item.get("id", f"item_{idx}")
+            item_status = item.get("post_status", "draft")
+            status_badge = {
+                "draft": "🟡 บันทึกเก็บไว้ (Save Only)",
+                "posted_auto": f"🟢 โพสต์อัตโนมัติแล้ว ({', '.join(item.get('post_platforms', [])) or 'โซเชียล'})",
+                "posted_manual": "🔵 โพสต์เองแล้ว (Manual Posted)",
+            }.get(item_status, "🟡 บันทึกเก็บไว้")
 
-# =============================================================
-# TAB 4: QUEUE & POST MANAGER (POST STATUS TRACKER & SOCIAL LOGS)
-# =============================================================
-with tab_queue:
-    subtab_planned, subtab_rendered = st.tabs([
-        "📋 1. คลังวางแผนหัวข้อ & เลือกรูปล่วงหน้า (Planned Production Queue)",
-        "📦 2. คลังคลิปสำเร็จ & บันทึกการโพสต์ (Video Post Tracker)",
-    ])
+            with st.expander(f"📌 {item.get('topic', 'ไม่มีชื่อ')} — {status_badge}", expanded=(idx < 2)):
+                st.caption(f"⏱️ สร้างเมื่อ: {item.get('date_str', '')} | ความยาว: {item.get('duration_seconds', 0)} วินาที | กรอบ: {item.get('framework', '')}")
+                if item.get("posted_at"):
+                    st.caption(f"📢 โพสต์เมื่อ: {item.get('posted_at')}")
 
-    with subtab_planned:
-        st.subheader("📋 คลังวางแผนหัวข้อ & เลือกรูปล่วงหน้า (Pre-curated Production Queue)")
-        st.caption("จัดเตรียมหัวข้อ ตรวจสอบรูปภาพสินค้า A & B ให้ตรงเป๊ะ ใส่ลิงก์ Affiliate ล่วงหน้า แล้วสั่งให้ระบบทยอยเรนเดอร์ทิ้งไว้ หรือให้บอททยอยนำไปโพสต์ได้ 24 ชม.")
-
-        p_queue = load_planned_queue()
-        q_ready = [it for it in p_queue if it.get("status") == "ready"]
-        q_completed = [it for it in p_queue if it.get("status") == "completed"]
-        q_priority = [it for it in p_queue if it.get("priority", False) and it.get("status") == "ready"]
-
-        col_pq1, col_pq2, col_pq3, col_pq4 = st.columns(4)
-        with col_pq1:
-            st.metric("⏳ พร้อมเรนเดอร์ (Ready)", f"{len(q_ready)} คลิป")
-        with col_pq2:
-            st.metric("⚡ คิวด่วน/แซงคิว (Priority)", f"{len(q_priority)} คลิป")
-        with col_pq3:
-            st.metric("🎬 เรนเดอร์เสร็จแล้ว", f"{len(q_completed)} คลิป")
-        with col_pq4:
-            st.metric("📦 ทั้งหมดในคลัง", f"{len(p_queue)} คลิป")
-
-        st.markdown("##### 🚀 คำสั่งผลิตคิวเป็นชุด (Batch Production Controls)")
-        b_post_choice = st.radio(
-            "เลือกโหมดการทำงานของชุดนี้:",
-            options=["📦 เรนเดอร์เก็บไว้ (Render & Save Only)", "🚀 เรนเดอร์แล้วโพสต์เลย (Render & Auto-Post)", "⚙️ ใช้ตามที่ตั้งไว้ในแต่ละหัวข้อ"],
-            horizontal=True,
-            key="rad_planned_batch_mode",
-        )
-        clean_b_mode = "render_only" if "เก็บไว้" in b_post_choice else ("render_and_post" if "โพสต์เลย" in b_post_choice else None)
-
-        btn_b_label = f"🚀 สั่งเรนเดอร์คิวที่พร้อมทั้งหมด ({len(q_ready)} คลิป)"
-        if st.button(btn_b_label, type="primary", use_container_width=True, disabled=(len(q_ready) == 0), key="btn_run_planned_batch"):
-            status_b = st.status(f"🚀 กำลังเริ่มทยอยเรนเดอร์คิวที่พร้อมทั้งหมด {len(q_ready)} คลิป...", expanded=True)
-            with status_b:
-                def _b_cb(curr, total, msg):
-                    st.write(f"🎬 {msg}")
-                s_cnt, f_cnt, res_list = run_planned_queue_batch(post_mode_override=clean_b_mode, progress_callback=_b_cb)
-                status_b.update(label=f"🎉 เรนเดอร์เสร็จสิ้น! สำเร็จ {s_cnt} คลิป (ผิดพลาด {f_cnt} คลิป)", state="complete" if s_cnt > 0 else "error")
-                for r in res_list:
-                    st.write(f"• {r}")
-                st.rerun()
-
-        st.markdown("##### 🎲 สร้างหัวข้อไวรัลตุนเข้าคิวทันที")
-        if st.button("⚡ สุ่มดึง 3 หัวข้อไวรัลเข้าคิวอัตโนมัติ", use_container_width=True, key="btn_auto_3_planned"):
-            with st.spinner("🤖 กำลังสุ่มไอเดียและสร้างร่างบทเข้าคิว..."):
-                from ai_script_generator import get_random_idea
-                gen = AIScriptGenerator()
-                for _ in range(3):
-                    idea = get_random_idea()
-                    idea_ctype = idea.get("clip_type", "commerce")
-                    idea_rel = idea.get("relation_type", "compare")
-                    s_data = gen.generate_script(
-                        topic=idea["topic"],
-                        name_a=idea["name_a"],
-                        name_b=idea["name_b"],
-                        details_a=idea.get("details_a", ""),
-                        details_b=idea.get("details_b", ""),
-                        framework=idea.get("framework", "persona"),
-                        clip_type=idea_ctype,
-                        relation_type=idea_rel,
-                    )
-                    add_to_planned_queue(
-                        topic=idea["topic"],
-                        name_a=idea["name_a"],
-                        name_b=idea["name_b"],
-                        script_data=s_data,
-                        affiliate_link_a=idea.get("affiliate_link_a", "https://shopee.co.th"),
-                        affiliate_link_b=idea.get("affiliate_link_b", "https://shopee.co.th"),
-                        post_mode="render_only",
-                        jump_to_top=False,
-                        framework=idea.get("framework", "persona"),
-                        clip_type=idea_ctype,
-                        relation_type=idea_rel,
-                    )
-                st.toast("เพิ่ม 3 หัวข้อไวรัลเข้าคิวเรียบร้อย!")
-                st.rerun()
-
-        # Urgent / Breaking Topic Expander
-        with st.expander("⚡ เพิ่มหัวข้อด่วน / ข่าวดังแทรกคิว (Quick Add / Jump Queue)", expanded=False):
-            st.caption("เจอประเด็นร้อนหรือข่าวดัง? กรอกหัวข้อ รูป และลิงก์ แล้วติ๊ก 'แทรกเป็นคิวแรก' ได้ทันที โดยคิวเดิมไม่หายและยังอยู่ครบ!")
-            u_topic = st.text_input("หัวข้อด่วน / ประเด็นเปรียบเทียบ:", placeholder="เช่น แปรงสีฟันไฟฟ้า vs แปรงธรรมดา", key="u_input_topic")
-
-            u_col_ct, u_col_rel = st.columns(2)
-            with u_col_ct:
-                u_ctype = st.radio("รูปแบบคลิป:", options=list(CLIP_TYPES.keys()), format_func=lambda k: CLIP_TYPES[k]["name"], horizontal=True, key="u_select_ctype")
-            with u_col_rel:
-                u_rel = st.selectbox("ฟังก์ชันคู่เทียบ:", options=list(RELATION_TYPES.keys()), format_func=lambda k: RELATION_TYPES[k]["name"], key="u_select_rel")
-
-            u_fw = st.selectbox("กรอบการเล่าเรื่อง:", options=list(FRAMEWORK_PRESETS.keys()), format_func=lambda k: FRAMEWORK_PRESETS.get(k, {}).get("name", k), key="u_select_fw")
-
-            st.markdown("##### 🟢 ข้อมูลสินค้าฝั่ง A")
-            u_name_a = st.text_input("ชื่อสินค้า/ประเด็น A (ฝั่งซ้าย):", placeholder="เช่น แปรงสีฟันไฟฟ้า", key="u_input_name_a")
-            u_aff_a = st.text_input("ลิงก์ Affiliate/อ้างอิง A:", value="https://shopee.co.th", key="u_input_aff_a")
-            u_file_a = st.file_uploader("📁 อัปโหลดรูปสินค้า A (ถ้ามี):", type=["png", "jpg", "jpeg", "webp"], key="u_file_a")
-
-            st.markdown("##### 🔵 ข้อมูลสินค้าฝั่ง B")
-            u_name_b = st.text_input("ชื่อสินค้า/ประเด็น B (ฝั่งขวา):", placeholder="เช่น แปรงธรรมดา", key="u_input_name_b")
-            u_aff_b = st.text_input("ลิงก์ Affiliate/อ้างอิง B:", value="https://shopee.co.th", key="u_input_aff_b")
-            u_file_b = st.file_uploader("📁 อัปโหลดรูปสินค้า B (ถ้ามี):", type=["png", "jpg", "jpeg", "webp"], key="u_file_b")
-
-            st.markdown("##### ⚙️ โหมดการทำงานเมื่อถึงคิว")
-            u_post_mode = st.radio("โหมดเมื่อถึงคิว:", ["📦 เรนเดอร์เก็บไว้ (Render Only)", "🚀 เรนเดอร์แล้วโพสต์เลย (Render & Post)"], key="u_post_mode")
-            clean_u_pm = "render_only" if "เก็บไว้" in u_post_mode else "render_and_post"
-            u_jump = st.checkbox("⚡ แทรกเป็นคิวแรกสุดทันที (Jump to Top)", value=True, key="u_jump_top")
-
-            if st.button("🚀 สร้างบทและเพิ่มเข้าคิวทันที", type="primary", use_container_width=True, key="btn_add_urgent_queue"):
-                if not u_topic.strip() or not u_name_a.strip() or not u_name_b.strip():
-                    st.error("กรุณากรอกหัวข้อ และชื่อฝั่ง A และ B ให้ครบถ้วน")
-                else:
-                    with st.spinner("🤖 AI กำลังสร้างบทสำหรับหัวข้อด่วนนี้..."):
-                        t_stamp = int(time.time())
-                        from planned_queue import QUEUE_ASSETS_DIR
-                        u_img_a = None
-                        if u_file_a:
-                            u_img_a = QUEUE_ASSETS_DIR / f"urgent_a_{t_stamp}.png"
-                            with open(u_img_a, "wb") as fa:
-                                fa.write(u_file_a.getbuffer())
-                        u_img_b = None
-                        if u_file_b:
-                            u_img_b = QUEUE_ASSETS_DIR / f"urgent_b_{t_stamp}.png"
-                            with open(u_img_b, "wb") as fb:
-                                fb.write(u_file_b.getbuffer())
-
-                        gen = AIScriptGenerator()
-                        s_data = gen.generate_script(
-                            topic=u_topic,
-                            name_a=u_name_a,
-                            name_b=u_name_b,
-                            framework=u_fw,
-                            affiliate_link_a=u_aff_a,
-                            affiliate_link_b=u_aff_b,
-                            clip_type=u_ctype,
-                            relation_type=u_rel,
-                        )
-                        add_to_planned_queue(
-                            topic=u_topic,
-                            name_a=u_name_a,
-                            name_b=u_name_b,
-                            script_data=s_data,
-                            image_a_path=str(u_img_a) if u_img_a else None,
-                            image_b_path=str(u_img_b) if u_img_b else None,
-                            affiliate_link_a=u_aff_a,
-                            affiliate_link_b=u_aff_b,
-                            post_mode=clean_u_pm,
-                            jump_to_top=u_jump,
-                            framework=u_fw,
-                            clip_type=u_ctype,
-                            relation_type=u_rel,
-                        )
-                        st.success(f"✅ เพิ่มหัวข้อ '{u_topic}' เข้าคิวเรียบร้อย!")
-                        st.rerun()
-
-        st.divider()
-        st.markdown("#### 📑 รายการคิวทั้งหมด (ลำดับการผลิต FIFO & Priority)")
-
-        if not p_queue:
-            st.info("💡 ขณะนี้ยังไม่มีหัวข้อในคิวล่วงหน้า คุณสามารถสร้างบทและบันทึกได้จาก 'แท็บ 1. ร่างบท' หรือจากกล่อง '➕ เพิ่มหัวข้อด่วน' ด้านบนได้เลยครับ")
-        else:
-            for idx, item in enumerate(p_queue):
-                item_id = item.get("id", f"pq_{idx}")
-                status = item.get("status", "ready")
-                priority = item.get("priority", False)
-                topic_title = item.get("topic", "ไม่มีชื่อหัวข้อ")
-                name_a = item.get("name_a", "A")
-                name_b = item.get("name_b", "B")
-                post_mode = item.get("post_mode", "render_only")
-
-                p_badge = "⚡ [ด่วน-แซงคิว] " if priority else ""
-                s_badge = {
-                    "ready": "🟢 พร้อมเรนเดอร์ (Ready)",
-                    "processing": "⏳ กำลังผลิตคลิป...",
-                    "completed": "🎉 ผลิตสำเร็จแล้ว",
-                    "draft": "📝 แบบร่าง (พักคิว)",
-                    "error": "❌ เกิดข้อผิดพลาด",
-                }.get(status, status)
-
-                card_label = f"#{idx+1} {p_badge}{topic_title} — {s_badge}"
-                with st.expander(card_label, expanded=(status in ["ready", "error"] and idx < 2)):
-                    st.markdown(f"**มวยถูกคู่:** `{name_a}` **VS** `{name_b}`")
-                    st.caption(f"🗓️ สร้างเมื่อ: {item.get('created_at', '')} | กรอบ: {item.get('framework', '')} | โหมด: {'📦 เรนเดอร์เก็บไว้' if post_mode == 'render_only' else '🚀 เรนเดอร์แล้วโพสต์เลย'}")
-
-                    if status == "error":
-                        err_detail = item.get("error_message") or "ไม่ระบุสาเหตุ"
-                        st.error(f"❌ สาเหตุข้อผิดพลาดล่าสุด: {err_detail}")
-                        if st.button("🔄 รีเซ็ตคิวนี้กลับเป็น 'พร้อมเรนเดอร์' (Reset & Retry)", key=f"btn_retry_{item_id}", type="primary", use_container_width=True):
-                            update_planned_item(item_id, {"status": "ready", "error_message": None})
-                            st.toast("รีเซ็ตสถานะเป็นพร้อมเรนเดอร์แล้ว")
-                            st.rerun()
-
-                    # Two columns in the same plane for Item A and Item B
-                    col_qa, col_qb = st.columns(2, gap="medium")
-                    with col_qa:
-                        st.markdown(f"##### 🟢 ข้อมูลสินค้าฝั่ง A: **{name_a}**")
-                        cur_a = item.get("image_a_path")
-                        if cur_a and Path(cur_a).exists():
-                            st.image(cur_a, width=150)
-                        else:
-                            st.warning("⚠️ ยังไม่มีรูป (จะออโต้ค้นหา)")
-
-                        up_a = st.file_uploader(f"เปลี่ยนรูป {name_a}:", type=["png", "jpg", "jpeg", "webp"], key=f"up_a_{item_id}")
-                        if up_a is not None:
-                            import hashlib
-                            f_bytes_a = up_a.getvalue()
-                            f_hash_a = hashlib.md5(f_bytes_a).hexdigest()
-                            hash_key_a = f"uploaded_hash_a_{item_id}"
-                            if st.session_state.get(hash_key_a) != f_hash_a:
-                                new_p_a = save_queue_image_asset(item_id, "a", f_bytes_a)
-                                update_planned_item(item_id, {"image_a_path": new_p_a})
-                                st.session_state[hash_key_a] = f_hash_a
-                                st.toast(f"✅ อัปเดตรูป {name_a} สำเร็จ!")
-                                st.rerun()
-
-                        new_aff_a = st.text_input("ลิงก์ Aff A:", value=item.get("affiliate_link_a", ""), key=f"aff_a_{item_id}")
-                        if new_aff_a != item.get("affiliate_link_a"):
-                            update_planned_item(item_id, {"affiliate_link_a": new_aff_a})
-
-                    with col_qb:
-                        st.markdown(f"##### 🔵 ข้อมูลสินค้าฝั่ง B: **{name_b}**")
-                        cur_b = item.get("image_b_path")
-                        if cur_b and Path(cur_b).exists():
-                            st.image(cur_b, width=150)
-                        else:
-                            st.warning("⚠️ ยังไม่มีรูป (จะออโต้ค้นหา)")
-
-                        up_b = st.file_uploader(f"เปลี่ยนรูป {name_b}:", type=["png", "jpg", "jpeg", "webp"], key=f"up_b_{item_id}")
-                        if up_b is not None:
-                            import hashlib
-                            f_bytes_b = up_b.getvalue()
-                            f_hash_b = hashlib.md5(f_bytes_b).hexdigest()
-                            hash_key_b = f"uploaded_hash_b_{item_id}"
-                            if st.session_state.get(hash_key_b) != f_hash_b:
-                                new_p_b = save_queue_image_asset(item_id, "b", f_bytes_b)
-                                update_planned_item(item_id, {"image_b_path": new_p_b})
-                                st.session_state[hash_key_b] = f_hash_b
-                                st.toast(f"✅ อัปเดตรูป {name_b} สำเร็จ!")
-                                st.rerun()
-
-                        new_aff_b = st.text_input("ลิงก์ Aff B:", value=item.get("affiliate_link_b", ""), key=f"aff_b_{item_id}")
-                        if new_aff_b != item.get("affiliate_link_b"):
-                            update_planned_item(item_id, {"affiliate_link_b": new_aff_b})
-
-                    v_done = item.get("video_path")
-                    if v_done and Path(v_done).exists():
-                        st.success(f"🎬 วิดีโอพร้อมรับชม: {Path(v_done).name}")
-                        st.video(v_done)
-
-                    st.markdown("##### 🛠️ จัดการคิวนี้")
-                    item_pm = st.selectbox(
-                        "โหมดการทำงาน:",
-                        options=["📦 เรนเดอร์เก็บไว้ (Render Only)", "🚀 เรนเดอร์แล้วโพสต์เลย (Render & Post)"],
-                        index=0 if post_mode == "render_only" else 1,
-                        key=f"pm_sel_{item_id}",
-                    )
-                    clean_item_pm = "render_only" if "เก็บไว้" in item_pm else "render_and_post"
-                    if clean_item_pm != post_mode:
-                        update_planned_item(item_id, {"post_mode": clean_item_pm})
-                        st.toast("อัปเดตโหมดการทำงานแล้ว")
-
-                    if status != "ready":
-                        if st.button("🟢 ตั้งเป็น 'พร้อมเรนเดอร์'", key=f"btn_rdy_{item_id}", use_container_width=True):
-                            update_planned_item(item_id, {"status": "ready", "error_message": None})
-                            st.rerun()
-                    else:
-                        if st.button("⏸️ พักคิวไว้ก่อน (Draft)", key=f"btn_dft_{item_id}", use_container_width=True):
-                            update_planned_item(item_id, {"status": "draft"})
-                            st.rerun()
-
-                    if st.button("🚀 สั่งเรนเดอร์เดี๋ยวนี้", key=f"btn_rn_now_{item_id}", type="primary", use_container_width=True):
-                        with st.spinner(f"กำลังเรนเดอร์คลิป: {topic_title}..."):
-                            ok, msg = run_autopilot_cycle(is_manual=True, queue_item_id=item_id, force_post_mode=clean_item_pm)
-                            if ok:
-                                st.toast(f"🎉 {msg}")
-                                st.success(f"สำเร็จ: {msg}")
-                            else:
-                                st.toast(f"❌ {msg}")
-                                st.error(f"ผิดพลาด: {msg}")
-                            import time
-                            time.sleep(1)
-                            st.rerun()
-
-                    st.markdown("**↕️ ลำดับคิว:**")
-                    col_mv1, col_mv2, col_mv3 = st.columns(3)
-                    with col_mv1:
-                        if idx > 0:
-                            if st.button("⬆️ ขึ้น", key=f"btn_up_{item_id}", use_container_width=True):
-                                move_queue_item(item_id, "up")
-                                st.rerun()
-                    with col_mv2:
-                        if idx < len(p_queue) - 1:
-                            if st.button("⬇️ ลง", key=f"btn_dn_{item_id}", use_container_width=True):
-                                move_queue_item(item_id, "down")
-                                st.rerun()
-                    with col_mv3:
-                        if idx > 0:
-                            if st.button("⚡ แซงคิวแรก", key=f"btn_top_{item_id}", use_container_width=True, help="เลื่อนขึ้นเป็นอันดับ 1 ทันที"):
-                                move_queue_item(item_id, "top")
-                                st.rerun()
-
-                    st.divider()
-                    if st.button("🗑️ ลบคิวนี้ทิ้ง", key=f"btn_del_q_{item_id}", use_container_width=True):
-                        delete_planned_item(item_id)
-                        st.toast("ลบคิวเรียบร้อยแล้ว!")
-                        st.rerun()
-
-    with subtab_rendered:
-        st.subheader("📦 คลังคลิปสำเร็จ & ระบบจัดการสถานะการโพสต์ (Video Post Tracker)")
-        st.caption("ตรวจสอบคลิปทั้งหมดที่สร้างไว้ ติดตามว่าคลิปไหนเป็น Draft หรือโพสต์อัตโนมัติแล้ว พร้อมปุ่มติ๊กเครื่องหมายว่าโพสต์เองแล้ว")
-
-        all_history = load_history()
-        draft_count = sum(1 for h in all_history if h.get("post_status", "draft") == "draft")
-        auto_count = sum(1 for h in all_history if h.get("post_status") == "posted_auto")
-        manual_count = sum(1 for h in all_history if h.get("post_status") == "posted_manual")
-
-        col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-        with col_m1:
-            st.metric("📦 คลิปทั้งหมด", f"{len(all_history)} คลิป")
-        with col_m2:
-            st.metric("🟡 ยังไม่โพสต์ (Draft)", f"{draft_count} คลิป")
-        with col_m3:
-            st.metric("🟢 โพสต์อัตโนมัติ", f"{auto_count} คลิป")
-        with col_m4:
-            st.metric("🔵 โพสต์เองแล้ว", f"{manual_count} คลิป")
-
-        filter_choice = st.radio(
-            "กรองตามสถานะ:",
-            options=["ทั้งหมด", "🟡 ยังไม่โพสต์ (Draft)", "🟢 โพสต์อัตโนมัติแล้ว", "🔵 โพสต์เองแล้ว"],
-            horizontal=True,
-            key="rad_filter_post_status",
-        )
-
-        filtered_list = all_history
-        if filter_choice == "🟡 ยังไม่โพสต์ (Draft)":
-            filtered_list = [h for h in all_history if h.get("post_status", "draft") == "draft"]
-        elif filter_choice == "🟢 โพสต์อัตโนมัติแล้ว":
-            filtered_list = [h for h in all_history if h.get("post_status") == "posted_auto"]
-        elif filter_choice == "🔵 โพสต์เองแล้ว":
-            filtered_list = [h for h in all_history if h.get("post_status") == "posted_manual"]
-
-        if not filtered_list:
-            st.info("ไม่มีคลิปในหมวดหมู่นี้")
-        else:
-            for idx, item in enumerate(filtered_list):
-                item_id = item.get("id", f"item_{idx}")
-                item_status = item.get("post_status", "draft")
-                status_badge = {
-                    "draft": "🟡 ยังไม่โพสต์ (Draft พร้อมโพสต์)",
-                    "posted_auto": f"🟢 โพสต์อัตโนมัติแล้ว ({', '.join(item.get('post_platforms', [])) or 'โซเชียล'})",
-                    "posted_manual": "🔵 โพสต์เองแล้ว (Manual Posted)",
-                }.get(item_status, "🟡 ยังไม่โพสต์")
-
-                with st.expander(f"📌 {item.get('topic', 'ไม่มีชื่อ')} — {status_badge}", expanded=(idx < 2)):
-                    st.caption(f"⏱️ สร้างเมื่อ: {item.get('date_str', '')} | ความยาว: {item.get('duration_seconds', 0)} วินาที | กรอบ: {item.get('framework', '')}")
-                    if item.get("posted_at"):
-                        st.caption(f"📢 โพสต์เมื่อ: {item.get('posted_at')}")
-
-                    v_path = item.get("video_path")
-                    if v_path and Path(v_path).exists():
+                v_path = item.get("video_path")
+                c_path = item.get("cover_path")
+                if v_path and Path(v_path).exists():
+                    col_pv, col_pc = st.columns([1.2, 1])
+                    with col_pv:
+                        st.markdown("**🎬 วิดีโอ (9:16):**")
+                        st.video(v_path)
                         with open(v_path, "rb") as vf:
                             st.download_button(
                                 "⬇️ ดาวน์โหลดวิดีโอ MP4",
@@ -1932,57 +1410,73 @@ with tab_queue:
                                 key=f"dl_vid_t4_{item_id}",
                                 use_container_width=True,
                             )
-
-                    st.markdown("**📱 แคปชั่น & แฮชแท็ก:**")
-                    st.code(f"{item.get('social_caption', '')}\n\n{item.get('hashtags', '')}", language="text")
-
-                    if item.get("affiliate_comment"):
-                        st.markdown("**📌 พิกัด Affiliate ปักหมุด:**")
-                        st.code(item.get("affiliate_comment", ""), language="text")
-
-                    st.markdown("##### 🛠️ จัดการสถานะการโพสต์")
-                    if st.button("🚀 สั่งโพสต์คลิปนี้ลงโซเชียลเดี๋ยวนี้", key=f"btn_pub_single_{item_id}", type="primary", use_container_width=True):
-                        v_p = item.get("video_path")
-                        if not v_p or not Path(v_p).exists():
-                            st.error("ไม่พบไฟล์วิดีโอในเครื่อง")
-                        else:
-                            c_p = item.get("cover_path")
-                            m_p = Path(v_p).parent / f"{Path(v_p).stem}_meta.json"
-                            with st.spinner(f"กำลังส่งคลิป '{item.get('topic')}' ไปยังแพลตฟอร์มที่เปิดใช้งาน..."):
-                                res = publish_to_all_enabled(
-                                    video_path=v_p,
-                                    cover_path=c_p if c_p and Path(c_p).exists() else None,
-                                    meta_path=str(m_p) if m_p.exists() else None,
+                    with col_pc:
+                        if c_path and Path(c_path).exists():
+                            st.markdown("**🖼️ ภาพปกคลิป:**")
+                            st.image(c_path, use_container_width=True)
+                            with open(c_path, "rb") as cf:
+                                st.download_button(
+                                    "⬇️ ดาวน์โหลดภาพปก",
+                                    data=cf,
+                                    file_name=Path(c_path).name,
+                                    mime="image/jpeg",
+                                    key=f"dl_cov_t4_{item_id}",
+                                    use_container_width=True,
                                 )
-                                if res:
-                                    st.success(f"ส่งคำสั่งโพสต์แล้ว ({len(res)} ช่องทาง)")
-                                    st.rerun()
-                                else:
-                                    st.warning("ยังไม่ได้เปิดใช้งานหรือกรอก Token ในแพลตฟอร์มใดๆ (ไปตั้งค่าได้ที่แท็บ '5. ตั้งค่าส่วนกลาง')")
 
+                st.markdown("**📱 แคปชั่น & แฮชแท็ก:**")
+                st.code(f"{item.get('social_caption', '')}\n\n{item.get('hashtags', '')}", language="text")
+
+                if item.get("affiliate_comment"):
+                    st.markdown("**📌 พิกัด Affiliate ปักหมุด:**")
+                    st.code(item.get("affiliate_comment", ""), language="text")
+
+                st.markdown("##### 🛠️ จัดการการโพสต์โซเชียล")
+                if st.button("🚀 สั่งโพสต์คลิปนี้ลงโซเชียลทันที", key=f"btn_pub_single_{item_id}", type="primary", use_container_width=True):
+                    v_p = item.get("video_path")
+                    if not v_p or not Path(v_p).exists():
+                        st.error("ไม่พบไฟล์วิดีโอในเครื่อง")
+                    else:
+                        c_p = item.get("cover_path")
+                        m_p = Path(v_p).parent / f"{Path(v_p).stem}_meta.json"
+                        with st.spinner(f"กำลังส่งคลิป '{item.get('topic')}' ไปยังแพลตฟอร์มที่เปิดใช้งาน..."):
+                            res = publish_to_all_enabled(
+                                video_path=v_p,
+                                cover_path=c_p if c_p and Path(c_p).exists() else None,
+                                meta_path=str(m_p) if m_p.exists() else None,
+                            )
+                            if res:
+                                update_history_post_status(item_id, "posted_auto", platforms=list(res.keys()))
+                                st.success(f"🎉 ส่งคำสั่งโพสต์แล้ว ({len(res)} ช่องทาง: {', '.join(res.keys())})")
+                                st.rerun()
+                            else:
+                                st.warning("ยังไม่ได้เปิดใช้งานหรือกรอก Token ในแพลตฟอร์มใดๆ (ไปตั้งค่าได้ที่แท็บ '4. ตั้งค่าส่วนกลาง')")
+
+                col_b1, col_b2 = st.columns(2)
+                with col_b1:
                     if item_status != "posted_manual":
-                        if st.button("✅ ติ๊กเครื่องหมายว่า 'โพสต์เองแล้ว'", key=f"btn_mark_manual_{item_id}", use_container_width=True):
+                        if st.button("✅ ทำเครื่องหมาย 'โพสต์เองแล้ว'", key=f"btn_mark_manual_{item_id}", use_container_width=True):
                             update_history_post_status(item_id, "posted_manual")
                             st.toast(f"บันทึกสถานะ 'โพสต์เองแล้ว' สำหรับคลิป: {item.get('topic')} เรียบร้อย!")
                             st.rerun()
-
+                with col_b2:
                     if item_status != "draft":
-                        if st.button("🔄 รีเซ็ตกลับเป็น 'ยังไม่โพสต์' (Draft)", key=f"btn_reset_draft_{item_id}", use_container_width=True):
+                        if st.button("🔄 รีเซ็ตกลับเป็น 'บันทึกเก็บไว้' (Draft)", key=f"btn_reset_draft_{item_id}", use_container_width=True):
                             update_history_post_status(item_id, "draft")
                             st.toast(f"รีเซ็ตคลิป: {item.get('topic')} กลับเป็น Draft แล้ว!")
                             st.rerun()
 
-        st.divider()
-        st.markdown("#### 📜 ประวัติการส่งโพสต์โซเชียล (Live Auto-Post Logs)")
-        post_cfg = load_autopost_config()
-        p_logs = post_cfg.get("post_log", [])
-        if not p_logs:
-            st.caption("ยังไม่มีประวัติการส่งโพสต์ในระบบ")
-        else:
-            st.text_area("Social Post Activity", value="\n".join(p_logs), height=180, disabled=True)
+    st.divider()
+    st.markdown("#### 📜 ประวัติการส่งโพสต์โซเชียล (Live Auto-Post Logs)")
+    post_cfg = load_autopost_config()
+    p_logs = post_cfg.get("post_log", [])
+    if not p_logs:
+        st.caption("ยังไม่มีประวัติการส่งโพสต์ในระบบ")
+    else:
+        st.text_area("Social Post Activity", value="\n".join(p_logs), height=180, disabled=True)
 
 # =============================================================
-# TAB 5: GLOBAL SETTINGS (ONE-TIME SETUP FOR BRAND, LOGO, VOICE & APIS)
+# TAB 4: GLOBAL SETTINGS (ONE-TIME SETUP FOR BRAND, LOGO, VOICE & APIS)
 # =============================================================
 with tab_settings:
     st.subheader("⚙️ ตั้งค่าระบบส่วนกลาง (VSIFY Global Settings)")
