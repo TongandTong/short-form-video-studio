@@ -432,7 +432,15 @@ with tab_script:
         st.session_state.seen_topics = []
 
     with st.expander("🎲 ตัวช่วยคิดหัวข้อ: สุ่มไอเดียไวรัล หรือ ให้ AI คิดสดใหม่ (Optional)", expanded=False):
-        st.caption("คลิกเลือกหมวดหมู่และกรอบแนวทางที่ต้องการ แล้วกดสุ่มไอเดีย หรือให้ AI ช่วยคิดหัวข้อให้ทันที")
+        st.caption("พิมพ์สินค้า/ไอเดียที่อยากทำ หรือเลือกหมวดหมู่ แล้วกดให้ AI ช่วยจับคู่ หรือสุ่มไอเดียได้ทันที")
+
+        seed_kw = st.text_input(
+            "💡 พิมพ์ไอเดีย/สินค้าตั้งต้น (ไม่บังคับ):",
+            placeholder="เช่น ยาดม, ชาเขียว, แปรงสีฟันไฟฟ้า, คอลลาเจน (หรือเว้นว่างไว้หากต้องการสุ่มอิสระ)",
+            key="seed_topic_kw",
+            help="หากพิมพ์คำค้น เช่น 'ยาดม' AI จะวิเคราะห์และจับคู่เปรียบเทียบกับสินค้าตัวแทนที่น่าสนใจให้โดยอัตโนมัติ",
+        )
+
         cat_options = ["ทั้งหมด (สุ่มทุกหมวด)"] + CATEGORIES
         selected_cat = st.selectbox("📂 หมวดหมู่สินค้า:", cat_options, index=0)
 
@@ -446,10 +454,18 @@ with tab_script:
             index=0,
         )
 
-        if st.button("🎲 สุ่มไอเดียไวรัล (จากคลัง 60+ หัวข้อ)", use_container_width=True, type="secondary"):
+        kw_clean = (seed_kw or "").strip()
+        random_label = f"🎲 สุ่มไอเดียหัวข้อ{'เกี่ยวกับ ' + kw_clean if kw_clean else ' (จากคลัง 60+ หัวข้อ)'}"
+        if st.button(random_label, use_container_width=True, type="secondary"):
             cat_param = None if selected_cat == "ทั้งหมด (สุ่มทุกหมวด)" else selected_cat
             fw_param = None if selected_fw_filter == "all" else selected_fw_filter
-            idea = get_random_idea(category=cat_param, framework=fw_param, use_ai=False, seen_topics=st.session_state.seen_topics)
+            idea = get_random_idea(
+                category=cat_param,
+                framework=fw_param,
+                use_ai=False,
+                seen_topics=st.session_state.seen_topics,
+                keyword=kw_clean if kw_clean else None,
+            )
             st.session_state.seen_topics.append(idea["topic"])
             if len(st.session_state.seen_topics) > 30:
                 st.session_state.seen_topics.pop(0)
@@ -467,19 +483,26 @@ with tab_script:
             st.session_state.in_target = idea.get("target_audience", "")
             st.session_state.input_angles = idea.get("key_angles", "")
             st.session_state.in_angles = idea.get("key_angles", "")
-            st.session_state.input_aff_a = idea.get("affiliate_a", "")
-            st.session_state.aff_a = idea.get("affiliate_a", "")
-            st.session_state.input_aff_b = idea.get("affiliate_b", "")
-            st.session_state.aff_b = idea.get("affiliate_b", "")
+            st.session_state.input_aff_a = idea.get("affiliate_a", "") or idea.get("affiliate_link_a", "")
+            st.session_state.aff_a = idea.get("affiliate_a", "") or idea.get("affiliate_link_a", "")
+            st.session_state.input_aff_b = idea.get("affiliate_b", "") or idea.get("affiliate_link_b", "")
+            st.session_state.aff_b = idea.get("affiliate_b", "") or idea.get("affiliate_link_b", "")
             st.session_state.input_framework = idea.get("framework", "persona")
             st.session_state.last_parsed_topic = idea["topic"]
             st.rerun()
 
-        if st.button("🤖 ให้ AI วิเคราะห์คิดหัวข้อสดใหม่", use_container_width=True, type="primary"):
+        ai_label = f"🤖 ให้ AI ช่วยหาคู่เปรียบเทียบสำหรับ '{kw_clean}'" if kw_clean else "🤖 ให้ AI วิเคราะห์คิดหัวข้อสดใหม่"
+        if st.button(ai_label, use_container_width=True, type="primary"):
             cat_param = None if selected_cat == "ทั้งหมด (สุ่มทุกหมวด)" else selected_cat
             fw_param = None if selected_fw_filter == "all" else selected_fw_filter
-            with st.spinner("🤖 AI กำลังคิดหัวข้อเปรียบเทียบสุดไวรัล..."):
-                idea = get_random_idea(category=cat_param, framework=fw_param, use_ai=True)
+            spinner_msg = f"🤖 AI กำลังค้นหาและจับคู่เปรียบเทียบสุดไวรัลสำหรับ '{kw_clean}'..." if kw_clean else "🤖 AI กำลังคิดหัวข้อเปรียบเทียบสุดไวรัล..."
+            with st.spinner(spinner_msg):
+                idea = get_random_idea(
+                    category=cat_param,
+                    framework=fw_param,
+                    use_ai=True,
+                    keyword=kw_clean if kw_clean else None,
+                )
                 st.session_state.seen_topics.append(idea["topic"])
                 st.session_state.input_topic = idea["topic"]
                 st.session_state.in_topic = idea["topic"]
@@ -495,10 +518,10 @@ with tab_script:
                 st.session_state.in_target = idea.get("target_audience", "")
                 st.session_state.input_angles = idea.get("key_angles", "")
                 st.session_state.in_angles = idea.get("key_angles", "")
-                st.session_state.input_aff_a = idea.get("affiliate_a", "")
-                st.session_state.aff_a = idea.get("affiliate_a", "")
-                st.session_state.input_aff_b = idea.get("affiliate_b", "")
-                st.session_state.aff_b = idea.get("affiliate_b", "")
+                st.session_state.input_aff_a = idea.get("affiliate_a", "") or idea.get("affiliate_link_a", "")
+                st.session_state.aff_a = idea.get("affiliate_a", "") or idea.get("affiliate_link_a", "")
+                st.session_state.input_aff_b = idea.get("affiliate_b", "") or idea.get("affiliate_link_b", "")
+                st.session_state.aff_b = idea.get("affiliate_b", "") or idea.get("affiliate_link_b", "")
                 st.session_state.input_framework = idea.get("framework", "persona")
                 st.session_state.last_parsed_topic = idea["topic"]
                 st.rerun()

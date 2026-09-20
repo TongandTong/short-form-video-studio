@@ -279,20 +279,19 @@ class AIScriptGenerator:
                 "Gemini API Key is missing! Set GEMINI_API_KEY in .env or pass it to AIScriptGenerator."
             )
         # Multi-tiered model hierarchy:
-        # 1. Gemini Flash Latest & 2.5 Flash - State-of-the-art fast intelligence & reliable quota
-        # 2. Gemini 3.5 Flash & 3-Flash-Preview - Cutting edge reasoning
+        # 1. Gemini 3.5 Flash & Flash Latest - State-of-the-art fast intelligence & reliable quota
+        # 2. Gemini 3 Flash Preview & Flash Lite Latest - Cutting edge reasoning
         # 3. Gemini 3.1 Pro Preview - Flagship deep reasoning fallback
         self.endpoints = [
-            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={self.api_key}",
-            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={self.api_key}",
             f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={self.api_key}",
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={self.api_key}",
             f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key={self.api_key}",
             f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key={self.api_key}",
             f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key={self.api_key}",
         ]
         self.endpoint = self.endpoints[0]
         self.fallback_endpoint = self.endpoints[1]
-        self.secondary_fallback = self.endpoints[4]
+        self.secondary_fallback = self.endpoints[3]
 
     def generate_script(
         self,
@@ -781,14 +780,22 @@ class AIScriptGenerator:
         self,
         category: Optional[str] = None,
         framework: Optional[str] = None,
+        keyword: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Uses Gemini to invent a brand new, trending, highly viral comparison topic on demand."""
+        """Uses Gemini to invent a brand new, trending, highly viral comparison topic on demand, optionally seeded with a keyword."""
+        kw_clean = (keyword or "").strip()
+        if kw_clean:
+            kw_hint = f"- บังคับ: ต้องใช้ไอเดีย/คีย์เวิร์ดตั้งต้นคือ '{kw_clean}' โดยนำไปจับคู่เปรียบเทียบกับคู่แข่ง ตัวเลือกทดแทน หรือมุมมองที่น่าสนใจ ชวนสงสัย หรือเป็นที่ถกเถียงที่สุด (เช่น ถ้าคีย์เวิร์ดคือ '{kw_clean}' ให้หาอีกสิ่งหนึ่งมาเปรียบเทียบกันอย่างสมน้ำสมเนื้อและน่าติดตาม)"
+        else:
+            kw_hint = "- คิดหัวข้อแบบเปิดกว้าง เลือกสิ่งที่เป็นกระแสและน่าสนใจที่สุดในตอนนี้"
+
         cat_hint = f"ในหมวดหมู่: {category}" if category and category != "ทั้งหมด (สุ่มทุกหมวด)" else "เลือกหมวดหมู่ที่เป็นกระแสไวรัลในไทย (ของกิน, เครื่องดื่ม, แกดเจ็ต, ของใช้, สุขภาพ, การเงิน)"
         fw_hint = f"ใช้กรอบจิตวิทยา: {framework}" if framework and framework != "all" else "เลือกกรอบจิตวิทยาที่น่าสนใจ (เช่น persona, budget_vs_luxury, crossover, perfect_pairing, science_myth)"
 
         prompt = f"""คุณคือ Senior Viral Content Strategist ของช่องวิดีโอสั้น 'แตกต่างกันอย่างไร / Why It Works'
 โปรดคิดหัวข้อเปรียบเทียบ (VS / Pairing) ที่สดใหม่ แปลกใหม่ ชวนสงสัย และมีโอกาสเป็นไวรัลสูงมาก 1 หัวข้อ
 เงื่อนไข:
+{kw_hint}
 - {cat_hint}
 - {fw_hint}
 - ต้องเป็นของ 2 สิ่งที่คนไทยรู้จักดี เคยสงสัย หรือกำลังถกเถียงกันในชีวิตประจำวัน
@@ -814,7 +821,8 @@ class AIScriptGenerator:
             "generationConfig": {
                 "temperature": 0.88,
                 "topP": 0.95,
-                "maxOutputTokens": 800,
+                "maxOutputTokens": 2000,
+                "thinkingConfig": {"thinkingBudget": 0},
                 "responseMimeType": "application/json",
             },
         }
@@ -837,6 +845,31 @@ class AIScriptGenerator:
                             return parsed
             except Exception as e:
                 print(f"[AI] Fresh topic call error on {url}: {e}")
+
+        # Fallback handling
+        if kw_clean:
+            matching = [
+                t for t in TRENDING_COMPARISON_TEMPLATES
+                if kw_clean.lower() in t.get("topic", "").lower()
+                or kw_clean.lower() in t.get("name_a", "").lower()
+                or kw_clean.lower() in t.get("name_b", "").lower()
+            ]
+            if matching:
+                import random
+                return random.choice(matching).copy()
+            return {
+                "framework": framework if framework and framework != "all" else "persona",
+                "category": category if category and category != "ทั้งหมด (สุ่มทุกหมวด)" else "💡 ไลฟ์สไตล์ & ของใช้",
+                "topic": f"{kw_clean} รุ่นยอดนิยม VS {kw_clean} ตัวท็อปพรีเมียม",
+                "name_a": f"{kw_clean} รุ่นคุ้มค่า",
+                "name_b": f"{kw_clean} รุ่นพรีเมียม",
+                "details_a": f"{kw_clean} สำหรับการใช้งานทั่วไป ราคาจับต้องง่าย",
+                "details_b": f"{kw_clean} ฟังก์ชันครบ คุณภาพสูง สำหรับผู้ใช้งานจริงจัง",
+                "target_audience": f"คนที่กำลังมองหาและตัดสินใจซื้อ {kw_clean}",
+                "key_angles": "ความคุ้มค่าเทียบกับฟังก์ชันและประสิทธิภาพ",
+                "affiliate_link_a": "https://shopee.co.th",
+                "affiliate_link_b": "https://shopee.co.th",
+            }
 
         # Fallback to random template
         return get_random_idea(category=category, framework=framework, use_ai=False)
@@ -1354,18 +1387,30 @@ def get_random_idea(
     framework: Optional[str] = None,
     use_ai: bool = False,
     seen_topics: Optional[List[str]] = None,
+    keyword: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Returns a fresh high-retention comparison idea template or generates a fresh one via AI."""
     import random
 
-    if use_ai:
+    kw_clean = (keyword or "").strip()
+    if use_ai or (kw_clean and not any(kw_clean.lower() in item.get("topic", "").lower() for item in TRENDING_COMPARISON_TEMPLATES)):
         try:
             gen = AIScriptGenerator()
-            return gen.generate_fresh_topic_idea(category=category, framework=framework)
+            return gen.generate_fresh_topic_idea(category=category, framework=framework, keyword=kw_clean)
         except Exception:
             pass
 
     pool = TRENDING_COMPARISON_TEMPLATES
+    if kw_clean:
+        matching = [
+            item for item in pool
+            if kw_clean.lower() in item.get("topic", "").lower()
+            or kw_clean.lower() in item.get("name_a", "").lower()
+            or kw_clean.lower() in item.get("name_b", "").lower()
+        ]
+        if matching:
+            pool = matching
+
     if category and category != "ทั้งหมด (สุ่มทุกหมวด)":
         filtered = [item for item in pool if item.get("category") == category]
         if filtered:
