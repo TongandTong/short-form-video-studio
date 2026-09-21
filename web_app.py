@@ -1599,16 +1599,65 @@ with tab_settings:
     st.markdown("##### 🎭 ตัวละครมาสคอตพิธีกรประจำเพจ (Mascot Host)")
     s_char_mode = st.radio(
         "รูปแบบตัวละครมาสคอตพิธีกร (Mascot):",
-        options=["multi_pose", "builtin"],
-        index=0 if prof.get("default_char_mode", "multi_pose") == "multi_pose" else 1,
+        options=["video_pose", "multi_pose", "builtin"],
+        index={"video_pose": 0, "multi_pose": 1, "builtin": 2}.get(prof.get("default_char_mode", "multi_pose"), 1),
         format_func=lambda x: {
+            "video_pose": "🎬 มาสคอตเคลื่อนไหว MP4/GIF (4 ท่า x ไฟล์วิดีโอ) — เนียนสุดขีด!",
             "multi_pose": "🎨 มาสคอตคัสตอม 8 รูป (4 ท่า x หุบปาก/อ้าปาก) — สำหรับคลิปเนียนระดับโปร",
             "builtin": "✨ มาสคอตระบบ VSIFY Host (ตัวเริ่มต้น)",
         }[x],
         key="set_char_mode",
     )
 
-    if s_char_mode == "multi_pose":
+    if s_char_mode == "video_pose":
+        st.markdown("##### 🎬 อัปโหลดไฟล์มาสคอตเคลื่อนไหว 4 ท่า (MP4 หรือ GIF)")
+        st.caption("💡 **อัปโหลดไฟล์วิดีโอ/GIF ที่มาสคอตขยับได้จริง (พื้นหลังโปร่งใส/เขียว)** ระบบจะดึงเฟรมภาพจากวิดีโอมาซ้อนลงในคลิปให้อัตโนมัติ ท่าละ 1 ไฟล์ รวม 4 ท่า")
+
+        _vid_pose_info = [
+            ("char_video_think", "🤔 ท่าที่ 1: ท่าคิด (Hook เปิดคลิป)", "think"),
+            ("char_video_a", "👈 ท่าที่ 2: ท่าชี้สินค้า A (ซ้าย)", "point_a"),
+            ("char_video_b", "👉 ท่าที่ 3: ท่าชี้สินค้า B (ขวา)", "point_b"),
+            ("char_video_neutral", "🎉 ท่าที่ 4: ท่ายิ้มสรุป (ปิดคลิป)", "neutral"),
+        ]
+
+        for prof_key, label, pose_id in _vid_pose_info:
+            with st.expander(label, expanded=True):
+                cur_vid = prof.get(prof_key, "")
+                if cur_vid and Path(cur_vid).exists():
+                    ext = Path(cur_vid).suffix.lower()
+                    if ext in (".mp4", ".mov", ".webm", ".avi"):
+                        st.video(cur_vid)
+                    elif ext == ".gif":
+                        st.image(cur_vid, width=150)
+                    st.caption(f"📁 ไฟล์ปัจจุบัน: {Path(cur_vid).name}")
+                else:
+                    st.info("ยังไม่มีไฟล์ — อัปโหลดได้เลย")
+
+                up_vid = st.file_uploader(
+                    f"อัปโหลด {label}:",
+                    type=["mp4", "mov", "webm", "avi", "gif"],
+                    key=f"up_vid_{pose_id}",
+                )
+                if up_vid is not None:
+                    save_ext = Path(up_vid.name).suffix.lower() or ".mp4"
+                    save_path = ASSETS_DIR / "images" / f"char_video_{pose_id}{save_ext}"
+                    with open(save_path, "wb") as f:
+                        f.write(up_vid.getbuffer())
+                    prof[prof_key] = str(save_path)
+                    prof["default_char_mode"] = "video_pose"
+                    save_channel_profile(prof)
+                    st.session_state.channel_profile = prof
+                    st.success(f"✅ บันทึก {label} เรียบร้อย!")
+
+        st.markdown("##### 💾 บันทึกการตั้งค่ามาสคอตวิดีโอถาวร")
+        if st.button("💾 บันทึกมาสคอตเคลื่อนไหวทั้ง 4 ท่าไว้ใช้ตลอดไป", type="primary", use_container_width=True, key="btn_save_video_poses"):
+            prof["default_char_mode"] = "video_pose"
+            save_channel_profile(prof)
+            st.session_state.channel_profile = prof
+            st.toast("✅ บันทึกมาสคอตเคลื่อนไหวถาวรเรียบร้อย!")
+            st.rerun()
+
+    elif s_char_mode == "multi_pose":
         st.markdown("##### 📥 อัปโหลดรูปมาสคอตเต็มตัว 8 รูป (4 ท่าทาง x หุบปาก/อ้าปาก)")
         st.caption("💡 **วาดเห็นเต็มตัวตั้งแต่หัวจรดเท้าได้เลยครับ:** ระบบจัดวางให้เท้ายืนบนพื้นสตูดิโอ มีเงามิติที่พื้น และศีรษะอยู่ใต้ซับไตเติลพอดีเป๊ะ พร้อมตัดพื้นหลังโปร่งใสให้อัตโนมัติ")
 

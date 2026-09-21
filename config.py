@@ -183,6 +183,11 @@ DEFAULT_CHANNEL_PROFILE = {
     "default_art_style": "3d_pixar",    # "3d_pixar" | "2d_flat" | "ghibli" | "claymation" | "cyberpunk"
     "default_subtitle_style": "clean_floating",  # "clean_floating" (ไร้กรอบ เหลือแต่ตัวหนังสือ) | "paper_card" (การ์ดสติกเกอร์)
     "default_subtitle_anim": "typewriter",      # "typewriter" (พิมพ์ทีละตัวตามเสียง) | "sentence_pop" (มาทั้งประโยค)
+    # Animated Mascot (MP4/GIF per pose)
+    "char_video_think": "",
+    "char_video_a": "",
+    "char_video_b": "",
+    "char_video_neutral": "",
 }
 
 def load_channel_profile() -> dict:
@@ -239,6 +244,22 @@ def get_active_character_assets(prof: dict = None) -> tuple:
         gp = prof.get("char_gif_path", "")
         if gp and Path(gp).exists():
             return Path(gp), None
+    elif char_mode == "video_pose":
+        # Return paths dict for MP4/GIF per-pose — video_builder extracts frames at render time
+        video_poses = {}
+        mapping = [
+            ("thinking", "char_video_think"),
+            ("point_a", "char_video_a"),
+            ("point_b", "char_video_b"),
+            ("neutral", "char_video_neutral"),
+        ]
+        for pose_key, prof_key in mapping:
+            vp = prof.get(prof_key, "")
+            if vp and Path(vp).exists():
+                video_poses[pose_key] = Path(vp)
+        if video_poses:
+            first_path = list(video_poses.values())[0]
+            return first_path, {"_video_poses": video_poses}
     elif char_mode == "multi_pose":
         poses = {}
         for key, prop in [

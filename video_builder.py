@@ -458,6 +458,84 @@ class VideoBuilder:
             img.thumbnail((max_w, max_h), Image.Resampling.LANCZOS)
             return img
 
+        # 0. If video poses (MP4/GIF per pose) — extract all frames per pose
+        if character_poses and "_video_poses" in character_poses:
+            video_poses_map = character_poses["_video_poses"]
+            poses = {}
+            for pose_name in ["thinking", "point_a", "point_b", "neutral"]:
+                vp = video_poses_map.get(pose_name)
+                if vp and Path(vp).exists():
+                    ext = Path(vp).suffix.lower()
+                    frames = []
+                    if ext in (".mp4", ".mov", ".webm", ".avi"):
+                        try:
+                            import cv2
+                            cap = cv2.VideoCapture(str(vp))
+                            # Sample up to 30 frames for smooth looping animation
+                            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+                            step = max(1, total_frames // 30)
+                            idx = 0
+                            while True:
+                                ret, bgr = cap.read()
+                                if not ret:
+                                    break
+                                if idx % step == 0:
+                                    rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGBA)
+                                    pil_f = Image.fromarray(rgb)
+                                    pil_f = _load_and_resize(pil_f)
+                                    frames.append(pil_f)
+                                idx += 1
+                            cap.release()
+                        except ImportError:
+                            # cv2 not available — try moviepy
+                            try:
+                                from moviepy import VideoFileClip
+                                clip = VideoFileClip(str(vp), has_mask=True)
+                                fps_sample = min(clip.fps, 10)
+                                for t_sec in np.arange(0, clip.duration, 1.0 / fps_sample):
+                                    arr = clip.get_frame(t_sec)
+                                    pil_f = Image.fromarray(arr).convert("RGBA")
+                                    pil_f = _load_and_resize(pil_f)
+                                    frames.append(pil_f)
+                                    if len(frames) >= 30:
+                                        break
+                                clip.close()
+                            except Exception as e2:
+                                print(f"[VideoBuilder] MP4 frame extract fallback error: {e2}")
+                        except Exception as e:
+                            print(f"[VideoBuilder] MP4 frame extract error for {pose_name}: {e}")
+                    elif ext in (".gif",):
+                        try:
+                            gif_im = Image.open(vp)
+                            for f_i in range(getattr(gif_im, "n_frames", 1)):
+                                gif_im.seek(f_i)
+                                f_rgba = gif_im.convert("RGBA")
+                                f_clean = _load_and_resize(f_rgba)
+                                frames.append(f_clean)
+                        except Exception as e:
+                            print(f"[VideoBuilder] GIF frame extract error for {pose_name}: {e}")
+
+                    if frames:
+                        poses[pose_name] = {
+                            "closed": frames[0],
+                            "open": frames[len(frames) // 2] if len(frames) > 1 else frames[0],
+                            "frames": frames,
+                        }
+                    else:
+                        poses[pose_name] = None
+                else:
+                    poses[pose_name] = None
+
+            # Fill missing poses: fallback chain
+            base_pose = poses.get("neutral") or poses.get("thinking") or poses.get("point_a")
+            if not base_pose:
+                base_img = self._generate_sample_character(max_w, max_h)
+                base_pose = {"closed": base_img, "open": base_img}
+            for p in ["thinking", "point_a", "point_b", "neutral"]:
+                if not poses.get(p):
+                    poses[p] = base_pose
+            return poses
+
         # 1. If explicit poses dictionary passed
         if character_poses:
             poses = {}
